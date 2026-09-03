@@ -1,0 +1,1435 @@
+{
+  "players": [
+    {
+      "id": "p1",
+      "nombre": "Álvaro Nieto",
+      "dorsal": 1,
+      "posicion": "POR",
+      "posicion_secundaria": "",
+      "pie": "Derecho",
+      "fecha_nacimiento": "1999-05-11",
+      "nacionalidad": "España",
+      "altura_cm": 188,
+      "peso_kg": 82,
+      "contacto_emergencia": "Rosa Nieto (madre)",
+      "categoria": "Senior",
+      "club_anterior": "CF Puente Alto",
+      "fecha_alta": "2021-07-01",
+      "foto_url": "",
+      "activo": true,
+      "ritmo": 55,
+      "tiro": 30,
+      "pase": 58,
+      "regate": 40,
+      "defensa": 62,
+      "fisico": 70
+    },
+    {
+      "id": "p2",
+      "nombre": "Rubén Castillo",
+      "dorsal": 4,
+      "posicion": "DEF",
+      "posicion_secundaria": "Lateral derecho",
+      "pie": "Derecho",
+      "fecha_nacimiento": "2000-02-20",
+      "nacionalidad": "España",
+      "altura_cm": 180,
+      "peso_kg": 76,
+      "contacto_emergencia": "Laura Castillo (esposa)",
+      "categoria": "Senior",
+      "club_anterior": "UD Montenuevo",
+      "fecha_alta": "2022-08-15",
+      "foto_url": "",
+      "activo": true,
+      "ritmo": 68,
+      "tiro": 45,
+      "pase": 62,
+      "regate": 50,
+      "defensa": 78,
+      "fisico": 74
+    },
+    {
+      "id": "p3",
+      "nombre": "Iker Molina",
+      "dorsal": 6,
+      "posicion": "DEF",
+      "posicion_secundaria": "Central",
+      "pie": "Izquierdo",
+      "fecha_nacimiento": "2001-11-03",
+      "nacionalidad": "España",
+      "altura_cm": 184,
+      "peso_kg": 79,
+      "contacto_emergencia": "Ana Molina (madre)",
+      "categoria": "Senior",
+      "club_anterior": "",
+      "fecha_alta": "2023-01-10",
+      "foto_url": "",
+      "activo": true,
+      "ritmo": 60,
+      "tiro": 35,
+      "pase": 55,
+      "regate": 42,
+      "defensa": 74,
+      "fisico": 71
+    },
+    {
+      "id": "p4",
+      "nombre": "Pablo Serrano",
+      "dorsal": 8,
+      "posicion": "CEN",
+      "posicion_secundaria": "Mediocentro",
+      "pie": "Derecho",
+      "fecha_nacimiento": "2000-06-30",
+      "nacionalidad": "España",
+      "altura_cm": 176,
+      "peso_kg": 70,
+      "contacto_emergencia": "Sergio Serrano (padre)",
+      "categoria": "Senior",
+      "club_anterior": "CF Els Molins",
+      "fecha_alta": "2021-09-01",
+      "foto_url": "",
+      "activo": true,
+      "ritmo": 72,
+      "tiro": 65,
+      "pase": 84,
+      "regate": 70,
+      "defensa": 58,
+      "fisico": 68
+    },
+    {
+      "id": "p5",
+      "nombre": "Diego Prieto",
+      "dorsal": 10,
+      "posicion": "CEN",
+      "posicion_secundaria": "Interior derecho",
+      "pie": "Derecho",
+      "fecha_nacimiento": "2002-03-14",
+      "nacionalidad": "España",
+      "altura_cm": 178,
+      "peso_kg": 74,
+      "contacto_emergencia": "María Prieto (madre)",
+      "categoria": "Senior",
+      "club_anterior": "CF Els Molins",
+      "fecha_alta": "2023-08-01",
+      "foto_url": "",
+      "activo": true,
+      "ritmo": 72,
+      "tiro": 68,
+      "pase": 88,
+      "regate": 75,
+      "defensa": 60,
+      "fisico": 78
+    },
+    {
+      "id": "p6",
+      "nombre": "Hugo Santos",
+      "dorsal": 14,
+      "posicion": "CEN",
+      "posicion_secundaria": "Mediapunta",
+      "pie": "Izquierdo",
+      "fecha_nacimiento": "2001-09-09",
+      "nacionalidad": "España",
+      "altura_cm": 174,
+      "peso_kg": 68,
+      "contacto_emergencia": "Pilar Santos (madre)",
+      "categoria": "Senior",
+      "club_anterior": "",
+      "fecha_alta": "2022-02-01",
+      "foto_url": "",
+      "activo": true,
+      "ritmo": 75,
+      "tiro": 62,
+      "pase": 66,
+      "regate": 71,
+      "defensa": 42,
+      "fisico": 60
+    },
+    {
+      "id": "p7",
+      "nombre": "Jorge Ruiz",
+      "dorsal": 7,
+      "posicion": "DEL",
+      "posicion_secundaria": "Extremo derecho",
+      "pie": "Derecho",
+      "fecha_nacimiento": "1999-12-01",
+      "nacionalidad": "España",
+      "altura_cm": 179,
+      "peso_kg": 73,
+      "contacto_emergencia": "Elena Ruiz (esposa)",
+      "categoria": "Senior",
+      "club_anterior": "At. Bracamonte",
+      "fecha_alta": "2020-07-01",
+      "foto_url": "",
+      "activo": true,
+      "ritmo": 88,
+      "tiro": 82,
+      "pase": 55,
+      "regate": 78,
+      "defensa": 30,
+      "fisico": 72
+    },
+    {
+      "id": "p8",
+      "nombre": "Adrián Lozano",
+      "dorsal": 9,
+      "posicion": "DEL",
+      "posicion_secundaria": "Delantero centro",
+      "pie": "Derecho",
+      "fecha_nacimiento": "2000-04-18",
+      "nacionalidad": "España",
+      "altura_cm": 183,
+      "peso_kg": 78,
+      "contacto_emergencia": "Carmen Lozano (madre)",
+      "categoria": "Senior",
+      "club_anterior": "Real Costa",
+      "fecha_alta": "2021-01-15",
+      "foto_url": "",
+      "activo": true,
+      "ritmo": 76,
+      "tiro": 80,
+      "pase": 52,
+      "regate": 66,
+      "defensa": 28,
+      "fisico": 75
+    },
+    {
+      "id": "p9",
+      "nombre": "Nico Vega",
+      "dorsal": 13,
+      "posicion": "POR",
+      "posicion_secundaria": "",
+      "pie": "Derecho",
+      "fecha_nacimiento": "2003-07-22",
+      "nacionalidad": "España",
+      "altura_cm": 186,
+      "peso_kg": 80,
+      "contacto_emergencia": "Pedro Vega (padre)",
+      "categoria": "Senior",
+      "club_anterior": "",
+      "fecha_alta": "2024-08-01",
+      "foto_url": "",
+      "activo": true,
+      "ritmo": 50,
+      "tiro": 25,
+      "pase": 50,
+      "regate": 35,
+      "defensa": 55,
+      "fisico": 65
+    },
+    {
+      "id": "p10",
+      "nombre": "Marc Ortega",
+      "dorsal": 5,
+      "posicion": "DEF",
+      "posicion_secundaria": "Central",
+      "pie": "Derecho",
+      "fecha_nacimiento": "2002-10-05",
+      "nacionalidad": "España",
+      "altura_cm": 182,
+      "peso_kg": 77,
+      "contacto_emergencia": "Nuria Ortega (madre)",
+      "categoria": "Senior",
+      "club_anterior": "",
+      "fecha_alta": "2023-07-01",
+      "foto_url": "",
+      "activo": true,
+      "ritmo": 62,
+      "tiro": 30,
+      "pase": 58,
+      "regate": 45,
+      "defensa": 76,
+      "fisico": 72
+    }
+  ],
+  "staff": [
+    {
+      "id": "s1",
+      "nombre": "Marcos Vidal",
+      "rol": "Entrenador principal",
+      "licencia": "UEFA Pro",
+      "fecha_alta": "2022",
+      "foto_url": ""
+    },
+    {
+      "id": "s2",
+      "nombre": "Elena Roig",
+      "rol": "2ª entrenadora · Porteros",
+      "licencia": "UEFA B",
+      "fecha_alta": "2023",
+      "foto_url": ""
+    },
+    {
+      "id": "s3",
+      "nombre": "Iván Bautista",
+      "rol": "Preparador físico",
+      "licencia": "Grado en CAFyD",
+      "fecha_alta": "2022",
+      "foto_url": ""
+    },
+    {
+      "id": "s4",
+      "nombre": "Clara Muñoz",
+      "rol": "Fisioterapeuta",
+      "licencia": "Fisioterapia deportiva",
+      "fecha_alta": "2024",
+      "foto_url": ""
+    },
+    {
+      "id": "s5",
+      "nombre": "Tomás Ferrer",
+      "rol": "Delegado de equipo",
+      "licencia": "Logística y viajes",
+      "fecha_alta": "2021",
+      "foto_url": ""
+    }
+  ],
+  "sessions": [
+    {
+      "id": "se1",
+      "fecha": "2026-09-01",
+      "hora": "18:30",
+      "tipo": "entrenamiento",
+      "lugar": "Campo Municipal La Ribera",
+      "match_id": ""
+    },
+    {
+      "id": "se2",
+      "fecha": "2026-09-03",
+      "hora": "18:30",
+      "tipo": "entrenamiento",
+      "lugar": "Campo Municipal La Ribera",
+      "match_id": ""
+    },
+    {
+      "id": "se3",
+      "fecha": "2026-09-08",
+      "hora": "18:30",
+      "tipo": "entrenamiento",
+      "lugar": "Campo Municipal La Ribera",
+      "match_id": ""
+    },
+    {
+      "id": "se4",
+      "fecha": "2026-09-10",
+      "hora": "18:30",
+      "tipo": "entrenamiento",
+      "lugar": "Campo Municipal La Ribera",
+      "match_id": ""
+    },
+    {
+      "id": "se5",
+      "fecha": "2026-09-15",
+      "hora": "18:30",
+      "tipo": "entrenamiento",
+      "lugar": "Campo Municipal La Ribera",
+      "match_id": ""
+    },
+    {
+      "id": "se6",
+      "fecha": "2026-09-17",
+      "hora": "18:30",
+      "tipo": "entrenamiento",
+      "lugar": "Campo Municipal La Ribera",
+      "match_id": ""
+    },
+    {
+      "id": "se7",
+      "fecha": "2026-09-22",
+      "hora": "18:30",
+      "tipo": "entrenamiento",
+      "lugar": "Campo Municipal La Ribera",
+      "match_id": ""
+    },
+    {
+      "id": "se8",
+      "fecha": "2026-09-24",
+      "hora": "18:30",
+      "tipo": "entrenamiento",
+      "lugar": "Campo Municipal La Ribera",
+      "match_id": ""
+    },
+    {
+      "id": "se9",
+      "fecha": "2026-08-07",
+      "hora": "18:00",
+      "tipo": "partido",
+      "lugar": "Campo Municipal La Ribera",
+      "match_id": "m1"
+    },
+    {
+      "id": "se10",
+      "fecha": "2026-08-14",
+      "hora": "17:00",
+      "tipo": "partido",
+      "lugar": "Campo Real Costa",
+      "match_id": "m2"
+    },
+    {
+      "id": "se11",
+      "fecha": "2026-08-21",
+      "hora": "18:00",
+      "tipo": "partido",
+      "lugar": "Campo Municipal La Ribera",
+      "match_id": "m3"
+    },
+    {
+      "id": "se12",
+      "fecha": "2026-08-31",
+      "hora": "12:00",
+      "tipo": "partido",
+      "lugar": "Campo Juvenil Norte",
+      "match_id": "m4"
+    },
+    {
+      "id": "se13",
+      "fecha": "2026-09-07",
+      "hora": "18:30",
+      "tipo": "partido",
+      "lugar": "Campo Municipal La Ribera",
+      "match_id": "m5"
+    },
+    {
+      "id": "se14",
+      "fecha": "2026-09-14",
+      "hora": "17:30",
+      "tipo": "partido",
+      "lugar": "Campo Municipal La Ribera",
+      "match_id": "m6"
+    }
+  ],
+  "attendance": [
+    {
+      "id": "at1",
+      "session_id": "se1",
+      "player_id": "p1",
+      "estado": "presente"
+    },
+    {
+      "id": "at2",
+      "session_id": "se1",
+      "player_id": "p2",
+      "estado": "presente"
+    },
+    {
+      "id": "at3",
+      "session_id": "se1",
+      "player_id": "p3",
+      "estado": "presente"
+    },
+    {
+      "id": "at4",
+      "session_id": "se1",
+      "player_id": "p4",
+      "estado": "justificado"
+    },
+    {
+      "id": "at5",
+      "session_id": "se1",
+      "player_id": "p5",
+      "estado": "presente"
+    },
+    {
+      "id": "at6",
+      "session_id": "se1",
+      "player_id": "p6",
+      "estado": "presente"
+    },
+    {
+      "id": "at7",
+      "session_id": "se1",
+      "player_id": "p7",
+      "estado": "ausente"
+    },
+    {
+      "id": "at8",
+      "session_id": "se1",
+      "player_id": "p8",
+      "estado": "presente"
+    },
+    {
+      "id": "at9",
+      "session_id": "se1",
+      "player_id": "p9",
+      "estado": "presente"
+    },
+    {
+      "id": "at10",
+      "session_id": "se1",
+      "player_id": "p10",
+      "estado": "presente"
+    },
+    {
+      "id": "at11",
+      "session_id": "se2",
+      "player_id": "p1",
+      "estado": "presente"
+    },
+    {
+      "id": "at12",
+      "session_id": "se2",
+      "player_id": "p2",
+      "estado": "presente"
+    },
+    {
+      "id": "at13",
+      "session_id": "se2",
+      "player_id": "p3",
+      "estado": "presente"
+    },
+    {
+      "id": "at14",
+      "session_id": "se2",
+      "player_id": "p4",
+      "estado": "presente"
+    },
+    {
+      "id": "at15",
+      "session_id": "se2",
+      "player_id": "p5",
+      "estado": "justificado"
+    },
+    {
+      "id": "at16",
+      "session_id": "se2",
+      "player_id": "p6",
+      "estado": "presente"
+    },
+    {
+      "id": "at17",
+      "session_id": "se2",
+      "player_id": "p7",
+      "estado": "presente"
+    },
+    {
+      "id": "at18",
+      "session_id": "se2",
+      "player_id": "p8",
+      "estado": "ausente"
+    },
+    {
+      "id": "at19",
+      "session_id": "se2",
+      "player_id": "p9",
+      "estado": "presente"
+    },
+    {
+      "id": "at20",
+      "session_id": "se2",
+      "player_id": "p10",
+      "estado": "presente"
+    },
+    {
+      "id": "at21",
+      "session_id": "se3",
+      "player_id": "p1",
+      "estado": "presente"
+    },
+    {
+      "id": "at22",
+      "session_id": "se3",
+      "player_id": "p2",
+      "estado": "presente"
+    },
+    {
+      "id": "at23",
+      "session_id": "se3",
+      "player_id": "p3",
+      "estado": "presente"
+    },
+    {
+      "id": "at24",
+      "session_id": "se3",
+      "player_id": "p4",
+      "estado": "presente"
+    },
+    {
+      "id": "at25",
+      "session_id": "se3",
+      "player_id": "p5",
+      "estado": "presente"
+    },
+    {
+      "id": "at26",
+      "session_id": "se3",
+      "player_id": "p6",
+      "estado": "justificado"
+    },
+    {
+      "id": "at27",
+      "session_id": "se3",
+      "player_id": "p7",
+      "estado": "presente"
+    },
+    {
+      "id": "at28",
+      "session_id": "se3",
+      "player_id": "p8",
+      "estado": "presente"
+    },
+    {
+      "id": "at29",
+      "session_id": "se3",
+      "player_id": "p9",
+      "estado": "ausente"
+    },
+    {
+      "id": "at30",
+      "session_id": "se3",
+      "player_id": "p10",
+      "estado": "presente"
+    },
+    {
+      "id": "at31",
+      "session_id": "se4",
+      "player_id": "p1",
+      "estado": "presente"
+    },
+    {
+      "id": "at32",
+      "session_id": "se4",
+      "player_id": "p2",
+      "estado": "presente"
+    },
+    {
+      "id": "at33",
+      "session_id": "se4",
+      "player_id": "p3",
+      "estado": "presente"
+    },
+    {
+      "id": "at34",
+      "session_id": "se4",
+      "player_id": "p4",
+      "estado": "presente"
+    },
+    {
+      "id": "at35",
+      "session_id": "se4",
+      "player_id": "p5",
+      "estado": "presente"
+    },
+    {
+      "id": "at36",
+      "session_id": "se4",
+      "player_id": "p6",
+      "estado": "presente"
+    },
+    {
+      "id": "at37",
+      "session_id": "se4",
+      "player_id": "p7",
+      "estado": "justificado"
+    },
+    {
+      "id": "at38",
+      "session_id": "se4",
+      "player_id": "p8",
+      "estado": "presente"
+    },
+    {
+      "id": "at39",
+      "session_id": "se4",
+      "player_id": "p9",
+      "estado": "presente"
+    },
+    {
+      "id": "at40",
+      "session_id": "se4",
+      "player_id": "p10",
+      "estado": "ausente"
+    },
+    {
+      "id": "at41",
+      "session_id": "se9",
+      "player_id": "p1",
+      "estado": "ausente"
+    },
+    {
+      "id": "at42",
+      "session_id": "se9",
+      "player_id": "p2",
+      "estado": "presente"
+    },
+    {
+      "id": "at43",
+      "session_id": "se9",
+      "player_id": "p3",
+      "estado": "presente"
+    },
+    {
+      "id": "at44",
+      "session_id": "se9",
+      "player_id": "p4",
+      "estado": "presente"
+    },
+    {
+      "id": "at45",
+      "session_id": "se9",
+      "player_id": "p5",
+      "estado": "presente"
+    },
+    {
+      "id": "at46",
+      "session_id": "se9",
+      "player_id": "p6",
+      "estado": "presente"
+    },
+    {
+      "id": "at47",
+      "session_id": "se9",
+      "player_id": "p7",
+      "estado": "presente"
+    },
+    {
+      "id": "at48",
+      "session_id": "se9",
+      "player_id": "p8",
+      "estado": "justificado"
+    },
+    {
+      "id": "at49",
+      "session_id": "se9",
+      "player_id": "p9",
+      "estado": "presente"
+    },
+    {
+      "id": "at50",
+      "session_id": "se9",
+      "player_id": "p10",
+      "estado": "presente"
+    },
+    {
+      "id": "at51",
+      "session_id": "se10",
+      "player_id": "p1",
+      "estado": "presente"
+    },
+    {
+      "id": "at52",
+      "session_id": "se10",
+      "player_id": "p2",
+      "estado": "ausente"
+    },
+    {
+      "id": "at53",
+      "session_id": "se10",
+      "player_id": "p3",
+      "estado": "presente"
+    },
+    {
+      "id": "at54",
+      "session_id": "se10",
+      "player_id": "p4",
+      "estado": "presente"
+    },
+    {
+      "id": "at55",
+      "session_id": "se10",
+      "player_id": "p5",
+      "estado": "presente"
+    },
+    {
+      "id": "at56",
+      "session_id": "se10",
+      "player_id": "p6",
+      "estado": "presente"
+    },
+    {
+      "id": "at57",
+      "session_id": "se10",
+      "player_id": "p7",
+      "estado": "presente"
+    },
+    {
+      "id": "at58",
+      "session_id": "se10",
+      "player_id": "p8",
+      "estado": "presente"
+    },
+    {
+      "id": "at59",
+      "session_id": "se10",
+      "player_id": "p9",
+      "estado": "justificado"
+    },
+    {
+      "id": "at60",
+      "session_id": "se10",
+      "player_id": "p10",
+      "estado": "presente"
+    },
+    {
+      "id": "at61",
+      "session_id": "se11",
+      "player_id": "p1",
+      "estado": "presente"
+    },
+    {
+      "id": "at62",
+      "session_id": "se11",
+      "player_id": "p2",
+      "estado": "presente"
+    },
+    {
+      "id": "at63",
+      "session_id": "se11",
+      "player_id": "p3",
+      "estado": "ausente"
+    },
+    {
+      "id": "at64",
+      "session_id": "se11",
+      "player_id": "p4",
+      "estado": "presente"
+    },
+    {
+      "id": "at65",
+      "session_id": "se11",
+      "player_id": "p5",
+      "estado": "presente"
+    },
+    {
+      "id": "at66",
+      "session_id": "se11",
+      "player_id": "p6",
+      "estado": "presente"
+    },
+    {
+      "id": "at67",
+      "session_id": "se11",
+      "player_id": "p7",
+      "estado": "presente"
+    },
+    {
+      "id": "at68",
+      "session_id": "se11",
+      "player_id": "p8",
+      "estado": "presente"
+    },
+    {
+      "id": "at69",
+      "session_id": "se11",
+      "player_id": "p9",
+      "estado": "presente"
+    },
+    {
+      "id": "at70",
+      "session_id": "se11",
+      "player_id": "p10",
+      "estado": "justificado"
+    },
+    {
+      "id": "at71",
+      "session_id": "se12",
+      "player_id": "p1",
+      "estado": "justificado"
+    },
+    {
+      "id": "at72",
+      "session_id": "se12",
+      "player_id": "p2",
+      "estado": "presente"
+    },
+    {
+      "id": "at73",
+      "session_id": "se12",
+      "player_id": "p3",
+      "estado": "presente"
+    },
+    {
+      "id": "at74",
+      "session_id": "se12",
+      "player_id": "p4",
+      "estado": "ausente"
+    },
+    {
+      "id": "at75",
+      "session_id": "se12",
+      "player_id": "p5",
+      "estado": "presente"
+    },
+    {
+      "id": "at76",
+      "session_id": "se12",
+      "player_id": "p6",
+      "estado": "presente"
+    },
+    {
+      "id": "at77",
+      "session_id": "se12",
+      "player_id": "p7",
+      "estado": "presente"
+    },
+    {
+      "id": "at78",
+      "session_id": "se12",
+      "player_id": "p8",
+      "estado": "presente"
+    },
+    {
+      "id": "at79",
+      "session_id": "se12",
+      "player_id": "p9",
+      "estado": "presente"
+    },
+    {
+      "id": "at80",
+      "session_id": "se12",
+      "player_id": "p10",
+      "estado": "presente"
+    },
+    {
+      "id": "at81",
+      "session_id": "se13",
+      "player_id": "p1",
+      "estado": "presente"
+    },
+    {
+      "id": "at82",
+      "session_id": "se13",
+      "player_id": "p2",
+      "estado": "justificado"
+    },
+    {
+      "id": "at83",
+      "session_id": "se13",
+      "player_id": "p3",
+      "estado": "presente"
+    },
+    {
+      "id": "at84",
+      "session_id": "se13",
+      "player_id": "p4",
+      "estado": "presente"
+    },
+    {
+      "id": "at85",
+      "session_id": "se13",
+      "player_id": "p5",
+      "estado": "ausente"
+    },
+    {
+      "id": "at86",
+      "session_id": "se13",
+      "player_id": "p6",
+      "estado": "presente"
+    },
+    {
+      "id": "at87",
+      "session_id": "se13",
+      "player_id": "p7",
+      "estado": "presente"
+    },
+    {
+      "id": "at88",
+      "session_id": "se13",
+      "player_id": "p8",
+      "estado": "presente"
+    },
+    {
+      "id": "at89",
+      "session_id": "se13",
+      "player_id": "p9",
+      "estado": "presente"
+    },
+    {
+      "id": "at90",
+      "session_id": "se13",
+      "player_id": "p10",
+      "estado": "presente"
+    }
+  ],
+  "matches": [
+    {
+      "id": "m1",
+      "fecha": "2026-08-07",
+      "hora": "18:00",
+      "rival": "Atlético Sur",
+      "condicion": "local",
+      "lugar": "Campo Municipal La Ribera",
+      "jornada": 9,
+      "goles_favor": 4,
+      "goles_contra": 1,
+      "jugado": true
+    },
+    {
+      "id": "m2",
+      "fecha": "2026-08-14",
+      "hora": "17:00",
+      "rival": "Real Costa",
+      "condicion": "visitante",
+      "lugar": "Campo Real Costa",
+      "jornada": 10,
+      "goles_favor": 0,
+      "goles_contra": 0,
+      "jugado": true
+    },
+    {
+      "id": "m3",
+      "fecha": "2026-08-21",
+      "hora": "18:00",
+      "rival": "Deportivo Alta",
+      "condicion": "local",
+      "lugar": "Campo Municipal La Ribera",
+      "jornada": 11,
+      "goles_favor": 3,
+      "goles_contra": 1,
+      "jugado": true
+    },
+    {
+      "id": "m4",
+      "fecha": "2026-08-31",
+      "hora": "12:00",
+      "rival": "Juvenil Norte",
+      "condicion": "visitante",
+      "lugar": "Campo Juvenil Norte",
+      "jornada": 12,
+      "goles_favor": 2,
+      "goles_contra": 2,
+      "jugado": true
+    },
+    {
+      "id": "m5",
+      "fecha": "2026-09-07",
+      "hora": "18:30",
+      "rival": "CF Miralba",
+      "condicion": "local",
+      "lugar": "Campo Municipal La Ribera",
+      "jornada": 13,
+      "goles_favor": 2,
+      "goles_contra": 0,
+      "jugado": true
+    },
+    {
+      "id": "m6",
+      "fecha": "2026-09-14",
+      "hora": "17:30",
+      "rival": "At. Bracamonte",
+      "condicion": "local",
+      "lugar": "Campo Municipal La Ribera",
+      "jornada": 14,
+      "goles_favor": null,
+      "goles_contra": null,
+      "jugado": false
+    }
+  ],
+  "matchEvents": [
+    {
+      "id": "e1",
+      "match_id": "m1",
+      "player_id": "p7",
+      "tipo": "gol"
+    },
+    {
+      "id": "e2",
+      "match_id": "m1",
+      "player_id": "p7",
+      "tipo": "gol"
+    },
+    {
+      "id": "e3",
+      "match_id": "m1",
+      "player_id": "p7",
+      "tipo": "gol"
+    },
+    {
+      "id": "e4",
+      "match_id": "m1",
+      "player_id": "p8",
+      "tipo": "gol"
+    },
+    {
+      "id": "e5",
+      "match_id": "m1",
+      "player_id": "p5",
+      "tipo": "asistencia"
+    },
+    {
+      "id": "e6",
+      "match_id": "m1",
+      "player_id": "p4",
+      "tipo": "asistencia"
+    },
+    {
+      "id": "e7",
+      "match_id": "m1",
+      "player_id": "p10",
+      "tipo": "amarilla"
+    },
+    {
+      "id": "e8",
+      "match_id": "m3",
+      "player_id": "p7",
+      "tipo": "gol"
+    },
+    {
+      "id": "e9",
+      "match_id": "m3",
+      "player_id": "p5",
+      "tipo": "gol"
+    },
+    {
+      "id": "e10",
+      "match_id": "m3",
+      "player_id": "p4",
+      "tipo": "gol"
+    },
+    {
+      "id": "e11",
+      "match_id": "m3",
+      "player_id": "p4",
+      "tipo": "asistencia"
+    },
+    {
+      "id": "e12",
+      "match_id": "m3",
+      "player_id": "p5",
+      "tipo": "asistencia"
+    },
+    {
+      "id": "e13",
+      "match_id": "m3",
+      "player_id": "p2",
+      "tipo": "amarilla"
+    },
+    {
+      "id": "e14",
+      "match_id": "m4",
+      "player_id": "p5",
+      "tipo": "gol"
+    },
+    {
+      "id": "e15",
+      "match_id": "m4",
+      "player_id": "p5",
+      "tipo": "gol"
+    },
+    {
+      "id": "e16",
+      "match_id": "m4",
+      "player_id": "p6",
+      "tipo": "amarilla"
+    },
+    {
+      "id": "e17",
+      "match_id": "m5",
+      "player_id": "p7",
+      "tipo": "gol"
+    },
+    {
+      "id": "e18",
+      "match_id": "m5",
+      "player_id": "p5",
+      "tipo": "gol"
+    },
+    {
+      "id": "e19",
+      "match_id": "m5",
+      "player_id": "p8",
+      "tipo": "asistencia"
+    }
+  ],
+  "matchAppearances": [
+    {
+      "id": "ma1",
+      "match_id": "m1",
+      "player_id": "p1",
+      "minutos": 90,
+      "valoracion": 7.4
+    },
+    {
+      "id": "ma2",
+      "match_id": "m2",
+      "player_id": "p1",
+      "minutos": 90,
+      "valoracion": 7
+    },
+    {
+      "id": "ma3",
+      "match_id": "m3",
+      "player_id": "p1",
+      "minutos": 90,
+      "valoracion": 7.6
+    },
+    {
+      "id": "ma4",
+      "match_id": "m4",
+      "player_id": "p1",
+      "minutos": 90,
+      "valoracion": 7.1
+    },
+    {
+      "id": "ma5",
+      "match_id": "m5",
+      "player_id": "p1",
+      "minutos": 90,
+      "valoracion": 7.8
+    },
+    {
+      "id": "ma6",
+      "match_id": "m1",
+      "player_id": "p2",
+      "minutos": 90,
+      "valoracion": 7
+    },
+    {
+      "id": "ma7",
+      "match_id": "m2",
+      "player_id": "p2",
+      "minutos": 90,
+      "valoracion": 6.8
+    },
+    {
+      "id": "ma8",
+      "match_id": "m3",
+      "player_id": "p2",
+      "minutos": 90,
+      "valoracion": 7.5
+    },
+    {
+      "id": "ma9",
+      "match_id": "m4",
+      "player_id": "p2",
+      "minutos": 90,
+      "valoracion": 7.2
+    },
+    {
+      "id": "ma10",
+      "match_id": "m5",
+      "player_id": "p2",
+      "minutos": 90,
+      "valoracion": 7.6
+    },
+    {
+      "id": "ma11",
+      "match_id": "m1",
+      "player_id": "p3",
+      "minutos": 80,
+      "valoracion": 6.9
+    },
+    {
+      "id": "ma12",
+      "match_id": "m2",
+      "player_id": "p3",
+      "minutos": 90,
+      "valoracion": 7.1
+    },
+    {
+      "id": "ma13",
+      "match_id": "m3",
+      "player_id": "p3",
+      "minutos": 90,
+      "valoracion": 7.3
+    },
+    {
+      "id": "ma14",
+      "match_id": "m5",
+      "player_id": "p3",
+      "minutos": 90,
+      "valoracion": 7
+    },
+    {
+      "id": "ma15",
+      "match_id": "m1",
+      "player_id": "p4",
+      "minutos": 90,
+      "valoracion": 7.6
+    },
+    {
+      "id": "ma16",
+      "match_id": "m2",
+      "player_id": "p4",
+      "minutos": 90,
+      "valoracion": 7.2
+    },
+    {
+      "id": "ma17",
+      "match_id": "m3",
+      "player_id": "p4",
+      "minutos": 90,
+      "valoracion": 8.2
+    },
+    {
+      "id": "ma18",
+      "match_id": "m4",
+      "player_id": "p4",
+      "minutos": 90,
+      "valoracion": 7.4
+    },
+    {
+      "id": "ma19",
+      "match_id": "m5",
+      "player_id": "p4",
+      "minutos": 85,
+      "valoracion": 7.9
+    },
+    {
+      "id": "ma20",
+      "match_id": "m1",
+      "player_id": "p5",
+      "minutos": 90,
+      "valoracion": 7.2
+    },
+    {
+      "id": "ma21",
+      "match_id": "m2",
+      "player_id": "p5",
+      "minutos": 85,
+      "valoracion": 7.8
+    },
+    {
+      "id": "ma22",
+      "match_id": "m3",
+      "player_id": "p5",
+      "minutos": 90,
+      "valoracion": 8.5
+    },
+    {
+      "id": "ma23",
+      "match_id": "m4",
+      "player_id": "p5",
+      "minutos": 90,
+      "valoracion": 7.9
+    },
+    {
+      "id": "ma24",
+      "match_id": "m5",
+      "player_id": "p5",
+      "minutos": 85,
+      "valoracion": 8.8
+    },
+    {
+      "id": "ma25",
+      "match_id": "m1",
+      "player_id": "p6",
+      "minutos": 70,
+      "valoracion": 7
+    },
+    {
+      "id": "ma26",
+      "match_id": "m2",
+      "player_id": "p6",
+      "minutos": 60,
+      "valoracion": 6.7
+    },
+    {
+      "id": "ma27",
+      "match_id": "m3",
+      "player_id": "p6",
+      "minutos": 75,
+      "valoracion": 7.1
+    },
+    {
+      "id": "ma28",
+      "match_id": "m4",
+      "player_id": "p6",
+      "minutos": 90,
+      "valoracion": 6.8
+    },
+    {
+      "id": "ma29",
+      "match_id": "m5",
+      "player_id": "p6",
+      "minutos": 65,
+      "valoracion": 7.2
+    },
+    {
+      "id": "ma30",
+      "match_id": "m1",
+      "player_id": "p7",
+      "minutos": 90,
+      "valoracion": 9.2
+    },
+    {
+      "id": "ma31",
+      "match_id": "m2",
+      "player_id": "p7",
+      "minutos": 90,
+      "valoracion": 6.9
+    },
+    {
+      "id": "ma32",
+      "match_id": "m3",
+      "player_id": "p7",
+      "minutos": 90,
+      "valoracion": 8.4
+    },
+    {
+      "id": "ma33",
+      "match_id": "m4",
+      "player_id": "p7",
+      "minutos": 90,
+      "valoracion": 7
+    },
+    {
+      "id": "ma34",
+      "match_id": "m5",
+      "player_id": "p7",
+      "minutos": 90,
+      "valoracion": 8.6
+    },
+    {
+      "id": "ma35",
+      "match_id": "m1",
+      "player_id": "p8",
+      "minutos": 85,
+      "valoracion": 8.3
+    },
+    {
+      "id": "ma36",
+      "match_id": "m2",
+      "player_id": "p8",
+      "minutos": 75,
+      "valoracion": 6.8
+    },
+    {
+      "id": "ma37",
+      "match_id": "m3",
+      "player_id": "p8",
+      "minutos": 80,
+      "valoracion": 7
+    },
+    {
+      "id": "ma38",
+      "match_id": "m4",
+      "player_id": "p8",
+      "minutos": 70,
+      "valoracion": 6.9
+    },
+    {
+      "id": "ma39",
+      "match_id": "m5",
+      "player_id": "p8",
+      "minutos": 90,
+      "valoracion": 7.9
+    },
+    {
+      "id": "ma40",
+      "match_id": "m1",
+      "player_id": "p10",
+      "minutos": 90,
+      "valoracion": 7.1
+    },
+    {
+      "id": "ma41",
+      "match_id": "m2",
+      "player_id": "p10",
+      "minutos": 90,
+      "valoracion": 6.9
+    },
+    {
+      "id": "ma42",
+      "match_id": "m4",
+      "player_id": "p10",
+      "minutos": 90,
+      "valoracion": 7.3
+    },
+    {
+      "id": "ma43",
+      "match_id": "m5",
+      "player_id": "p10",
+      "minutos": 90,
+      "valoracion": 7.4
+    }
+  ]
+}
