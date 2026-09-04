@@ -1,4 +1,9 @@
 {
+  "settings": {
+    "club_nombre": "CD Ribera",
+    "entrenador_nombre": "Marcos Vidal",
+    "entrenador_rol": "Entrenador"
+  },
   "players": [
     {
       "id": "p1",

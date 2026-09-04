@@ -19,6 +19,10 @@
   let sortKey = 'goles';
   let sortDir = -1;
 
+  SM.sidebar.onSettingsClick(function () {
+    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = data; });
+  });
+
   function render() {
     const rows = SM.stats.fullStatsTable(DATA);
     const scorers = SM.stats.topScorers(DATA, 6);
@@ -119,6 +123,7 @@
 
   SM.api.fetchAll().then(function (data) {
     DATA = data;
+    SM.sidebar.applySettings(data.settings);
     render();
   }).catch(function (err) {
     main.innerHTML = '<div class="empty-state">' + err.message + '</div>';

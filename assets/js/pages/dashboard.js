@@ -4,6 +4,11 @@
   const shell = document.getElementById('app-shell');
   SM.sidebar.mount(shell, 'inicio');
   const main = document.getElementById('main');
+  let DATA = null;
+
+  SM.sidebar.onSettingsClick(function () {
+    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = data; render(data); });
+  });
 
   const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
   const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -38,6 +43,9 @@
   }
 
   function render(data) {
+    const settings = data.settings || SM.sidebar.DEFAULT_SETTINGS;
+    const clubName = settings.club_nombre;
+    const coachFirstName = (settings.entrenador_nombre || '').split(/\s+/)[0] || 'Entrenador/a';
     const kpis = SM.stats.teamKpis(data);
     const nextMatch = kpis.nextMatch;
     const upcomingTrainings = SM.stats.upcomingSessions(data, { tipo: 'entrenamiento', n: 3 });
@@ -49,7 +57,7 @@
 
     main.innerHTML =
       '<div class="page-header">' +
-        '<div><div class="page-title">Hola, Marcos</div><div class="page-subtitle">' + todayHeader() + '</div></div>' +
+        '<div><div class="page-title">Hola, ' + SM.ui.escapeHtml(coachFirstName) + '</div><div class="page-subtitle">' + todayHeader() + '</div></div>' +
         '<div style="display:flex;align-items:center;gap:14px;">' +
           '<div class="badge" style="background:var(--panel);border:1px solid var(--border-soft);color:var(--text-dim);">Liga Regional · Grupo B</div>' +
         '</div>' +
@@ -67,7 +75,7 @@
       '</div>' +
 
       '<div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;">' +
-        heroMatchCard(nextMatch) +
+        heroMatchCard(nextMatch, clubName) +
         trainingsCard(upcomingTrainings) +
       '</div>' +
 
@@ -95,7 +103,7 @@
       '</div>';
   }
 
-  function heroMatchCard(match) {
+  function heroMatchCard(match, clubName) {
     if (!match) {
       return (
         '<div class="panel center" style="flex-direction:column;gap:14px;padding:40px;">' +
@@ -106,7 +114,7 @@
       );
     }
     const days = Math.max(0, daysUntil(match.fecha));
-    const rivalInitials = match.rival.split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 3).toUpperCase();
+    const rivalInitials = SM.ui.clubInitials(match.rival);
     const local = match.condicion === 'local';
     return (
       '<div class="panel" style="padding:26px 30px;">' +
@@ -118,8 +126,8 @@
         '</div>' +
         '<div style="display:flex;align-items:center;justify-content:center;gap:42px;">' +
           '<div style="display:flex;flex-direction:column;align-items:center;gap:10px;width:150px;">' +
-            '<div style="width:64px;height:64px;border-radius:50%;background:var(--panel-2);border:1.5px solid oklch(0.80 0.19 150 / 0.5);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:16px;color:var(--green);box-shadow:0 0 20px oklch(0.80 0.19 150 / 0.25);">CDR</div>' +
-            '<span style="font-size:15px;font-weight:700;color:var(--text);">CD Ribera</span>' +
+            '<div style="width:64px;height:64px;border-radius:50%;background:var(--panel-2);border:1.5px solid oklch(0.80 0.19 150 / 0.5);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:16px;color:var(--green);box-shadow:0 0 20px oklch(0.80 0.19 150 / 0.25);">' + SM.ui.clubInitials(clubName) + '</div>' +
+            '<span style="font-size:15px;font-weight:700;color:var(--text);">' + SM.ui.escapeHtml(clubName) + '</span>' +
           '</div>' +
           '<div style="font-family:var(--font-display);font-weight:900;font-size:20px;color:var(--text-ghost);">VS</div>' +
           '<div style="display:flex;flex-direction:column;align-items:center;gap:10px;width:150px;">' +
@@ -178,7 +186,11 @@
     );
   }
 
-  SM.api.fetchAll().then(render).catch(function (err) {
+  SM.api.fetchAll().then(function (data) {
+    DATA = data;
+    SM.sidebar.applySettings(data.settings);
+    render(data);
+  }).catch(function (err) {
     main.innerHTML = '<div class="empty-state">' + err.message + '</div>';
   });
 })();

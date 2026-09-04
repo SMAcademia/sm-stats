@@ -19,13 +19,18 @@ SM.sidebar = (function () {
     { key: 'estadisticas', label: 'Estadísticas', href: 'estadisticas.html' }
   ];
 
+  // Shown until the real Settings row loads from Sheets (or in demo mode,
+  // overwritten immediately by the bundled sample data).
+  const DEFAULT_SETTINGS = { club_nombre: 'CD Ribera', entrenador_nombre: 'Marcos Vidal', entrenador_rol: 'Entrenador' };
+
   function icon(key, size) {
     return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" ' +
       'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
       ICONS[key] + '</svg>';
   }
 
-  function render(activeKey) {
+  function render(activeKey, settings) {
+    const s = Object.assign({}, DEFAULT_SETTINGS, settings);
     const nav = ITEMS.map(function (item) {
       return '<a class="nav-item' + (item.key === activeKey ? ' active' : '') + '" href="' + item.href + '">' +
         icon(item.key, 19) + '<span>' + item.label + '</span></a>';
@@ -37,19 +42,27 @@ SM.sidebar = (function () {
           '<div class="sidebar-mark"><span>SM</span></div>' +
           '<div class="sidebar-brand-text">' +
             '<span class="name">SM STATS</span>' +
-            '<span class="club">CD Ribera</span>' +
+            '<span class="club" id="sidebar-club-name">' + SM.ui.escapeHtml(s.club_nombre) + '</span>' +
           '</div>' +
         '</div>' +
         '<div class="sidebar-rule"></div>' +
         '<nav class="sidebar-nav">' + nav + '</nav>' +
         '<div class="sidebar-footer">' +
           '<div class="sidebar-rule" style="margin:0 0 16px 0;"></div>' +
-          '<div class="sidebar-user">' +
-            '<div class="sidebar-user-avatar">MV</div>' +
-            '<div class="sidebar-user-text">' +
-              '<span class="name">Marcos Vidal</span>' +
-              '<span class="role">Entrenador</span>' +
+          '<div style="display:flex;align-items:center;gap:6px;">' +
+            '<div class="sidebar-user" style="flex:1 1 auto;min-width:0;">' +
+              '<div class="sidebar-user-avatar" id="sidebar-user-avatar">' + SM.ui.initials(s.entrenador_nombre) + '</div>' +
+              '<div class="sidebar-user-text" style="min-width:0;overflow:hidden;">' +
+                '<span class="name" id="sidebar-user-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">' + SM.ui.escapeHtml(s.entrenador_nombre) + '</span>' +
+                '<span class="role" id="sidebar-user-role">' + SM.ui.escapeHtml(s.entrenador_rol) + '</span>' +
+              '</div>' +
             '</div>' +
+            '<button id="sidebar-settings-btn" type="button" title="Configuración del club" ' +
+              'style="flex:none;width:30px;height:30px;border-radius:8px;background:transparent;border:1px solid transparent;color:var(--text-mute);cursor:pointer;display:flex;align-items:center;justify-content:center;">' +
+              '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+                '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>' +
+              '</svg>' +
+            '</button>' +
           '</div>' +
         '</div>' +
       '</aside>'
@@ -59,7 +72,32 @@ SM.sidebar = (function () {
   // Injects the sidebar as the first child of the given shell element.
   function mount(shellEl, activeKey) {
     shellEl.insertAdjacentHTML('afterbegin', render(activeKey));
+    const btn = document.getElementById('sidebar-settings-btn');
+    if (btn) {
+      btn.addEventListener('mouseenter', function () { btn.style.background = 'var(--panel-2)'; btn.style.color = 'var(--text)'; });
+      btn.addEventListener('mouseleave', function () { btn.style.background = 'transparent'; btn.style.color = 'var(--text-mute)'; });
+    }
   }
 
-  return { render: render, mount: mount };
+  // Call once real settings have loaded (from Sheets or the demo dataset)
+  // to replace the placeholder club/coach text painted at mount time.
+  function applySettings(settings) {
+    if (!settings) return;
+    const s = Object.assign({}, DEFAULT_SETTINGS, settings);
+    const clubEl = document.getElementById('sidebar-club-name');
+    const nameEl = document.getElementById('sidebar-user-name');
+    const roleEl = document.getElementById('sidebar-user-role');
+    const avatarEl = document.getElementById('sidebar-user-avatar');
+    if (clubEl) clubEl.textContent = s.club_nombre;
+    if (nameEl) nameEl.textContent = s.entrenador_nombre;
+    if (roleEl) roleEl.textContent = s.entrenador_rol;
+    if (avatarEl) avatarEl.textContent = SM.ui.initials(s.entrenador_nombre);
+  }
+
+  function onSettingsClick(handler) {
+    const btn = document.getElementById('sidebar-settings-btn');
+    if (btn) btn.addEventListener('click', handler);
+  }
+
+  return { render: render, mount: mount, applySettings: applySettings, onSettingsClick: onSettingsClick, DEFAULT_SETTINGS: DEFAULT_SETTINGS };
 })();

@@ -8,7 +8,13 @@
   let DATA = null;
   let filter = 'todos';
 
+  SM.sidebar.onSettingsClick(function () {
+    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = data; render(); });
+  });
+
   function render() {
+    const settings = DATA.settings || SM.sidebar.DEFAULT_SETTINGS;
+    const clubName = settings.club_nombre;
     const next = SM.stats.nextMatch(DATA);
     let list = DATA.matches.slice();
     if (filter === 'proximos') list = list.filter(function (m) { return !m.jugado; }).sort(function (a, b) { return a.fecha.localeCompare(b.fecha); });
@@ -28,10 +34,10 @@
           '<button class="btn btn-primary" id="btn-new-match">+ Nuevo partido</button>' +
         '</div>' +
       '</div>' +
-      (next && filter !== 'jugados' ? heroCard(next) : '') +
+      (next && filter !== 'jugados' ? heroCard(next, clubName) : '') +
       '<div style="display:flex;flex-direction:column;gap:12px;">' +
         '<span class="panel-title" style="padding-left:4px;">' + (filter === 'proximos' ? 'Próximos partidos' : filter === 'jugados' ? 'Partidos jugados' : 'Todos los partidos') + '</span>' +
-        (list.length ? list.map(matchRow).join('') : '<div class="empty-state">No hay partidos en esta vista.</div>') +
+        (list.length ? list.map(function (m) { return matchRow(m, clubName); }).join('') : '<div class="empty-state">No hay partidos en esta vista.</div>') +
       '</div>';
 
     document.getElementById('tabbar').addEventListener('click', function (e) {
@@ -49,9 +55,9 @@
     });
   }
 
-  function heroCard(match) {
+  function heroCard(match, clubName) {
     const days = daysUntil(match.fecha);
-    const rivalInitials = match.rival.split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 3).toUpperCase();
+    const rivalInitials = SM.ui.clubInitials(match.rival);
     return (
       '<div class="panel" style="padding:30px 40px;">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;">' +
@@ -62,8 +68,8 @@
         '</div>' +
         '<div style="display:flex;align-items:center;justify-content:center;gap:60px;">' +
           '<div style="display:flex;flex-direction:column;align-items:center;gap:12px;width:170px;">' +
-            '<div style="width:78px;height:78px;border-radius:50%;background:var(--panel-2);border:2px solid ' + SM.ui.alpha('var(--green)', 0.55) + ';display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:19px;color:var(--green);">CDR</div>' +
-            '<span style="font-size:16px;font-weight:700;color:var(--text-bright);">CD Ribera</span>' +
+            '<div style="width:78px;height:78px;border-radius:50%;background:var(--panel-2);border:2px solid ' + SM.ui.alpha('var(--green)', 0.55) + ';display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:19px;color:var(--green);">' + SM.ui.clubInitials(clubName) + '</div>' +
+            '<span style="font-size:16px;font-weight:700;color:var(--text-bright);">' + SM.ui.escapeHtml(clubName) + '</span>' +
             '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">' + (match.condicion === 'local' ? 'Local' : 'Visitante') + '</span>' +
           '</div>' +
           '<div style="display:flex;flex-direction:column;align-items:center;gap:10px;"><span style="font-family:var(--font-display);font-weight:900;font-size:24px;color:var(--text-ghost);">VS</span><span style="font-size:13px;color:var(--text-mute);font-weight:600;">' + SM.ui.formatDateShort(match.fecha) + ' · ' + match.hora + '</span></div>' +
@@ -90,7 +96,7 @@
     return Math.round((target - startToday) / 86400000);
   }
 
-  function matchRow(m) {
+  function matchRow(m, clubName) {
     const scorers = {};
     DATA.matchEvents.filter(function (e) { return e.match_id === m.id && e.tipo === 'gol'; }).forEach(function (e) {
       scorers[e.player_id] = (scorers[e.player_id] || 0) + 1;
@@ -117,9 +123,9 @@
       '<div class="panel" data-match="' + m.id + '" style="padding:16px 24px;display:grid;grid-template-columns:90px 1fr 140px 240px 26px;align-items:center;gap:16px;cursor:pointer;">' +
         '<span style="font-size:12.5px;color:var(--text-mute);font-weight:600;">' + SM.ui.formatDateShort(m.fecha) + '</span>' +
         '<div style="display:flex;align-items:center;gap:10px;">' +
-          '<span style="font-size:15px;font-weight:700;color:var(--text);">' + (m.condicion === 'local' ? 'CD Ribera' : SM.ui.escapeHtml(m.rival)) + '</span>' +
+          '<span style="font-size:15px;font-weight:700;color:var(--text);">' + (m.condicion === 'local' ? SM.ui.escapeHtml(clubName) : SM.ui.escapeHtml(m.rival)) + '</span>' +
           '<span style="font-size:12px;color:var(--text-mute);">vs</span>' +
-          '<span style="font-size:15px;font-weight:700;color:var(--text);">' + (m.condicion === 'local' ? SM.ui.escapeHtml(m.rival) : 'CD Ribera') + '</span>' +
+          '<span style="font-size:15px;font-weight:700;color:var(--text);">' + (m.condicion === 'local' ? SM.ui.escapeHtml(m.rival) : SM.ui.escapeHtml(clubName)) + '</span>' +
         '</div>' +
         scoreHtml +
         '<span style="font-size:12.5px;color:var(--text-mute);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + scorerText + '</span>' +
@@ -246,6 +252,7 @@
 
   SM.api.fetchAll().then(function (data) {
     DATA = data;
+    SM.sidebar.applySettings(data.settings);
     render();
   }).catch(function (err) {
     main.innerHTML = '<div class="empty-state">' + err.message + '</div>';

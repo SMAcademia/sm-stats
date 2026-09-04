@@ -69,6 +69,12 @@ SM.ui = (function () {
       .replace(/'/g, '&#39;');
   }
 
+  // Up to 3-letter badge initials for a club/team name, e.g. "CD Ribera" -> "CDR".
+  function clubInitials(name) {
+    if (!name) return '?';
+    return name.trim().split(/\s+/).map(function (w) { return w[0]; }).join('').slice(0, 3).toUpperCase();
+  }
+
   function initials(name) {
     if (!name) return '';
     const parts = name.trim().split(/\s+/);
@@ -168,6 +174,7 @@ SM.ui = (function () {
     formatDateLong: formatDateLong,
     ageFromBirthdate: ageFromBirthdate,
     initials: initials,
+    clubInitials: clubInitials,
     escapeHtml: escapeHtml,
     avatarHtml: avatarHtml,
     positionMeta: positionMeta,

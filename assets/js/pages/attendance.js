@@ -18,6 +18,10 @@
   let viewYear = now.getFullYear();
   let viewMonth = now.getMonth();
 
+  SM.sidebar.onSettingsClick(function () {
+    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = data; });
+  });
+
   function render() {
     const sessions = SM.stats.sessionsForMonth(DATA, viewYear, viewMonth);
     const players = DATA.players.filter(function (p) { return p.activo; }).sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
@@ -242,6 +246,7 @@
 
   SM.api.fetchAll().then(function (data) {
     DATA = data;
+    SM.sidebar.applySettings(data.settings);
     render();
   }).catch(function (err) {
     main.innerHTML = '<div class="empty-state">' + err.message + '</div>';

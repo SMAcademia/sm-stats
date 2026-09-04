@@ -5,6 +5,10 @@
   SM.sidebar.mount(shell, 'plantilla');
   const main = document.getElementById('main');
 
+  SM.sidebar.onSettingsClick(function () {
+    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = data; });
+  });
+
   const POSITIONS = [
     { code: 'TODOS', label: 'Todos' },
     { code: 'POR', label: 'Porteros' },
@@ -143,6 +147,7 @@
 
   SM.api.fetchAll().then(function (data) {
     DATA = data;
+    SM.sidebar.applySettings(data.settings);
     render();
   }).catch(function (err) {
     main.innerHTML = '<div class="empty-state">' + err.message + '</div>';

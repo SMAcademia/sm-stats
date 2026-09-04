@@ -26,7 +26,9 @@ SM.api = (function () {
       if (isLive()) {
         const res = await fetch(SM.config.APPS_SCRIPT_URL + '?action=data', { cache: 'no-store' });
         if (!res.ok) throw new Error('No se pudo conectar con la hoja de cálculo.');
-        cache = await res.json();
+        const json = await res.json();
+        if (!json || json.ok === false) throw new Error((json && json.error) || 'No se pudo leer la hoja de cálculo.');
+        cache = json.result;
       } else {
         const res = await fetch('assets/data/sample-data.json', { cache: 'no-store' });
         if (!res.ok) throw new Error('No se pudo cargar el dataset de ejemplo.');
@@ -90,6 +92,10 @@ SM.api = (function () {
           d.matchEvents.push(Object.assign({ id: nextMockId('e') }, e, { match_id: payload.matchId }));
         });
         return true;
+      }
+      case 'updateSettings': {
+        d.settings = Object.assign({}, d.settings, payload);
+        return d.settings;
       }
       case 'saveAttendance': {
         d.attendance = d.attendance.filter(function (a) { return a.session_id !== payload.sessionId; });

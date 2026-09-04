@@ -119,9 +119,46 @@ SM.forms = (function () {
     });
   }
 
+  function settingsFormHtml(settings) {
+    const s = settings || {};
+    return (
+      '<form id="settings-form">' +
+        '<div class="form-grid">' +
+          field('Nombre del club', '<input name="club_nombre" required value="' + esc(s.club_nombre) + '">', true) +
+          field('Nombre del entrenador/a', '<input name="entrenador_nombre" required value="' + esc(s.entrenador_nombre) + '">', true) +
+          field('Rol', '<input name="entrenador_rol" value="' + esc(s.entrenador_rol || 'Entrenador') + '">', true) +
+        '</div>' +
+        '<div class="form-actions">' +
+          '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
+          '<button type="submit" class="btn btn-primary">Guardar</button>' +
+        '</div>' +
+      '</form>'
+    );
+  }
+
+  // Opens the club/coach settings modal and wires submit -> updateSettings.
+  function openSettingsForm(current, onSaved) {
+    const body = SM.ui.el('div', { html: settingsFormHtml(current) });
+    const handle = SM.ui.openModal('Configuración del club', body);
+    body.querySelector('#cancel-btn').addEventListener('click', handle.close);
+    body.querySelector('#settings-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const payload = {};
+      new FormData(e.target).forEach(function (v, k) { payload[k] = v; });
+      SM.api.postAction('updateSettings', payload).then(function () {
+        handle.close();
+        return SM.api.fetchAll(true);
+      }).then(function (data) {
+        SM.sidebar.applySettings(data.settings);
+        SM.ui.toast('Configuración guardada.', 'ok');
+        if (onSaved) onSaved(data);
+      }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+    });
+  }
+
   return {
     esc: esc, field: field, selectHtml: selectHtml,
     playerFormHtml: playerFormHtml, staffFormHtml: staffFormHtml, formToPayload: formToPayload,
-    openPlayerForm: openPlayerForm, openStaffForm: openStaffForm
+    openPlayerForm: openPlayerForm, openStaffForm: openStaffForm, openSettingsForm: openSettingsForm
   };
 })();

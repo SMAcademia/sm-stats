@@ -25,7 +25,8 @@ const SHEETS = {
   attendance: 'Attendance',
   matches: 'Matches',
   matchEvents: 'MatchEvents',
-  matchAppearances: 'MatchAppearances'
+  matchAppearances: 'MatchAppearances',
+  settings: 'Settings'
 };
 
 const PLAYER_COLUMNS = ['id', 'nombre', 'dorsal', 'posicion', 'posicion_secundaria', 'pie', 'fecha_nacimiento', 'nacionalidad', 'altura_cm', 'peso_kg', 'contacto_emergencia', 'categoria', 'club_anterior', 'fecha_alta', 'foto_url', 'activo', 'ritmo', 'tiro', 'pase', 'regate', 'defensa', 'fisico'];
@@ -35,6 +36,9 @@ const ATTENDANCE_COLUMNS = ['id', 'session_id', 'player_id', 'estado'];
 const MATCH_COLUMNS = ['id', 'fecha', 'hora', 'rival', 'condicion', 'lugar', 'jornada', 'goles_favor', 'goles_contra', 'jugado'];
 const EVENT_COLUMNS = ['id', 'match_id', 'player_id', 'tipo'];
 const APPEARANCE_COLUMNS = ['id', 'match_id', 'player_id', 'minutos', 'valoracion'];
+// Settings is a singleton sheet: header row + exactly one data row (row 2).
+const SETTINGS_COLUMNS = ['club_nombre', 'entrenador_nombre', 'entrenador_rol'];
+const DEFAULT_SETTINGS = { club_nombre: 'Mi Club', entrenador_nombre: 'Nombre del entrenador', entrenador_rol: 'Entrenador' };
 
 /** Crea las 7 pestañas con sus cabeceras si no existen todavía.
  *  Ejecuta esta función UNA VEZ desde el editor de Apps Script (botón
@@ -48,7 +52,8 @@ function setupSheets() {
     [SHEETS.attendance, ATTENDANCE_COLUMNS],
     [SHEETS.matches, MATCH_COLUMNS],
     [SHEETS.matchEvents, EVENT_COLUMNS],
-    [SHEETS.matchAppearances, APPEARANCE_COLUMNS]
+    [SHEETS.matchAppearances, APPEARANCE_COLUMNS],
+    [SHEETS.settings, SETTINGS_COLUMNS]
   ];
   defs.forEach(function (def) {
     const name = def[0], columns = def[1];
@@ -59,6 +64,12 @@ function setupSheets() {
       sheet.setFrozenRows(1);
     }
   });
+  // Settings needs exactly one data row to edit — seed it with placeholders
+  // the coach is meant to overwrite from the app's settings form.
+  const settingsSheet = ss.getSheetByName(SHEETS.settings);
+  if (settingsSheet && settingsSheet.getLastRow() < 2) {
+    settingsSheet.appendRow(SETTINGS_COLUMNS.map(function (c) { return DEFAULT_SETTINGS[c]; }));
+  }
   const defaultSheet = ss.getSheetByName('Hoja 1') || ss.getSheetByName('Sheet1');
   if (defaultSheet && ss.getSheets().length > defs.length) ss.deleteSheet(defaultSheet);
 }
@@ -127,6 +138,37 @@ function deleteRowsWhere(name, matchColumn, matchValue) {
   }
 }
 
+function readSingletonRow(name, columns, defaults) {
+  const sheet = getSpreadsheet().getSheetByName(name);
+  if (!sheet || sheet.getLastRow() < 2) return Object.assign({}, defaults);
+  const values = sheet.getRange(1, 1, 2, sheet.getLastColumn()).getValues();
+  const header = values[0].map(String);
+  const row = values[1];
+  const obj = {};
+  header.forEach(function (col, i) { obj[col] = normalizeCell(row[i]); });
+  columns.forEach(function (c) {
+    if (obj[c] === '' || obj[c] === undefined || obj[c] === null) obj[c] = defaults[c];
+  });
+  return obj;
+}
+
+function writeSingletonRow(name, columns, patch) {
+  let sheet = getSpreadsheet().getSheetByName(name);
+  if (!sheet) {
+    sheet = getSpreadsheet().insertSheet(name);
+    sheet.getRange(1, 1, 1, columns.length).setValues([columns]);
+    sheet.setFrozenRows(1);
+  }
+  if (sheet.getLastRow() < 2) {
+    sheet.appendRow(columns.map(function (c) { return patch[c] !== undefined ? patch[c] : ''; }));
+  } else {
+    const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    header.forEach(function (col, i) {
+      if (patch[col] !== undefined) sheet.getRange(2, i + 1).setValue(patch[col]);
+    });
+  }
+}
+
 function newId(prefix) {
   return prefix + Utilities.getUuid().slice(0, 8);
 }
@@ -153,7 +195,8 @@ function doGet(e) {
       attendance: sheetToObjects(SHEETS.attendance),
       matches: sheetToObjects(SHEETS.matches).map(coerceMatch),
       matchEvents: sheetToObjects(SHEETS.matchEvents),
-      matchAppearances: sheetToObjects(SHEETS.matchAppearances).map(coerceAppearance)
+      matchAppearances: sheetToObjects(SHEETS.matchAppearances).map(coerceAppearance),
+      settings: readSingletonRow(SHEETS.settings, SETTINGS_COLUMNS, DEFAULT_SETTINGS)
     };
     return jsonResponse({ ok: true, result: data });
   } catch (err) {
@@ -172,7 +215,8 @@ function doPost(e) {
       addMatch: addMatch,
       addSession: addSession,
       saveMatchReport: saveMatchReport,
-      saveAttendance: saveAttendance
+      saveAttendance: saveAttendance,
+      updateSettings: updateSettings
     };
     const handler = handlers[body.action];
     if (!handler) throw new Error('Acción desconocida: ' + body.action);
@@ -238,6 +282,11 @@ function saveMatchReport(payload) {
     appendRow(SHEETS.matchEvents, EVENT_COLUMNS, Object.assign({ id: newId('e') }, ev, { match_id: matchId }));
   });
   return true;
+}
+
+function updateSettings(payload) {
+  writeSingletonRow(SHEETS.settings, SETTINGS_COLUMNS, payload);
+  return payload;
 }
 
 function saveAttendance(payload) {

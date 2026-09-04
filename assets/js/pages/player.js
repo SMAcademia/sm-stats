@@ -16,6 +16,10 @@
   const id = SM.ui.qs('id');
   let DATA = null;
 
+  SM.sidebar.onSettingsClick(function () {
+    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = data; });
+  });
+
   function render() {
     const p = DATA.players.find(function (pl) { return pl.id === id; });
     if (!p) {
@@ -161,6 +165,7 @@
   } else {
     SM.api.fetchAll().then(function (data) {
       DATA = data;
+      SM.sidebar.applySettings(data.settings);
       render();
     }).catch(function (err) {
       main.innerHTML = '<div class="empty-state">' + err.message + '</div>';
