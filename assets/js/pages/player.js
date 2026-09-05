@@ -104,6 +104,9 @@
           '<span style="font-family:var(--font-display);font-weight:800;font-size:15px;color:' + meta.bright + ';">RATING ' + rating.toFixed(1) + '</span>' +
         '</div>' +
         '<div style="width:100%;height:1px;background:var(--border);margin:22px 0;"></div>' +
+        '<span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-ghost);align-self:flex-start;margin-bottom:10px;">POSICIONES</span>' +
+        SM.pitch.render({ primary: p.posicion, secondary: (p.posicion_secundaria || '').split(',').map(function (s) { return s.trim(); }).filter(function (g) { return g && g !== p.posicion; }) }, { interactive: false, width: 130 }) +
+        '<div style="width:100%;height:1px;background:var(--border);margin:22px 0;"></div>' +
         '<div style="display:flex;flex-direction:column;gap:13px;width:100%;">' +
           '<span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-ghost);">DATOS PERSONALES</span>' +
           dataRow('Fecha de nacimiento', SM.ui.formatDateLong(p.fecha_nacimiento)) +
@@ -116,7 +119,6 @@
         '<div style="display:flex;flex-direction:column;gap:13px;width:100%;">' +
           '<span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-ghost);">DATOS DEPORTIVOS</span>' +
           dataRow('Posición principal', meta.label) +
-          dataRow('Posición secundaria', SM.ui.escapeHtml(p.posicion_secundaria) || '—') +
           dataRow('Pie dominante', p.pie || '—') +
           dataRow('Dorsal', '#' + p.dorsal) +
           dataRow('Categoría', p.categoria || '—') +

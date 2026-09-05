@@ -19,6 +19,20 @@ SM.forms = (function () {
     }).join('') + '</select>';
   }
 
+  function pitchPickerHtml(p) {
+    return (
+      '<div class="form-field span-2">' +
+        '<label>Posiciones — clic en el campo: sin marcar → secundaria → principal → sin marcar</label>' +
+        '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">' +
+          '<div id="pitch-picker"></div>' +
+          '<div id="pitch-legend" style="display:flex;flex-direction:column;gap:7px;font-size:12.5px;min-width:160px;"></div>' +
+        '</div>' +
+        '<input type="hidden" name="posicion" id="posicion-input" value="' + esc(p.posicion) + '">' +
+        '<input type="hidden" name="posicion_secundaria" id="posicion-secundaria-input" value="' + esc(p.posicion_secundaria) + '">' +
+      '</div>'
+    );
+  }
+
   function playerFormHtml(existing) {
     const p = existing || {};
     return (
@@ -27,8 +41,7 @@ SM.forms = (function () {
         '<div class="form-grid">' +
           field('Nombre completo', '<input name="nombre" required value="' + esc(p.nombre) + '">', true) +
           field('Dorsal', '<input name="dorsal" type="number" min="1" max="99" required value="' + esc(p.dorsal) + '">') +
-          field('Posición', selectHtml('posicion', [['POR', 'Portero'], ['DEF', 'Defensa'], ['CEN', 'Centrocampista'], ['DEL', 'Delantero']], p.posicion)) +
-          field('Posición secundaria', '<input name="posicion_secundaria" value="' + esc(p.posicion_secundaria) + '">') +
+          pitchPickerHtml(p) +
           field('Pie dominante', selectHtml('pie', [['Derecho', 'Derecho'], ['Izquierdo', 'Izquierdo'], ['Ambos', 'Ambos']], p.pie)) +
           field('Fecha de nacimiento', '<input name="fecha_nacimiento" type="date" value="' + esc(p.fecha_nacimiento) + '">') +
           field('Nacionalidad', '<input name="nacionalidad" value="' + esc(p.nacionalidad || 'España') + '">') +
@@ -83,14 +96,60 @@ SM.forms = (function () {
     return payload;
   }
 
+  function pitchLegendHtml(state) {
+    const groups = ['POR', 'DEF', 'CEN', 'DEL'];
+    const rows = groups.map(function (g) {
+      const tag = state.primary === g ? 'Principal' : (state.secondary || []).indexOf(g) !== -1 ? 'Secundaria' : null;
+      if (!tag) return '';
+      const meta = SM.ui.positionMeta(g);
+      return (
+        '<div style="display:flex;align-items:center;gap:7px;">' +
+          '<span style="width:9px;height:9px;border-radius:50%;flex:none;background:' + meta.color + ';box-shadow:0 0 5px ' + meta.color + ';"></span>' +
+          '<span style="color:var(--text-dim);">' + meta.label + ' <strong style="color:var(--text);">(' + tag + ')</strong></span>' +
+        '</div>'
+      );
+    }).filter(Boolean).join('');
+    return rows || '<div style="color:var(--text-ghost);">Sin posición marcada todavía</div>';
+  }
+
+  // Wires the interactive pitch inside the player form: clicking a zone
+  // cycles its group (sin marcar -> secundaria -> principal) and keeps the
+  // hidden posicion/posicion_secundaria inputs (read by formToPayload via
+  // plain FormData) in sync.
+  function wirePitchPicker(body, existing) {
+    const p = existing || {};
+    let state = {
+      primary: p.posicion || null,
+      secondary: (p.posicion_secundaria || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+    };
+    function sync() {
+      body.querySelector('#pitch-picker').innerHTML = SM.pitch.render(state, { interactive: true, width: 160 });
+      body.querySelector('#pitch-legend').innerHTML = pitchLegendHtml(state);
+      body.querySelector('#posicion-input').value = state.primary || '';
+      body.querySelector('#posicion-secundaria-input').value = state.secondary.join(',');
+      body.querySelectorAll('.pitch-dot').forEach(function (dot) {
+        dot.addEventListener('click', function () {
+          state = SM.pitch.toggle(state, dot.getAttribute('data-group'));
+          sync();
+        });
+      });
+    }
+    sync();
+  }
+
   // Opens the add/edit player modal and wires submit -> addPlayer/updatePlayer.
   function openPlayerForm(existing, onSaved) {
     const isEdit = !!(existing && existing.id);
     const body = SM.ui.el('div', { html: playerFormHtml(existing) });
     const handle = SM.ui.openModal(isEdit ? 'Editar ficha' : 'Añadir jugador', body);
     body.querySelector('#cancel-btn').addEventListener('click', handle.close);
+    wirePitchPicker(body, existing);
     body.querySelector('#player-form').addEventListener('submit', function (e) {
       e.preventDefault();
+      if (!body.querySelector('#posicion-input').value) {
+        SM.ui.toast('Marca al menos la posición principal en el campo.', 'error');
+        return;
+      }
       const payload = formToPayload(e.target);
       SM.api.postAction(isEdit ? 'updatePlayer' : 'addPlayer', payload).then(function () {
         handle.close();
