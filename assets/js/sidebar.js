@@ -20,8 +20,10 @@ SM.sidebar = (function () {
   ];
 
   // Shown until the real Settings row loads from Sheets (or in demo mode,
-  // overwritten immediately by the bundled sample data).
-  const DEFAULT_SETTINGS = { club_nombre: 'CD Ribera', entrenador_nombre: 'Marcos Vidal', entrenador_rol: 'Entrenador', liga_nombre: 'Liga Regional · Grupo B' };
+  // overwritten immediately by the bundled sample data). Deliberately a
+  // neutral placeholder, not a made-up club/coach name, so the brief flash
+  // before data arrives never looks like the wrong team's data.
+  const DEFAULT_SETTINGS = { club_nombre: 'Cargando…', entrenador_nombre: 'Cargando…', entrenador_rol: '', liga_nombre: '' };
 
   function icon(key, size) {
     return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" ' +
