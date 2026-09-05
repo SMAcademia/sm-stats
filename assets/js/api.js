@@ -45,8 +45,21 @@ SM.api = (function () {
     return prefix + Date.now().toString(36) + Math.floor(Math.random() * 1000);
   }
 
+  // Local-date (not UTC) yyyy-MM-dd — Date#toISOString shifts the calendar
+  // day for anyone west/east of UTC, which would silently misdate generated
+  // sessions/matches for a coach outside that timezone.
+  function isoFromLocalDate(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
   function applyMockAction(action, payload) {
     const d = cache;
+    function createMockMatch(m) {
+      const row = Object.assign({ id: nextMockId('m'), jugado: false, goles_favor: null, goles_contra: null }, m);
+      d.matches.push(row);
+      d.sessions.push({ id: nextMockId('se'), fecha: row.fecha, hora: row.hora, tipo: 'partido', lugar: row.lugar, match_id: row.id });
+      return row;
+    }
     switch (action) {
       case 'addPlayer': {
         const row = Object.assign({ id: nextMockId('p'), activo: true }, payload);
@@ -64,11 +77,10 @@ SM.api = (function () {
         return row;
       }
       case 'addMatch': {
-        const row = Object.assign({ id: nextMockId('m'), jugado: false, goles_favor: null, goles_contra: null }, payload);
-        d.matches.push(row);
-        // A match day is also a session, so it shows up in the attendance table.
-        d.sessions.push({ id: nextMockId('se'), fecha: row.fecha, hora: row.hora, tipo: 'partido', lugar: row.lugar, match_id: row.id });
-        return row;
+        return createMockMatch(payload);
+      }
+      case 'addMatches': {
+        return (payload.matches || []).map(createMockMatch);
       }
       case 'addSession': {
         const row = Object.assign({ id: nextMockId('se'), tipo: 'entrenamiento', match_id: '' }, payload);
@@ -84,7 +96,7 @@ SM.api = (function () {
           if (dias.indexOf(cur.getDay()) === -1) continue;
           const row = {
             id: nextMockId('se'),
-            fecha: cur.toISOString().slice(0, 10),
+            fecha: isoFromLocalDate(cur),
             hora: payload.hora || '',
             tipo: 'entrenamiento',
             lugar: payload.lugar || '',

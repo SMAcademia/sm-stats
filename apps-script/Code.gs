@@ -237,6 +237,7 @@ function doPost(e) {
       updatePlayer: updatePlayer,
       addStaffMember: addStaffMember,
       addMatch: addMatch,
+      addMatches: addMatches,
       addSession: addSession,
       addRecurringSessions: addRecurringSessions,
       updateSession: updateSession,
@@ -275,6 +276,16 @@ function addStaffMember(payload) {
 }
 
 function addMatch(payload) {
+  return createMatchWithSession(payload);
+}
+
+// Bulk version for "Importar calendario" — one call, one round trip, instead
+// of a POST per fixture when the league's whole schedule is pasted in.
+function addMatches(payload) {
+  return (payload.matches || []).map(createMatchWithSession);
+}
+
+function createMatchWithSession(payload) {
   const row = Object.assign({ id: newId('m'), jugado: false, goles_favor: '', goles_contra: '' }, payload);
   appendRow(SHEETS.matches, MATCH_COLUMNS, row);
   // Un partido es también una sesión, así aparece en la tabla de asistencia.

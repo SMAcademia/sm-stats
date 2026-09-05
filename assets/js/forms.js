@@ -167,7 +167,9 @@ SM.forms = (function () {
   ];
   const DEFAULT_WEEKDAYS = [1, 3, 5];
 
-  function isoDate(d) { return d.toISOString().slice(0, 10); }
+  // Local-date (not UTC) yyyy-MM-dd — avoids Date#toISOString shifting the
+  // day for anyone west/east of UTC.
+  function isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 
   function recurringSessionFormHtml() {
     const today = new Date();

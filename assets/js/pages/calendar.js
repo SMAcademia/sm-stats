@@ -85,7 +85,8 @@
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
     const leading = (firstOfMonth.getDay() + 6) % 7; // week starts Monday
     const totalCells = Math.ceil((leading + daysInMonth) / 7) * 7;
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayNow = new Date();
+    const todayStr = todayNow.getFullYear() + '-' + String(todayNow.getMonth() + 1).padStart(2, '0') + '-' + String(todayNow.getDate()).padStart(2, '0');
 
     let cells = '';
     for (let i = 0; i < totalCells; i++) {

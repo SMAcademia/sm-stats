@@ -38,6 +38,7 @@
               return '<button class="tab' + (f === filter ? ' active' : '') + '" data-filter="' + f + '">' + labels[f] + '</button>';
             }).join('') +
           '</div>' +
+          '<button class="btn btn-outline" id="btn-import-matches">Importar calendario</button>' +
           '<button class="btn btn-primary" id="btn-new-match">+ Nuevo partido</button>' +
         '</div>' +
       '</div>' +
@@ -54,6 +55,7 @@
       render();
     });
     document.getElementById('btn-new-match').addEventListener('click', openNewMatchForm);
+    document.getElementById('btn-import-matches').addEventListener('click', openImportMatchesForm);
     main.querySelectorAll('[data-match]').forEach(function (el) {
       el.addEventListener('click', function () {
         const m = DATA.matches.find(function (mm) { return mm.id === el.getAttribute('data-match'); });
@@ -173,6 +175,136 @@
         DATA = data;
         render();
         SM.ui.toast('Partido añadido.', 'ok');
+      }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+    });
+  }
+
+  // Splits one pasted line into fields — handles tab (pegado desde Excel/
+  // Sheets), semicolon and comma, whichever the line actually uses.
+  function splitFixtureLine(line) {
+    if (line.indexOf('\t') !== -1) return line.split('\t');
+    if (line.indexOf(';') !== -1) return line.split(';');
+    return line.split(',');
+  }
+
+  // "07/09/2026" / "7-9-2026" / "2026-09-07" -> "2026-09-07", or null if unparseable.
+  function parseFixtureDate(raw) {
+    const s = (raw || '').trim();
+    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) return m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0');
+    m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+    return null;
+  }
+
+  function parseFixtureCondicion(raw) {
+    const s = (raw || '').trim().toLowerCase();
+    if (['local', 'casa', 'l', 'h'].indexOf(s) !== -1) return 'local';
+    if (['visitante', 'fuera', 'v', 'a'].indexOf(s) !== -1) return 'visitante';
+    return null;
+  }
+
+  // Parses one pasted fixture line: fecha, rival, condición[, hora[, lugar[, jornada]]].
+  // Returns { match: {...} } or { error: 'mensaje' } — never both.
+  function parseFixtureLine(line) {
+    const parts = splitFixtureLine(line).map(function (p) { return p.trim(); });
+    if (parts.length < 3) return { error: 'Faltan datos — se necesita al menos fecha, rival y local/visitante.' };
+    const fecha = parseFixtureDate(parts[0]);
+    if (!fecha) return { error: 'Fecha no reconocida: "' + parts[0] + '" (usa dd/mm/aaaa).' };
+    const rival = parts[1];
+    if (!rival) return { error: 'Falta el nombre del rival.' };
+    const condicion = parseFixtureCondicion(parts[2]);
+    if (!condicion) return { error: 'Local/visitante no reconocido: "' + parts[2] + '" (escribe "local" o "visitante").' };
+    const hora = parts[3] || '';
+    const lugar = parts[4] || '';
+    const jornada = parts[5] ? Number(parts[5]) : null;
+    return { match: { fecha: fecha, rival: rival, condicion: condicion, hora: hora, lugar: lugar, jornada: jornada } };
+  }
+
+  function importPreviewHtml(parsed) {
+    if (!parsed.length) return '<div class="empty-state">Pega el calendario arriba para ver la vista previa.</div>';
+    const rows = parsed.map(function (p, i) {
+      if (p.error) {
+        return '<tr><td>' + (i + 1) + '</td><td colspan="5" style="color:var(--red-bright);">⚠ ' + SM.ui.escapeHtml(p.error) + '</td></tr>';
+      }
+      const m = p.match;
+      return (
+        '<tr>' +
+          '<td>' + (i + 1) + '</td>' +
+          '<td>' + SM.ui.formatDateShort(m.fecha) + '</td>' +
+          '<td style="text-align:left;">' + SM.ui.escapeHtml(m.rival) + '</td>' +
+          '<td>' + (m.condicion === 'local' ? 'Local' : 'Visitante') + '</td>' +
+          '<td>' + (m.hora || '—') + '</td>' +
+          '<td>' + (m.jornada != null ? m.jornada : '—') + '</td>' +
+        '</tr>'
+      );
+    }).join('');
+    return (
+      '<div style="overflow-x:auto;">' +
+        '<table class="data-table" style="min-width:480px;">' +
+          '<thead><tr><th>#</th><th>Fecha</th><th style="text-align:left;">Rival</th><th>Cond.</th><th>Hora</th><th>Jornada</th></tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>'
+    );
+  }
+
+  function openImportMatchesForm() {
+    const body = SM.ui.el('div', {
+      html:
+        '<div class="form-grid">' +
+          SM.forms.field('Competición (para todos)', SM.forms.selectHtml('competicion', [['liga', 'Liga'], ['copa', 'Copa'], ['torneo', 'Torneo'], ['amistoso', 'Amistoso']], 'liga')) +
+          SM.forms.field('Categoría (para todos)', SM.forms.selectHtml('categoria', [['Alevín', 'Alevín (35\')'], ['Benjamín', 'Benjamín (30\')']], 'Alevín')) +
+          SM.forms.field('Lugar por defecto (opcional)', '<input name="lugarDefecto" placeholder="Campo Municipal La Ribera">', true) +
+        '</div>' +
+        '<div style="margin-top:14px;">' +
+          SM.forms.field(
+            'Pega aquí el calendario — una línea por partido: fecha, rival, local/visitante, hora, lugar, jornada',
+            '<textarea id="fixture-text" rows="6" style="width:100%;font-family:monospace;font-size:12.5px;" placeholder="07/09/2026, CF Miralba, local, 18:30, , 1&#10;14/09/2026, At. Bracamonte, visitante, 17:30, , 2"></textarea>',
+            true
+          ) +
+        '</div>' +
+        '<div class="form-hint" style="margin:10px 0;">Los campos hora, lugar y jornada son opcionales. Puedes pegar directamente varias filas copiadas de Excel/Google Sheets.</div>' +
+        '<div id="fixture-preview"></div>' +
+        '<div class="form-actions">' +
+          '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
+          '<button type="button" class="btn btn-primary" id="import-btn" disabled>Importar</button>' +
+        '</div>'
+    });
+    const handle = SM.ui.openModal('Importar calendario de partidos', body);
+    body.querySelector('#cancel-btn').addEventListener('click', handle.close);
+
+    let parsed = [];
+    function updatePreview() {
+      const lines = body.querySelector('#fixture-text').value.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+      parsed = lines.map(parseFixtureLine);
+      body.querySelector('#fixture-preview').innerHTML = importPreviewHtml(parsed);
+      const validCount = parsed.filter(function (p) { return p.match; }).length;
+      const importBtn = body.querySelector('#import-btn');
+      importBtn.disabled = !validCount || parsed.some(function (p) { return p.error; });
+      importBtn.textContent = validCount ? 'Importar ' + validCount + (validCount === 1 ? ' partido' : ' partidos') : 'Importar';
+    }
+    body.querySelector('#fixture-text').addEventListener('input', updatePreview);
+
+    body.querySelector('#import-btn').addEventListener('click', function () {
+      const competicion = body.querySelector('[name="competicion"]').value;
+      const categoria = body.querySelector('[name="categoria"]').value;
+      const lugarDefecto = body.querySelector('[name="lugarDefecto"]').value;
+      const matches = parsed.filter(function (p) { return p.match; }).map(function (p) {
+        return Object.assign({}, p.match, {
+          lugar: p.match.lugar || lugarDefecto,
+          competicion: competicion,
+          categoria: categoria
+        });
+      });
+      if (!matches.length) return;
+      SM.api.postAction('addMatches', { matches: matches }).then(function () {
+        handle.close();
+        return SM.api.fetchAll(true);
+      }).then(function (data) {
+        DATA = data;
+        render();
+        SM.ui.toast(matches.length + (matches.length === 1 ? ' partido importado.' : ' partidos importados.'), 'ok');
       }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
     });
   }
