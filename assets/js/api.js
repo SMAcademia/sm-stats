@@ -85,11 +85,15 @@ SM.api = (function () {
         }
         d.matchAppearances = d.matchAppearances.filter(function (a) { return a.match_id !== payload.matchId; });
         d.matchEvents = d.matchEvents.filter(function (e) { return e.match_id !== payload.matchId; });
+        d.matchIntervals = (d.matchIntervals || []).filter(function (iv) { return iv.match_id !== payload.matchId; });
         (payload.appearances || []).forEach(function (a) {
           d.matchAppearances.push(Object.assign({ id: nextMockId('ma') }, a, { match_id: payload.matchId }));
         });
         (payload.events || []).forEach(function (e) {
           d.matchEvents.push(Object.assign({ id: nextMockId('e') }, e, { match_id: payload.matchId }));
+        });
+        (payload.intervals || []).forEach(function (iv) {
+          d.matchIntervals.push(Object.assign({ id: nextMockId('iv') }, iv, { match_id: payload.matchId }));
         });
         return true;
       }

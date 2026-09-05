@@ -26,6 +26,7 @@ const SHEETS = {
   matches: 'Matches',
   matchEvents: 'MatchEvents',
   matchAppearances: 'MatchAppearances',
+  matchIntervals: 'MatchIntervals',
   settings: 'Settings'
 };
 
@@ -33,14 +34,17 @@ const PLAYER_COLUMNS = ['id', 'nombre', 'dorsal', 'posicion', 'posicion_secundar
 const STAFF_COLUMNS = ['id', 'nombre', 'rol', 'licencia', 'fecha_alta', 'foto_url'];
 const SESSION_COLUMNS = ['id', 'fecha', 'hora', 'tipo', 'lugar', 'match_id'];
 const ATTENDANCE_COLUMNS = ['id', 'session_id', 'player_id', 'estado'];
-const MATCH_COLUMNS = ['id', 'fecha', 'hora', 'rival', 'condicion', 'lugar', 'jornada', 'goles_favor', 'goles_contra', 'jugado'];
+const MATCH_COLUMNS = ['id', 'fecha', 'hora', 'rival', 'condicion', 'lugar', 'jornada', 'competicion', 'categoria', 'goles_favor', 'goles_contra', 'jugado'];
 const EVENT_COLUMNS = ['id', 'match_id', 'player_id', 'tipo'];
 const APPEARANCE_COLUMNS = ['id', 'match_id', 'player_id', 'minutos', 'valoracion'];
+// One row per stretch a player spent on the pitch (unlimited substitutions):
+// entrada/salida are match minutes, e.g. 0-17 and 34-54 -> 37 minutes total.
+const INTERVAL_COLUMNS = ['id', 'match_id', 'player_id', 'entrada', 'salida'];
 // Settings is a singleton sheet: header row + exactly one data row (row 2).
-const SETTINGS_COLUMNS = ['club_nombre', 'entrenador_nombre', 'entrenador_rol'];
-const DEFAULT_SETTINGS = { club_nombre: 'Mi Club', entrenador_nombre: 'Nombre del entrenador', entrenador_rol: 'Entrenador' };
+const SETTINGS_COLUMNS = ['club_nombre', 'entrenador_nombre', 'entrenador_rol', 'liga_nombre'];
+const DEFAULT_SETTINGS = { club_nombre: 'Mi Club', entrenador_nombre: 'Nombre del entrenador', entrenador_rol: 'Entrenador', liga_nombre: 'Liga Regional · Grupo B' };
 
-/** Crea las 7 pestañas con sus cabeceras si no existen todavía.
+/** Crea las pestañas con sus cabeceras si no existen todavía.
  *  Ejecuta esta función UNA VEZ desde el editor de Apps Script (botón
  *  "Ejecutar" con setupSheets seleccionada) para preparar una hoja nueva. */
 function setupSheets() {
@@ -53,6 +57,7 @@ function setupSheets() {
     [SHEETS.matches, MATCH_COLUMNS],
     [SHEETS.matchEvents, EVENT_COLUMNS],
     [SHEETS.matchAppearances, APPEARANCE_COLUMNS],
+    [SHEETS.matchIntervals, INTERVAL_COLUMNS],
     [SHEETS.settings, SETTINGS_COLUMNS]
   ];
   defs.forEach(function (def) {
@@ -106,8 +111,26 @@ function normalizeCell(v) {
   return v;
 }
 
+// Extends a sheet's header (adding any of `columns` it's missing, at the end)
+// and returns the resulting header — so a sheet the coach set up by hand
+// before a field existed picks up new columns instead of misaligning data.
+function ensureHeader(sheet, columns) {
+  let header = sheet.getLastColumn() ? sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String) : [];
+  columns.forEach(function (c) {
+    if (header.indexOf(c) === -1) {
+      sheet.getRange(1, header.length + 1).setValue(c);
+      header.push(c);
+    }
+  });
+  return header;
+}
+
+// Appends by column NAME (via the sheet's actual header), not by array
+// position — safe even if the sheet's column order doesn't match `columns`.
 function appendRow(name, columns, obj) {
-  getSheet(name).appendRow(columns.map(function (c) { return obj[c] !== undefined ? obj[c] : ''; }));
+  const sheet = getSheet(name);
+  const header = ensureHeader(sheet, columns);
+  sheet.appendRow(header.map(function (c) { return obj[c] !== undefined ? obj[c] : ''; }));
 }
 
 function findRowIndexById(sheet, id) {
@@ -159,10 +182,10 @@ function writeSingletonRow(name, columns, patch) {
     sheet.getRange(1, 1, 1, columns.length).setValues([columns]);
     sheet.setFrozenRows(1);
   }
+  const header = ensureHeader(sheet, columns);
   if (sheet.getLastRow() < 2) {
-    sheet.appendRow(columns.map(function (c) { return patch[c] !== undefined ? patch[c] : ''; }));
+    sheet.appendRow(header.map(function (c) { return patch[c] !== undefined ? patch[c] : ''; }));
   } else {
-    const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     header.forEach(function (col, i) {
       if (patch[col] !== undefined) sheet.getRange(2, i + 1).setValue(patch[col]);
     });
@@ -196,6 +219,7 @@ function doGet(e) {
       matches: sheetToObjects(SHEETS.matches).map(coerceMatch),
       matchEvents: sheetToObjects(SHEETS.matchEvents),
       matchAppearances: sheetToObjects(SHEETS.matchAppearances).map(coerceAppearance),
+      matchIntervals: sheetToObjects(SHEETS.matchIntervals).map(coerceInterval),
       settings: readSingletonRow(SHEETS.settings, SETTINGS_COLUMNS, DEFAULT_SETTINGS)
     };
     return jsonResponse({ ok: true, result: data });
@@ -275,11 +299,15 @@ function saveMatchReport(payload) {
   });
   deleteRowsWhere(SHEETS.matchAppearances, 'match_id', matchId);
   deleteRowsWhere(SHEETS.matchEvents, 'match_id', matchId);
+  deleteRowsWhere(SHEETS.matchIntervals, 'match_id', matchId);
   (payload.appearances || []).forEach(function (a) {
     appendRow(SHEETS.matchAppearances, APPEARANCE_COLUMNS, Object.assign({ id: newId('ma') }, a, { match_id: matchId }));
   });
   (payload.events || []).forEach(function (ev) {
     appendRow(SHEETS.matchEvents, EVENT_COLUMNS, Object.assign({ id: newId('e') }, ev, { match_id: matchId }));
+  });
+  (payload.intervals || []).forEach(function (iv) {
+    appendRow(SHEETS.matchIntervals, INTERVAL_COLUMNS, Object.assign({ id: newId('iv') }, iv, { match_id: matchId }));
   });
   return true;
 }
@@ -321,4 +349,10 @@ function coerceAppearance(a) {
   a.minutos = a.minutos === '' || a.minutos === undefined ? 0 : Number(a.minutos);
   a.valoracion = a.valoracion === '' || a.valoracion === undefined ? null : Number(a.valoracion);
   return a;
+}
+
+function coerceInterval(iv) {
+  iv.entrada = iv.entrada === '' || iv.entrada === undefined ? 0 : Number(iv.entrada);
+  iv.salida = iv.salida === '' || iv.salida === undefined ? 0 : Number(iv.salida);
+  return iv;
 }

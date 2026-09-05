@@ -127,6 +127,7 @@ SM.forms = (function () {
           field('Nombre del club', '<input name="club_nombre" required value="' + esc(s.club_nombre) + '">', true) +
           field('Nombre del entrenador/a', '<input name="entrenador_nombre" required value="' + esc(s.entrenador_nombre) + '">', true) +
           field('Rol', '<input name="entrenador_rol" value="' + esc(s.entrenador_rol || 'Entrenador') + '">', true) +
+          field('Liga / competición (texto libre)', '<input name="liga_nombre" placeholder="Ej. Liga Alevín A · Grupo 3" value="' + esc(s.liga_nombre) + '">', true) +
         '</div>' +
         '<div class="form-actions">' +
           '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +

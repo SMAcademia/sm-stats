@@ -45,6 +45,7 @@
   function render(data) {
     const settings = data.settings || SM.sidebar.DEFAULT_SETTINGS;
     const clubName = settings.club_nombre;
+    const ligaNombre = settings.liga_nombre || SM.sidebar.DEFAULT_SETTINGS.liga_nombre;
     const coachFirstName = (settings.entrenador_nombre || '').split(/\s+/)[0] || 'Entrenador/a';
     const kpis = SM.stats.teamKpis(data);
     const nextMatch = kpis.nextMatch;
@@ -60,7 +61,7 @@
       '<div class="page-header">' +
         '<div><div class="page-title">Hola, ' + SM.ui.escapeHtml(coachFirstName) + '</div><div class="page-subtitle">' + todayHeader() + '</div></div>' +
         '<div style="display:flex;align-items:center;gap:14px;">' +
-          '<div class="badge" style="background:var(--panel);border:1px solid var(--border-soft);color:var(--text-dim);">Liga Regional · Grupo B</div>' +
+          '<div class="badge" style="background:var(--panel);border:1px solid var(--border-soft);color:var(--text-dim);">' + SM.ui.escapeHtml(ligaNombre) + '</div>' +
         '</div>' +
       '</div>' +
 
@@ -153,7 +154,7 @@
     return (
       '<div class="panel" style="padding:26px 30px;">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;">' +
-          '<span class="panel-title">Próximo partido · Jornada ' + (match.jornada || '—') + '</span>' +
+          '<span class="panel-title">Próximo partido · ' + SM.ui.competitionLabel(match.competicion) + ' · Jornada ' + (match.jornada || '—') + '</span>' +
           '<div class="badge" style="background:oklch(0.80 0.15 205 / 0.12);border:1px solid oklch(0.80 0.15 205 / 0.4);color:var(--cyan-bright);font-family:var(--font-display);">' +
             (days === 0 ? 'HOY' : 'FALTAN ' + days + ' DÍA' + (days === 1 ? '' : 'S')) +
           '</div>' +

@@ -5,6 +5,12 @@
   SM.sidebar.mount(shell, 'partidos');
   const main = document.getElementById('main');
 
+  // Category duration (minutes) drives how minutes-played is capped/defaulted
+  // in the acta — per club rules: Alevín se juega a 35', Benjamín a 30'.
+  const CATEGORY_DURATION = { 'Alevín': 35, 'Benjamín': 30 };
+  const DEFAULT_DURATION = 90;
+  function matchDuration(match) { return CATEGORY_DURATION[match.categoria] || DEFAULT_DURATION; }
+
   let DATA = null;
   let filter = 'todos';
 
@@ -15,6 +21,7 @@
   function render() {
     const settings = DATA.settings || SM.sidebar.DEFAULT_SETTINGS;
     const clubName = settings.club_nombre;
+    const ligaNombre = settings.liga_nombre || SM.sidebar.DEFAULT_SETTINGS.liga_nombre;
     const next = SM.stats.nextMatch(DATA);
     let list = DATA.matches.slice();
     if (filter === 'proximos') list = list.filter(function (m) { return !m.jugado; }).sort(function (a, b) { return a.fecha.localeCompare(b.fecha); });
@@ -23,7 +30,7 @@
 
     main.innerHTML =
       '<div class="page-header">' +
-        '<div><div class="page-title">Partidos</div><div class="page-subtitle">Liga Regional · Grupo B · Temporada 2026/27</div></div>' +
+        '<div><div class="page-title">Partidos</div><div class="page-subtitle">' + SM.ui.escapeHtml(ligaNombre) + ' · Temporada 2026/27</div></div>' +
         '<div style="display:flex;align-items:center;gap:14px;">' +
           '<div class="tabbar" id="tabbar">' +
             ['todos', 'proximos', 'jugados'].map(function (f) {
@@ -61,7 +68,7 @@
     return (
       '<div class="panel" style="padding:30px 40px;">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;">' +
-          '<span class="panel-title">Próximo partido · Jornada ' + (match.jornada || '—') + '</span>' +
+          '<span class="panel-title">Próximo partido · ' + SM.ui.competitionLabel(match.competicion) + ' · Jornada ' + (match.jornada || '—') + '</span>' +
           '<div class="badge" style="background:' + SM.ui.alpha('var(--cyan)', 0.12) + ';border:1px solid ' + SM.ui.alpha('var(--cyan)', 0.4) + ';color:var(--cyan-bright);font-family:var(--font-display);">' +
             (days <= 0 ? 'HOY' : 'FALTAN ' + days + ' DÍA' + (days === 1 ? '' : 'S')) +
           '</div>' +
@@ -120,7 +127,8 @@
     }
 
     return (
-      '<div class="panel" data-match="' + m.id + '" style="padding:16px 24px;display:grid;grid-template-columns:90px 1fr 140px 240px 26px;align-items:center;gap:16px;cursor:pointer;">' +
+      '<div class="panel" data-match="' + m.id + '" style="padding:16px 24px;display:grid;grid-template-columns:74px 90px 1fr 140px 200px 26px;align-items:center;gap:16px;cursor:pointer;">' +
+        '<span class="badge" style="justify-self:start;background:var(--panel-2);border:1px solid var(--border-soft);color:var(--text-mute);font-size:10.5px;padding:4px 8px;">' + SM.ui.competitionLabel(m.competicion) + '</span>' +
         '<span style="font-size:12.5px;color:var(--text-mute);font-weight:600;">' + SM.ui.formatDateShort(m.fecha) + '</span>' +
         '<div style="display:flex;align-items:center;gap:10px;">' +
           '<span style="font-size:15px;font-weight:700;color:var(--text);">' + (m.condicion === 'local' ? SM.ui.escapeHtml(clubName) : SM.ui.escapeHtml(m.rival)) + '</span>' +
@@ -143,6 +151,8 @@
           SM.forms.field('Hora', '<input name="hora" type="time" required value="17:00">') +
           SM.forms.field('Condición', SM.forms.selectHtml('condicion', [['local', 'Local'], ['visitante', 'Visitante']], 'local')) +
           SM.forms.field('Jornada', '<input name="jornada" type="number" min="1">') +
+          SM.forms.field('Competición', SM.forms.selectHtml('competicion', [['liga', 'Liga'], ['copa', 'Copa'], ['torneo', 'Torneo'], ['amistoso', 'Amistoso']], 'liga')) +
+          SM.forms.field('Categoría', SM.forms.selectHtml('categoria', [['Alevín', 'Alevín (35\')'], ['Benjamín', 'Benjamín (30\')']], 'Alevín')) +
           SM.forms.field('Lugar', '<input name="lugar" placeholder="Campo Municipal La Ribera">', true) +
         '</div><div class="form-actions">' +
           '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
@@ -168,6 +178,7 @@
   }
 
   function openMatchReportModal(match) {
+    const duration = matchDuration(match);
     const players = DATA.players.filter(function (p) { return p.activo; }).sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
     const appsByPlayer = {};
     DATA.matchAppearances.filter(function (a) { return a.match_id === match.id; }).forEach(function (a) { appsByPlayer[a.player_id] = a; });
@@ -176,16 +187,64 @@
       eventsByPlayer[e.player_id] = eventsByPlayer[e.player_id] || { gol: 0, asistencia: 0, amarilla: 0, roja: 0 };
       eventsByPlayer[e.player_id][e.tipo]++;
     });
+    const intervalsByPlayer = {};
+    (DATA.matchIntervals || []).filter(function (iv) { return iv.match_id === match.id; }).forEach(function (iv) {
+      (intervalsByPlayer[iv.player_id] = intervalsByPlayer[iv.player_id] || []).push({ entrada: iv.entrada, salida: iv.salida });
+    });
+    Object.keys(intervalsByPlayer).forEach(function (pid) {
+      intervalsByPlayer[pid].sort(function (a, b) { return a.entrada - b.entrada; });
+    });
 
-    const rows = players.map(function (p) {
+    // Editable on-pitch stretches per player (unlimited substitutions), e.g.
+    // 0-17 and 34-54 -> 37 minutes. Seeded from MatchIntervals, or from the
+    // old flat "minutos" field for matches saved before this existed.
+    const intervalsState = {};
+    players.forEach(function (p) {
+      const app = appsByPlayer[p.id];
+      if (intervalsByPlayer[p.id] && intervalsByPlayer[p.id].length) {
+        intervalsState[p.id] = intervalsByPlayer[p.id];
+      } else if (app) {
+        intervalsState[p.id] = [{ entrada: 0, salida: app.minutos || 0 }];
+      } else {
+        intervalsState[p.id] = [];
+      }
+    });
+
+    function totalMinutes(playerId) {
+      return (intervalsState[playerId] || []).reduce(function (sum, iv) {
+        return sum + Math.max(0, (Number(iv.salida) || 0) - (Number(iv.entrada) || 0));
+      }, 0);
+    }
+
+    function intervalsHtml(playerId) {
+      const list = intervalsState[playerId] || [];
+      return (
+        '<div style="display:flex;flex-direction:column;gap:4px;">' +
+          list.map(function (iv, idx) {
+            return (
+              '<div style="display:flex;align-items:center;gap:4px;">' +
+                '<input type="number" min="0" class="iv-in" data-player="' + playerId + '" data-idx="' + idx + '" value="' + iv.entrada + '" title="Minuto de entrada" style="width:46px;">' +
+                '<span style="color:var(--text-mute);">–</span>' +
+                '<input type="number" min="0" class="iv-out" data-player="' + playerId + '" data-idx="' + idx + '" value="' + iv.salida + '" title="Minuto de salida" style="width:46px;">' +
+                '<button type="button" class="iv-remove" data-player="' + playerId + '" data-idx="' + idx + '" title="Quitar cambio" style="width:22px;height:22px;flex:none;border-radius:6px;background:transparent;border:1px solid var(--border-soft);color:var(--text-mute);cursor:pointer;">×</button>' +
+              '</div>'
+            );
+          }).join('') +
+          '<button type="button" class="iv-add" data-player="' + playerId + '" style="align-self:flex-start;font-size:11px;font-weight:700;color:var(--cyan-bright);background:none;border:none;cursor:pointer;padding:2px 0;">+ Cambio</button>' +
+        '</div>'
+      );
+    }
+
+    function rowHtml(p) {
       const app = appsByPlayer[p.id];
       const ev = eventsByPlayer[p.id] || { gol: 0, asistencia: 0, amarilla: 0, roja: 0 };
-      const called = !!app || ev.gol || ev.asistencia || ev.amarilla || ev.roja;
+      const called = !!app || ev.gol || ev.asistencia || ev.amarilla || ev.roja || (intervalsState[p.id] && intervalsState[p.id].length);
       return (
         '<tr data-row="' + p.id + '">' +
-          '<td><input type="checkbox" name="conv_' + p.id + '"' + (called ? ' checked' : '') + '></td>' +
+          '<td><input type="checkbox" class="conv-cb" data-player="' + p.id + '" name="conv_' + p.id + '"' + (called ? ' checked' : '') + '></td>' +
           '<td style="text-align:left;">' + SM.ui.escapeHtml(p.nombre) + '</td>' +
-          '<td><input type="number" min="0" max="120" name="min_' + p.id + '" value="' + (app ? app.minutos : 90) + '" style="width:56px;"></td>' +
+          '<td data-total="' + p.id + '" style="font-weight:700;">' + totalMinutes(p.id) + '\'</td>' +
+          '<td data-intervals="' + p.id + '">' + intervalsHtml(p.id) + '</td>' +
           '<td><input type="number" min="0" max="10" step="0.1" name="nota_' + p.id + '" value="' + (app && app.valoracion != null ? app.valoracion : '') + '" style="width:56px;"></td>' +
           '<td><input type="number" min="0" name="gol_' + p.id + '" value="' + ev.gol + '" style="width:48px;"></td>' +
           '<td><input type="number" min="0" name="asis_' + p.id + '" value="' + ev.asistencia + '" style="width:48px;"></td>' +
@@ -193,7 +252,9 @@
           '<td><input type="checkbox" name="ro_' + p.id + '"' + (ev.roja ? ' checked' : '') + '></td>' +
         '</tr>'
       );
-    }).join('');
+    }
+
+    const rows = players.map(rowHtml).join('');
 
     const body = SM.ui.el('div', {
       html:
@@ -202,11 +263,11 @@
             SM.forms.field('Goles a favor', '<input name="golesFavor" type="number" min="0" value="' + (match.goles_favor != null ? match.goles_favor : '') + '">') +
             SM.forms.field('Goles en contra', '<input name="golesContra" type="number" min="0" value="' + (match.goles_contra != null ? match.goles_contra : '') + '">') +
           '</div>' +
-          '<div class="form-hint" style="margin:16px 0 8px;">Convocatoria y acta — marca quién jugó y sus datos.</div>' +
+          '<div class="form-hint" style="margin:16px 0 8px;">Convocatoria y acta — marca quién jugó y sus cambios (minuto de entrada y salida; los minutos totales se calculan solos). Duración del partido: ' + duration + ' min' + (match.categoria ? ' (' + SM.ui.escapeHtml(match.categoria) + ')' : '') + '.</div>' +
           '<div style="overflow-x:auto;">' +
-            '<table class="data-table" style="min-width:560px;">' +
-              '<thead><tr><th>Conv.</th><th style="text-align:left;">Jugador</th><th>Min</th><th>Nota</th><th>G</th><th>A</th><th>Am</th><th>Roja</th></tr></thead>' +
-              '<tbody>' + rows + '</tbody>' +
+            '<table class="data-table" style="min-width:740px;">' +
+              '<thead><tr><th>Conv.</th><th style="text-align:left;">Jugador</th><th>Min</th><th>Entrada – salida</th><th>Nota</th><th>G</th><th>A</th><th>Am</th><th>Roja</th></tr></thead>' +
+              '<tbody id="report-tbody">' + rows + '</tbody>' +
             '</table>' +
           '</div>' +
           '<div class="form-actions">' +
@@ -217,6 +278,51 @@
     });
     const handle = SM.ui.openModal('Acta · vs ' + match.rival, body);
     body.querySelector('#cancel-btn').addEventListener('click', handle.close);
+
+    function refreshPlayerCells(playerId) {
+      const cell = body.querySelector('[data-intervals="' + playerId + '"]');
+      if (cell) cell.innerHTML = intervalsHtml(playerId);
+      const totalCell = body.querySelector('[data-total="' + playerId + '"]');
+      if (totalCell) totalCell.textContent = totalMinutes(playerId) + '\'';
+    }
+
+    const tbody = body.querySelector('#report-tbody');
+    tbody.addEventListener('input', function (e) {
+      const t = e.target;
+      if (!t.classList.contains('iv-in') && !t.classList.contains('iv-out')) return;
+      const playerId = t.getAttribute('data-player');
+      const idx = Number(t.getAttribute('data-idx'));
+      const key = t.classList.contains('iv-in') ? 'entrada' : 'salida';
+      intervalsState[playerId][idx][key] = Number(t.value) || 0;
+      const totalCell = body.querySelector('[data-total="' + playerId + '"]');
+      if (totalCell) totalCell.textContent = totalMinutes(playerId) + '\'';
+    });
+    tbody.addEventListener('click', function (e) {
+      const addBtn = e.target.closest('.iv-add');
+      const removeBtn = e.target.closest('.iv-remove');
+      if (addBtn) {
+        const playerId = addBtn.getAttribute('data-player');
+        const list = intervalsState[playerId];
+        const lastOut = list.length ? list[list.length - 1].salida : 0;
+        list.push({ entrada: Math.min(lastOut, duration), salida: duration });
+        refreshPlayerCells(playerId);
+      } else if (removeBtn) {
+        const playerId = removeBtn.getAttribute('data-player');
+        const idx = Number(removeBtn.getAttribute('data-idx'));
+        intervalsState[playerId].splice(idx, 1);
+        refreshPlayerCells(playerId);
+      }
+    });
+    tbody.addEventListener('change', function (e) {
+      const cb = e.target.closest('.conv-cb');
+      if (!cb) return;
+      const playerId = cb.getAttribute('data-player');
+      if (cb.checked && (!intervalsState[playerId] || !intervalsState[playerId].length)) {
+        intervalsState[playerId] = [{ entrada: 0, salida: duration }];
+        refreshPlayerCells(playerId);
+      }
+    });
+
     body.querySelector('#report-form').addEventListener('submit', function (e) {
       e.preventDefault();
       const fd = new FormData(e.target);
@@ -224,12 +330,16 @@
       const golesContra = fd.get('golesContra') === '' ? null : Number(fd.get('golesContra'));
       const appearances = [];
       const events = [];
+      const intervals = [];
       players.forEach(function (p) {
         if (!fd.get('conv_' + p.id)) return;
         appearances.push({
           player_id: p.id,
-          minutos: Number(fd.get('min_' + p.id)) || 0,
+          minutos: totalMinutes(p.id),
           valoracion: fd.get('nota_' + p.id) ? Number(fd.get('nota_' + p.id)) : null
+        });
+        (intervalsState[p.id] || []).forEach(function (iv) {
+          intervals.push({ player_id: p.id, entrada: iv.entrada, salida: iv.salida });
         });
         const gol = Number(fd.get('gol_' + p.id)) || 0;
         const asis = Number(fd.get('asis_' + p.id)) || 0;
@@ -238,7 +348,7 @@
         if (fd.get('am_' + p.id)) events.push({ player_id: p.id, tipo: 'amarilla' });
         if (fd.get('ro_' + p.id)) events.push({ player_id: p.id, tipo: 'roja' });
       });
-      SM.api.postAction('saveMatchReport', { matchId: match.id, golesFavor: golesFavor, golesContra: golesContra, appearances: appearances, events: events })
+      SM.api.postAction('saveMatchReport', { matchId: match.id, golesFavor: golesFavor, golesContra: golesContra, appearances: appearances, events: events, intervals: intervals })
         .then(function () {
           handle.close();
           return SM.api.fetchAll(true);

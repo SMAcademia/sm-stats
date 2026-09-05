@@ -2,7 +2,8 @@
   "settings": {
     "club_nombre": "CD Ribera",
     "entrenador_nombre": "Marcos Vidal",
-    "entrenador_rol": "Entrenador"
+    "entrenador_rol": "Entrenador",
+    "liga_nombre": "Liga Alevín A · Grupo 3"
   },
   "players": [
     {
@@ -955,7 +956,9 @@
       "jornada": 9,
       "goles_favor": 4,
       "goles_contra": 1,
-      "jugado": true
+      "jugado": true,
+      "competicion": "liga",
+      "categoria": "Alevín"
     },
     {
       "id": "m2",
@@ -967,7 +970,9 @@
       "jornada": 10,
       "goles_favor": 0,
       "goles_contra": 0,
-      "jugado": true
+      "jugado": true,
+      "competicion": "liga",
+      "categoria": "Alevín"
     },
     {
       "id": "m3",
@@ -979,7 +984,9 @@
       "jornada": 11,
       "goles_favor": 3,
       "goles_contra": 1,
-      "jugado": true
+      "jugado": true,
+      "competicion": "liga",
+      "categoria": "Alevín"
     },
     {
       "id": "m4",
@@ -991,7 +998,9 @@
       "jornada": 12,
       "goles_favor": 2,
       "goles_contra": 2,
-      "jugado": true
+      "jugado": true,
+      "competicion": "liga",
+      "categoria": "Alevín"
     },
     {
       "id": "m5",
@@ -1003,7 +1012,9 @@
       "jornada": 13,
       "goles_favor": 2,
       "goles_contra": 0,
-      "jugado": true
+      "jugado": true,
+      "competicion": "liga",
+      "categoria": "Alevín"
     },
     {
       "id": "m6",
@@ -1015,7 +1026,9 @@
       "jornada": 14,
       "goles_favor": null,
       "goles_contra": null,
-      "jugado": false
+      "jugado": false,
+      "competicion": "amistoso",
+      "categoria": "Alevín"
     }
   ],
   "matchEvents": [
@@ -1436,5 +1449,6 @@
       "minutos": 90,
       "valoracion": 7.4
     }
-  ]
+  ],
+  "matchIntervals": []
 }

@@ -69,6 +69,11 @@ SM.ui = (function () {
       .replace(/'/g, '&#39;');
   }
 
+  const COMPETITION_LABELS = { liga: 'Liga', copa: 'Copa', torneo: 'Torneo', amistoso: 'Amistoso' };
+  function competitionLabel(code) {
+    return COMPETITION_LABELS[code] || '—';
+  }
+
   // Up to 3-letter badge initials for a club/team name, e.g. "CD Ribera" -> "CDR".
   function clubInitials(name) {
     if (!name) return '?';
@@ -175,6 +180,7 @@ SM.ui = (function () {
     ageFromBirthdate: ageFromBirthdate,
     initials: initials,
     clubInitials: clubInitials,
+    competitionLabel: competitionLabel,
     escapeHtml: escapeHtml,
     avatarHtml: avatarHtml,
     positionMeta: positionMeta,
