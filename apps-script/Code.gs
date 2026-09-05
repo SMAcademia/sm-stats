@@ -238,6 +238,9 @@ function doPost(e) {
       addStaffMember: addStaffMember,
       addMatch: addMatch,
       addSession: addSession,
+      addRecurringSessions: addRecurringSessions,
+      updateSession: updateSession,
+      deleteSession: deleteSession,
       saveMatchReport: saveMatchReport,
       saveAttendance: saveAttendance,
       updateSettings: updateSettings
@@ -285,6 +288,47 @@ function addSession(payload) {
   const row = Object.assign({ id: newId('se'), tipo: 'entrenamiento', match_id: '' }, payload);
   appendRow(SHEETS.sessions, SESSION_COLUMNS, row);
   return row;
+}
+
+// Creates one training session per date between fechaInicio/fechaFin (both
+// inclusive) whose weekday is in diasSemana (0=domingo..6=sábado) — e.g. a
+// club training Mon/Wed/Fri all season without adding each date by hand.
+function addRecurringSessions(payload) {
+  const dias = (payload.diasSemana || []).map(Number);
+  if (!dias.length) throw new Error('Selecciona al menos un día de la semana.');
+  if (!payload.fechaInicio) throw new Error('Falta la fecha de inicio.');
+  const start = new Date(payload.fechaInicio + 'T00:00:00');
+  const end = new Date((payload.fechaFin || payload.fechaInicio) + 'T00:00:00');
+  const created = [];
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    if (dias.indexOf(d.getDay()) === -1) continue;
+    const row = {
+      id: newId('se'),
+      fecha: Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+      hora: payload.hora || '',
+      tipo: 'entrenamiento',
+      lugar: payload.lugar || '',
+      match_id: ''
+    };
+    appendRow(SHEETS.sessions, SESSION_COLUMNS, row);
+    created.push(row);
+  }
+  return created;
+}
+
+// Fixes a single session's date/time/place — e.g. one Wednesday moves to a
+// different court, without touching the rest of the recurring series.
+function updateSession(payload) {
+  if (!payload.id) throw new Error('Falta el id de la sesión.');
+  updateRowById(SHEETS.sessions, SESSION_COLUMNS, payload.id, payload);
+  return payload;
+}
+
+function deleteSession(payload) {
+  if (!payload.id) throw new Error('Falta el id de la sesión.');
+  deleteRowsWhere(SHEETS.sessions, 'id', payload.id);
+  deleteRowsWhere(SHEETS.attendance, 'session_id', payload.id);
+  return true;
 }
 
 function saveMatchReport(payload) {

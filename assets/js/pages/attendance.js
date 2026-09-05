@@ -38,7 +38,8 @@
             '<span style="font-size:13.5px;font-weight:700;color:var(--text);width:120px;text-align:center;">' + MONTHS[viewMonth] + ' ' + viewYear + '</span>' +
             '<button id="next-month" style="background:none;border:none;color:#8a93a3;cursor:pointer;display:flex;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>' +
           '</div>' +
-          '<button id="new-session" class="btn btn-outline">+ Nueva sesión</button>' +
+          '<a href="calendario.html" class="btn btn-outline">Ver calendario</a>' +
+          '<button id="new-session" class="btn btn-outline">+ Nuevas sesiones</button>' +
           '<button id="take-attendance" class="btn btn-primary">+ Tomar asistencia</button>' +
         '</div>' +
       '</div>' +
@@ -75,10 +76,16 @@
 
     document.getElementById('prev-month').addEventListener('click', function () { shiftMonth(-1); });
     document.getElementById('next-month').addEventListener('click', function () { shiftMonth(1); });
-    document.getElementById('take-attendance').addEventListener('click', function () { openAttendanceModal(null); });
-    document.getElementById('new-session').addEventListener('click', openNewSessionForm);
+    document.getElementById('take-attendance').addEventListener('click', function () {
+      SM.forms.openAttendanceModal(DATA, null, function (data) { DATA = data; render(); });
+    });
+    document.getElementById('new-session').addEventListener('click', function () {
+      SM.forms.openRecurringSessionForm(function (data) { DATA = data; render(); });
+    });
     main.querySelectorAll('[data-session]').forEach(function (th) {
-      th.addEventListener('click', function () { openAttendanceModal(th.getAttribute('data-session')); });
+      th.addEventListener('click', function () {
+        SM.forms.openAttendanceModal(DATA, th.getAttribute('data-session'), function (data) { DATA = data; render(); });
+      });
     });
   }
 
@@ -142,106 +149,6 @@
     }).join('');
 
     return '<div style="padding:20px 22px;min-width:' + (210 + sessions.length * 64 + 100) + 'px;">' + header + rows + '</div>';
-  }
-
-  function openNewSessionForm() {
-    const defaultDate = new Date(viewYear, viewMonth, Math.min(now.getDate() + 7, 28)).toISOString().slice(0, 10);
-    const body = SM.ui.el('div', {
-      html:
-        '<form id="session-form"><div class="form-grid">' +
-          '<div class="form-field span-2"><label>Fecha</label><input name="fecha" type="date" required value="' + defaultDate + '"></div>' +
-          '<div class="form-field"><label>Hora</label><input name="hora" type="time" value="18:30"></div>' +
-          '<div class="form-field"><label>Lugar</label><input name="lugar" value="Campo Municipal La Ribera"></div>' +
-        '</div><div class="form-actions">' +
-          '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
-          '<button type="submit" class="btn btn-primary">Crear sesión</button>' +
-        '</div></form>'
-    });
-    const handle = SM.ui.openModal('Nuevo entrenamiento', body);
-    body.querySelector('#cancel-btn').addEventListener('click', handle.close);
-    body.querySelector('#session-form').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const payload = {};
-      new FormData(e.target).forEach(function (v, k) { payload[k] = v; });
-      SM.api.postAction('addSession', payload).then(function () {
-        handle.close();
-        return SM.api.fetchAll(true);
-      }).then(function (data) {
-        DATA = data;
-        viewYear = new Date(payload.fecha + 'T00:00:00').getFullYear();
-        viewMonth = new Date(payload.fecha + 'T00:00:00').getMonth();
-        render();
-        SM.ui.toast('Sesión creada.', 'ok');
-      }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
-    });
-  }
-
-  function openAttendanceModal(preselectSessionId) {
-    const allSessions = DATA.sessions.slice().sort(function (a, b) { return b.fecha.localeCompare(a.fecha); });
-    if (!allSessions.length) { SM.ui.toast('Todavía no hay sesiones creadas.', 'error'); return; }
-    const initialId = preselectSessionId || allSessions[0].id;
-
-    const body = SM.ui.el('div', {
-      html:
-        '<div class="form-field span-2" style="margin-bottom:18px;"><label>Sesión</label>' +
-          '<select id="session-select">' + allSessions.map(function (s) {
-            const label = SM.ui.formatDateLong(s.fecha) + ' · ' + (s.tipo === 'partido' ? 'Partido' : 'Entrenamiento') + (s.hora ? ' · ' + s.hora : '');
-            return '<option value="' + s.id + '"' + (s.id === initialId ? ' selected' : '') + '>' + label + '</option>';
-          }).join('') + '</select></div>' +
-        '<div id="player-toggle-list" style="display:flex;flex-direction:column;gap:10px;max-height:420px;overflow-y:auto;"></div>' +
-        '<div class="form-actions"><button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button><button type="button" class="btn btn-primary" id="save-btn">Guardar asistencia</button></div>'
-    });
-    const handle = SM.ui.openModal('Tomar asistencia', body);
-    body.querySelector('#cancel-btn').addEventListener('click', handle.close);
-
-    const state = {};
-    function loadSession(sessionId) {
-      const players = DATA.players.filter(function (p) { return p.activo; }).sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
-      players.forEach(function (p) {
-        const row = DATA.attendance.find(function (a) { return a.session_id === sessionId && a.player_id === p.id; });
-        state[p.id] = row ? row.estado : 'presente';
-      });
-      renderToggleList(players);
-    }
-
-    function renderToggleList(players) {
-      const list = body.querySelector('#player-toggle-list');
-      list.innerHTML = players.map(function (p) {
-        return (
-          '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">' +
-            '<div style="display:flex;align-items:center;gap:10px;">' + SM.ui.avatarHtml(p.foto_url, 30) + '<span style="font-size:13.5px;font-weight:600;color:var(--text);">' + SM.ui.escapeHtml(p.nombre) + '</span></div>' +
-            '<div style="display:flex;gap:6px;" data-player="' + p.id + '">' +
-              STATES.map(function (s) {
-                return '<button type="button" class="pill toggle-state" data-state="' + s.key + '" style="padding:6px 12px;font-size:12px;' + (state[p.id] === s.key ? 'background:' + SM.ui.alpha(s.color, 0.18) + ';color:' + s.color + ';font-weight:700;' : '') + '">' + s.label + '</button>';
-              }).join('') +
-            '</div>' +
-          '</div>'
-        );
-      }).join('');
-      list.querySelectorAll('.toggle-state').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          const playerId = btn.parentElement.getAttribute('data-player');
-          state[playerId] = btn.getAttribute('data-state');
-          renderToggleList(players);
-        });
-      });
-    }
-
-    body.querySelector('#session-select').addEventListener('change', function (e) { loadSession(e.target.value); });
-    loadSession(initialId);
-
-    body.querySelector('#save-btn').addEventListener('click', function () {
-      const sessionId = body.querySelector('#session-select').value;
-      const rows = Object.keys(state).map(function (playerId) { return { player_id: playerId, estado: state[playerId] }; });
-      SM.api.postAction('saveAttendance', { sessionId: sessionId, rows: rows }).then(function () {
-        handle.close();
-        return SM.api.fetchAll(true);
-      }).then(function (data) {
-        DATA = data;
-        render();
-        SM.ui.toast('Asistencia guardada.', 'ok');
-      }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
-    });
   }
 
   SM.api.fetchAll().then(function (data) {

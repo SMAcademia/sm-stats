@@ -75,6 +75,36 @@ SM.api = (function () {
         d.sessions.push(row);
         return row;
       }
+      case 'addRecurringSessions': {
+        const dias = (payload.diasSemana || []).map(Number);
+        const start = new Date(payload.fechaInicio + 'T00:00:00');
+        const end = new Date((payload.fechaFin || payload.fechaInicio) + 'T00:00:00');
+        const created = [];
+        for (const cur = new Date(start); cur <= end; cur.setDate(cur.getDate() + 1)) {
+          if (dias.indexOf(cur.getDay()) === -1) continue;
+          const row = {
+            id: nextMockId('se'),
+            fecha: cur.toISOString().slice(0, 10),
+            hora: payload.hora || '',
+            tipo: 'entrenamiento',
+            lugar: payload.lugar || '',
+            match_id: ''
+          };
+          d.sessions.push(row);
+          created.push(row);
+        }
+        return created;
+      }
+      case 'updateSession': {
+        const i = d.sessions.findIndex(function (s) { return s.id === payload.id; });
+        if (i >= 0) d.sessions[i] = Object.assign({}, d.sessions[i], payload);
+        return d.sessions[i];
+      }
+      case 'deleteSession': {
+        d.sessions = d.sessions.filter(function (s) { return s.id !== payload.id; });
+        d.attendance = d.attendance.filter(function (a) { return a.session_id !== payload.id; });
+        return true;
+      }
       case 'saveMatchReport': {
         const mi = d.matches.findIndex(function (m) { return m.id === payload.matchId; });
         if (mi >= 0) {
