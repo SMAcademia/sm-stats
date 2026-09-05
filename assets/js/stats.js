@@ -205,6 +205,16 @@ SM.stats = (function () {
     }).sort(function (a, b) { return a.fecha.localeCompare(b.fecha); });
   }
 
+  // Active players whose fecha_nacimiento falls on today's month/day (any birth year).
+  function birthdaysToday(data, today) {
+    const now = today || new Date();
+    return (data.players || []).filter(function (p) {
+      if (!p.activo || !p.fecha_nacimiento) return false;
+      const d = new Date(p.fecha_nacimiento + 'T00:00:00');
+      return !isNaN(d) && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    });
+  }
+
   return {
     ATTR_KEYS: ATTR_KEYS,
     overallRating: overallRating,
@@ -234,6 +244,7 @@ SM.stats = (function () {
     weeklyAttendanceTrend: weeklyAttendanceTrend,
     sessionsForMonth: sessionsForMonth,
     sessionsUpTo: sessionsUpTo,
-    upcomingSessions: upcomingSessions
+    upcomingSessions: upcomingSessions,
+    birthdaysToday: birthdaysToday
   };
 })();

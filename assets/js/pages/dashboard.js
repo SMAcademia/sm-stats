@@ -52,6 +52,7 @@
     const topScorers = SM.stats.topScorers(data, 4);
     const results = SM.stats.recentResults(data, 4);
     const trend = SM.stats.weeklyAttendanceTrend(data, 1)[0];
+    const birthdays = SM.stats.birthdaysToday(data);
 
     const daysLabel = nextMatch ? Math.max(0, daysUntil(nextMatch.fecha)) + ' días' : '—';
 
@@ -62,6 +63,8 @@
           '<div class="badge" style="background:var(--panel);border:1px solid var(--border-soft);color:var(--text-dim);">Liga Regional · Grupo B</div>' +
         '</div>' +
       '</div>' +
+
+      (birthdays.length ? birthdayCard(birthdays) : '') +
 
       '<div class="kpi-grid">' +
         kpiCard('Jugadores activos', kpis.activePlayers, { text: 'Plantilla actual' },
@@ -101,6 +104,37 @@
           (results.length ? results.map(resultChip).join('') : '<div class="empty-state">Todavía no hay partidos jugados</div>') +
         '</div>' +
       '</div>';
+  }
+
+  function birthdayCard(players) {
+    const today = new Date();
+    return (
+      '<div class="panel" style="display:flex;align-items:center;gap:22px;padding:20px 26px;flex-wrap:wrap;border:1px solid oklch(0.72 0.22 335 / 0.35);">' +
+        '<div class="panel-glow" style="top:-40px;left:-30px;width:150px;height:150px;background:radial-gradient(circle, ' + SM.ui.alpha('var(--magenta)', 0.18) + ', transparent 70%);"></div>' +
+        '<div style="display:flex;align-items:center;gap:12px;flex:none;">' +
+          '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--magenta-bright)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M4 21h16"/><path d="M5 21v-6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6"/>' +
+            '<path d="M8 13V9"/><path d="M12 13V9"/><path d="M16 13V9"/>' +
+            '<circle cx="8" cy="6.3" r="1.3"/><circle cx="12" cy="6.3" r="1.3"/><circle cx="16" cy="6.3" r="1.3"/>' +
+          '</svg>' +
+          '<span class="panel-title">' + (players.length === 1 ? 'Cumpleaños de hoy' : 'Cumpleaños de hoy (' + players.length + ')') + '</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:22px;flex-wrap:wrap;">' +
+          players.map(function (p) {
+            const age = SM.ui.ageFromBirthdate(p.fecha_nacimiento, today);
+            return (
+              '<div style="display:flex;align-items:center;gap:10px;">' +
+                SM.ui.avatarHtml(p.foto_url, 38) +
+                '<div style="display:flex;flex-direction:column;">' +
+                  '<span style="font-size:13.5px;font-weight:700;color:var(--text);">' + SM.ui.escapeHtml(p.nombre) + '</span>' +
+                  '<span style="font-size:12px;color:var(--text-mute);font-weight:600;">' + (age != null ? 'Cumple ' + age + ' años' : 'Cumpleaños') + '</span>' +
+                '</div>' +
+              '</div>'
+            );
+          }).join('') +
+        '</div>' +
+      '</div>'
+    );
   }
 
   function heroMatchCard(match, clubName) {
