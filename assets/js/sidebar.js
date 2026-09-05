@@ -9,6 +9,7 @@ SM.sidebar = (function () {
     asistencia: '<rect x="3.5" y="5" width="17" height="16" rx="2.4"/><path d="M3.5 9.5h17"/><path d="M8 3v4M16 3v4"/><path d="M8.5 13.3l2 2 4.2-4.4"/>',
     calendario: '<rect x="3.5" y="5" width="17" height="16" rx="2.4"/><path d="M3.5 9.5h17"/><path d="M8 3v4M16 3v4"/><circle cx="8.5" cy="14" r="1.1"/><circle cx="12" cy="14" r="1.1"/><circle cx="15.5" cy="14" r="1.1"/><circle cx="8.5" cy="17.3" r="1.1"/><circle cx="12" cy="17.3" r="1.1"/>',
     partidos: '<circle cx="12" cy="12" r="9"/><path d="M12 6.6 15.4 9l-1.3 3.9H9.9L8.6 9zM12 3v3.6M12 20.9V17.4M3.6 9.8l3.4 1.1M17 12.9l3.4 1.1M6.6 18.4l1.7-3M15.7 8.6l1.7-3"/>',
+    convocatorias: '<path d="M8 3.5h8a1.5 1.5 0 0 1 1.5 1.5v15a1.5 1.5 0 0 1-1.5 1.5H8a1.5 1.5 0 0 1-1.5-1.5V5A1.5 1.5 0 0 1 8 3.5Z"/><path d="M9.5 3.5V3a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v.5"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4.5"/>',
     estadisticas: '<path d="M4 20V10M11 20V4M18 20v-7"/><path d="M2.5 20h19"/>'
   };
 
@@ -18,6 +19,7 @@ SM.sidebar = (function () {
     { key: 'asistencia', label: 'Asistencia', href: 'asistencia.html' },
     { key: 'calendario', label: 'Calendario', href: 'calendario.html' },
     { key: 'partidos', label: 'Partidos', href: 'partidos.html' },
+    { key: 'convocatorias', label: 'Convocatorias', href: 'convocatorias.html' },
     { key: 'estadisticas', label: 'Estadísticas', href: 'estadisticas.html' }
   ];
 

@@ -705,3 +705,32 @@ button { font-family: inherit; }
   .main { padding: 20px; }
   .kpi-grid, .card-grid, .form-grid { grid-template-columns: 1fr; }
 }
+
+/* ---------- Convocatoria — printable call-up sheet ----------
+   Exported as PDF via the browser's own "Guardar como PDF" (window.print),
+   so no extra library is needed. Only .callup-sheet (and its contents) is
+   visible when printing — everything else on the page (sidebar, match
+   list, buttons) is hidden, and it switches from the neon dark theme to
+   plain black-on-white so it doesn't waste ink on a real printer. */
+.callup-sheet {
+  background: #fff;
+  color: #111;
+  border-radius: var(--radius-lg);
+  padding: 34px 38px;
+}
+.callup-sheet .callup-club { font-family: var(--font-display); font-weight: 800; font-size: 20px; }
+.callup-sheet .callup-title { font-family: var(--font-display); font-weight: 900; font-size: 15px; letter-spacing: 1px; color: #555; margin-top: 4px; }
+.callup-sheet .callup-meta { display: flex; flex-wrap: wrap; gap: 18px; margin: 18px 0 22px; padding: 14px 0; border-top: 1px solid #ddd; border-bottom: 1px solid #ddd; font-size: 13px; color: #333; }
+.callup-sheet .callup-meta strong { color: #111; }
+.callup-sheet table { width: 100%; border-collapse: collapse; }
+.callup-sheet th { text-align: left; font-size: 11px; letter-spacing: .5px; color: #777; padding: 6px 8px; border-bottom: 2px solid #333; }
+.callup-sheet td { padding: 7px 8px; border-bottom: 1px solid #e2e2e2; font-size: 13.5px; }
+.callup-sheet .callup-footer { margin-top: 24px; font-size: 11px; color: #999; }
+
+@media print {
+  html, body, .app-shell, .main { background: #fff; }
+  .sidebar, .page-header, .no-print { display: none !important; }
+  .main { padding: 0; }
+  .callup-page-grid { display: block; }
+  .callup-sheet { border-radius: 0; }
+}
