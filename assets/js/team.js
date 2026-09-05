@@ -5,10 +5,12 @@
 window.SM = window.SM || {};
 
 SM.team = (function () {
-  // "por parte" categories are two halves — duracion is the TOTAL match length.
+  // All categories play in two halves — duracion is the TOTAL match length
+  // (Alevín 35' x2, Benjamín 30' x2, Prebenjamín 25' x2; Miniprebenjamín is
+  // the one exception, played as a single 20' period).
   const CATEGORIES = [
-    { key: 'Alevín', duracion: 35 },
-    { key: 'Benjamín', duracion: 30 },
+    { key: 'Alevín', duracion: 70 },
+    { key: 'Benjamín', duracion: 60 },
     { key: 'Prebenjamín', duracion: 50 },
     { key: 'Miniprebenjamín', duracion: 20 }
   ];

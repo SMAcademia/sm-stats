@@ -54,6 +54,7 @@
     const results = SM.stats.recentResults(data, 4);
     const trend = SM.stats.weeklyAttendanceTrend(data, 1)[0];
     const birthdays = SM.stats.birthdaysToday(data);
+    const captainRanking = SM.stats.captainRanking(data);
 
     const daysLabel = nextMatch ? Math.max(0, daysUntil(nextMatch.fecha)) + ' días' : '—';
 
@@ -83,7 +84,7 @@
         trainingsCard(upcomingTrainings) +
       '</div>' +
 
-      '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:20px;">' +
+      '<div style="display:grid;grid-template-columns:1.2fr 0.8fr 1fr;gap:20px;">' +
         '<div class="panel">' +
           '<span class="panel-title">Top goleadores</span>' +
           '<div style="display:flex;flex-direction:column;gap:14px;margin-top:18px;">' +
@@ -97,6 +98,7 @@
             SM.charts.ringGauge(trend ? trend.pct : null, { color: 'var(--cyan)', label: 'MEDIA' }) +
           '</div>' +
         '</div>' +
+        captainsCard(captainRanking) +
       '</div>' +
 
       '<div class="panel">' +
@@ -105,6 +107,30 @@
           (results.length ? results.map(resultChip).join('') : '<div class="empty-state">Todavía no hay partidos jugados</div>') +
         '</div>' +
       '</div>';
+  }
+
+  // Full roster, most-captained first, zero-count players included — lets
+  // the coach see at a glance who's due a turn as captain (rotaciones).
+  function captainsCard(ranking) {
+    return (
+      '<div class="panel" style="display:flex;flex-direction:column;">' +
+        '<span class="panel-title">Ranking de capitanías</span>' +
+        (ranking.length ? (
+          '<div style="display:flex;flex-direction:column;gap:9px;margin-top:14px;max-height:230px;overflow-y:auto;">' +
+            ranking.map(function (r, i) {
+              return (
+                '<div style="display:flex;align-items:center;gap:10px;">' +
+                  '<span style="width:16px;font-size:11.5px;font-weight:700;color:var(--text-ghost);">' + (i + 1) + '</span>' +
+                  SM.ui.avatarHtml(r.player.foto_url, 26) +
+                  '<span style="flex:1;font-size:12.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + SM.ui.escapeHtml(r.player.nombre) + '</span>' +
+                  '<span style="font-family:var(--font-display);font-weight:800;font-size:13px;color:' + (r.count > 0 ? 'var(--amber-bright)' : 'var(--text-ghost)') + ';">' + r.count + '</span>' +
+                '</div>'
+              );
+            }).join('') +
+          '</div>'
+        ) : '<div class="empty-state">Todavía no hay capitanes registrados</div>') +
+      '</div>'
+    );
   }
 
   function birthdayCard(players) {

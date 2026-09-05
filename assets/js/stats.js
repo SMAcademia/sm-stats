@@ -60,6 +60,17 @@ SM.stats = (function () {
     return (data.matchAppearances || []).filter(function (a) { return a.player_id === playerId && a.capitan; }).length;
   }
 
+  // Every active player, most-captained first, ties broken by name — unlike
+  // topScorers/topAssisters this deliberately keeps 0-count players in the
+  // list so the coach can see who hasn't had a turn yet (rotation planning).
+  function captainRanking(data) {
+    const counts = {};
+    (data.matchAppearances || []).forEach(function (a) { if (a.capitan) counts[a.player_id] = (counts[a.player_id] || 0) + 1; });
+    return (data.players || []).filter(function (p) { return p.activo; })
+      .map(function (p) { return { player: p, count: counts[p.id] || 0 }; })
+      .sort(function (a, b) { return b.count - a.count || a.player.nombre.localeCompare(b.player.nombre); });
+  }
+
   function appearancesForPlayer(data, playerId) {
     const matchesById = byId(data.matches);
     return (data.matchAppearances || [])
@@ -232,6 +243,7 @@ SM.stats = (function () {
     yellowsForPlayer: yellowsForPlayer,
     redsForPlayer: redsForPlayer,
     captainCount: captainCount,
+    captainRanking: captainRanking,
     appearancesForPlayer: appearancesForPlayer,
     appearancesCount: appearancesCount,
     minutesForPlayer: minutesForPlayer,
