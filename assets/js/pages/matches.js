@@ -486,6 +486,12 @@
         SM.ui.toast('Se necesitan al menos 7 jugadores convocados para guardar el acta.', 'error');
         return;
       }
+      const starters = new Set();
+      intervals.forEach(function (iv) { if (Number(iv.entrada) === 0) starters.add(iv.player_id); });
+      if (starters.size !== 7) {
+        SM.ui.toast('El 7 inicial (minuto 0) debe ser exactamente 7 jugadores — ahora mismo hay ' + starters.size + '.', 'error');
+        return;
+      }
       SM.api.postAction('saveMatchReport', { matchId: match.id, golesFavor: golesFavor, golesContra: golesContra, appearances: appearances, events: events, intervals: intervals })
         .then(function () {
           handle.close();

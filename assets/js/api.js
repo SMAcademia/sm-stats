@@ -115,6 +115,12 @@ SM.api = (function () {
         if ((payload.appearances || []).length < 7) {
           throw new Error('Se necesitan al menos 7 jugadores convocados para guardar el acta.');
         }
+        const starterIds = {};
+        (payload.intervals || []).forEach(function (iv) { if (Number(iv.entrada) === 0) starterIds[iv.player_id] = true; });
+        const startersCount = Object.keys(starterIds).length;
+        if (startersCount !== 7) {
+          throw new Error('El 7 inicial (minuto 0) debe ser exactamente 7 jugadores — ahora mismo hay ' + startersCount + '.');
+        }
         const mi = d.matches.findIndex(function (m) { return m.id === payload.matchId; });
         if (mi >= 0) {
           const hasResult = payload.golesFavor != null && payload.golesContra != null;

@@ -16,6 +16,17 @@
     return DATA.matchAppearances.filter(function (a) { return a.match_id === matchId; });
   }
 
+  // Starting 7 (fútbol 7) — auto-filled from whoever has an interval
+  // starting at minute 0 in the acta; the acta itself enforces exactly 7.
+  function startersForMatch(matchId) {
+    const starterIds = {};
+    (DATA.matchIntervals || []).forEach(function (iv) {
+      if (iv.match_id === matchId && Number(iv.entrada) === 0) starterIds[iv.player_id] = true;
+    });
+    const playersById = SM.stats.byId(DATA.players);
+    return Object.keys(starterIds).map(function (id) { return playersById[id]; }).filter(Boolean);
+  }
+
   function render() {
     const settings = DATA.settings || SM.sidebar.DEFAULT_SETTINGS;
     const clubName = settings.club_nombre;
@@ -74,6 +85,7 @@
       .map(function (a) { return { player: playersById[a.player_id], capitan: a.capitan }; })
       .filter(function (r) { return r.player; })
       .sort(function (a, b) { return (a.player.dorsal || 99) - (b.player.dorsal || 99); });
+    const starters = startersForMatch(match.id);
 
     return (
       '<div style="display:flex;flex-direction:column;gap:16px;">' +
@@ -92,6 +104,12 @@
             '<span><strong>Lugar:</strong> ' + SM.ui.escapeHtml(match.lugar || '—') + '</span>' +
             (match.jornada ? '<span><strong>Jornada:</strong> ' + match.jornada + '</span>' : '') +
           '</div>' +
+          (starters.length === 7 ? (
+            '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:22px;">' +
+              '<span class="callup-title" style="margin:0;">7 INICIAL</span>' +
+              SM.pitch.renderLineup(starters, { width: 220 }) +
+            '</div>'
+          ) : '') +
           (rows.length ? (
             '<table>' +
               '<thead><tr><th>DORSAL</th><th>JUGADOR</th><th></th></tr></thead>' +

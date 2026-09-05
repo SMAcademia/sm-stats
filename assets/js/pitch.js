@@ -28,6 +28,18 @@ SM.pitch = (function () {
     );
   }
 
+  // Marcado plano (blanco/negro), sin neón — usado en la convocatoria
+  // imprimible, donde el fondo del papel es blanco.
+  function pitchMarkingsPlain() {
+    return (
+      '<rect x="2" y="2" width="96" height="126" rx="4" fill="#fff" stroke="#000" stroke-width="1"/>' +
+      '<line x1="2" y1="65" x2="98" y2="65" stroke="#000" stroke-width="0.8"/>' +
+      '<circle cx="50" cy="65" r="14" fill="none" stroke="#000" stroke-width="0.8"/>' +
+      '<rect x="24" y="2" width="52" height="16" fill="none" stroke="#000" stroke-width="0.8"/>' +
+      '<rect x="24" y="112" width="52" height="16" fill="none" stroke="#000" stroke-width="0.8"/>'
+    );
+  }
+
   // state: { primary: 'DEF'|null, secondary: ['CEN', ...] }
   // opts: { interactive: bool, width: number }
   function render(state, opts) {
@@ -75,5 +87,60 @@ SM.pitch = (function () {
     return { primary: state.primary || null, secondary: secondary };
   }
 
-  return { ZONES: ZONES, render: render, toggle: toggle };
+  // Evenly spaces n dots across a row, within [12, 88] on the 0-100 viewBox.
+  function rowXs(n) {
+    if (n <= 1) return [50];
+    const step = (88 - 12) / (n - 1);
+    const xs = [];
+    for (let i = 0; i < n; i++) xs.push(12 + step * i);
+    return xs;
+  }
+
+  function shortLabel(nombre) {
+    const parts = (nombre || '').trim().split(/\s+/);
+    return parts[0] + (parts[1] ? ' ' + parts[1][0] + '.' : '');
+  }
+
+  // Auto-filled starting 7 (fútbol 7) — one row per position group, with
+  // as many dots as players started in that group (no fixed 1-2-2-2
+  // assumption, since a coach's real formation varies match to match).
+  // players: array of exactly 7 {nombre, dorsal, posicion}.
+  // Siempre en blanco/negro plano: esto solo se usa en la hoja de
+  // convocatoria imprimible (fondo de papel blanco).
+  function renderLineup(players, opts) {
+    opts = opts || {};
+    const w = opts.width || 260;
+    const h = Math.round(w * 1.3);
+    const rowY = { POR: 90, DEF: 68, CEN: 44, DEL: 21 };
+    const labelBelow = { POR: true, DEF: true, CEN: false, DEL: false };
+    const groups = { POR: [], DEF: [], CEN: [], DEL: [] };
+    (players || []).forEach(function (p) { (groups[p.posicion] || groups.CEN).push(p); });
+
+    let dots = '';
+    ['POR', 'DEF', 'CEN', 'DEL'].forEach(function (code) {
+      const list = groups[code];
+      if (!list.length) return;
+      const xs = rowXs(list.length);
+      const y = rowY[code];
+      const labelY = y + (labelBelow[code] ? 13 : -12);
+      list.forEach(function (p, i) {
+        const x = xs[i];
+        dots += (
+          '<g>' +
+            '<circle cx="' + x + '" cy="' + y + '" r="9" fill="#fff" stroke="#000" stroke-width="1.5"/>' +
+            '<text x="' + x + '" y="' + (y + 2.6) + '" text-anchor="middle" font-size="6.5" font-weight="800" fill="#000">' + (p.dorsal != null ? p.dorsal : '') + '</text>' +
+            '<text x="' + x + '" y="' + labelY + '" text-anchor="middle" font-size="5.4" font-weight="700" fill="#000">' + SM.ui.escapeHtml(shortLabel(p.nombre)) + '</text>' +
+          '</g>'
+        );
+      });
+    });
+
+    return (
+      '<svg viewBox="0 0 100 130" width="' + w + '" height="' + h + '" style="overflow:visible;flex:none;">' +
+        pitchMarkingsPlain() + dots +
+      '</svg>'
+    );
+  }
+
+  return { ZONES: ZONES, render: render, toggle: toggle, renderLineup: renderLineup };
 })();

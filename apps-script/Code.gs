@@ -38,6 +38,7 @@ const MATCH_COLUMNS = ['id', 'fecha', 'hora', 'rival', 'condicion', 'lugar', 'jo
 const EVENT_COLUMNS = ['id', 'match_id', 'player_id', 'tipo'];
 const APPEARANCE_COLUMNS = ['id', 'match_id', 'player_id', 'minutos', 'valoracion', 'capitan'];
 const MIN_CONVOCADOS = 7;
+const TITULARES_MINUTO_CERO = 7;
 // One row per stretch a player spent on the pitch (unlimited substitutions):
 // entrada/salida are match minutes, e.g. 0-17 and 34-54 -> 37 minutes total.
 const INTERVAL_COLUMNS = ['id', 'match_id', 'player_id', 'entrada', 'salida'];
@@ -362,6 +363,12 @@ function saveMatchReport(payload) {
   if (!matchId) throw new Error('Falta el id del partido.');
   if ((payload.appearances || []).length < MIN_CONVOCADOS) {
     throw new Error('Se necesitan al menos ' + MIN_CONVOCADOS + ' jugadores convocados para guardar el acta.');
+  }
+  const starters = {};
+  (payload.intervals || []).forEach(function (iv) { if (Number(iv.entrada) === 0) starters[iv.player_id] = true; });
+  const startersCount = Object.keys(starters).length;
+  if (startersCount !== TITULARES_MINUTO_CERO) {
+    throw new Error('El 7 inicial (minuto 0) debe ser exactamente ' + TITULARES_MINUTO_CERO + ' jugadores — ahora mismo hay ' + startersCount + '.');
   }
   const hasResult = payload.golesFavor !== null && payload.golesFavor !== undefined &&
     payload.golesContra !== null && payload.golesContra !== undefined;
