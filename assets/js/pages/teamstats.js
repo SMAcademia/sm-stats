@@ -20,7 +20,7 @@
   let sortDir = -1;
 
   SM.sidebar.onSettingsClick(function () {
-    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = data; });
+    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = SM.team.filterData(data, SM.team.current()); });
   });
 
   function render() {
@@ -122,7 +122,7 @@
   }
 
   SM.api.fetchAll().then(function (data) {
-    DATA = data;
+    DATA = SM.team.filterData(data, SM.team.current());
     SM.sidebar.applySettings(data.settings);
     render();
   }).catch(function (err) {

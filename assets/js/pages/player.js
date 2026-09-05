@@ -17,7 +17,7 @@
   let DATA = null;
 
   SM.sidebar.onSettingsClick(function () {
-    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = data; });
+    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = SM.team.filterData(data, SM.team.current()); });
   });
 
   function render() {
@@ -34,6 +34,7 @@
     const minutos = SM.stats.minutesForPlayer(DATA, p.id);
     const amarillas = SM.stats.yellowsForPlayer(DATA, p.id);
     const asistenciaPct = SM.stats.attendancePct(DATA, p.id);
+    const capitanias = SM.stats.captainCount(DATA, p.id);
     const age = SM.ui.ageFromBirthdate(p.fecha_nacimiento);
 
     const radarAttrs = [
@@ -60,13 +61,14 @@
       '<div style="display:grid;grid-template-columns:320px 1fr;gap:22px;">' +
         leftCardHtml(p, meta, rating, age) +
         '<div style="display:flex;flex-direction:column;gap:20px;">' +
-          '<div style="display:grid;grid-template-columns:repeat(6, minmax(0,1fr));gap:14px;">' +
+          '<div style="display:grid;grid-template-columns:repeat(7, minmax(0,1fr));gap:12px;">' +
             miniKpi(goles, 'GOLES', 'var(--green)') +
             miniKpi(asistencias, 'ASISTENCIAS', 'var(--cyan)') +
             miniKpi(pj, 'PARTIDOS', 'var(--text)') +
             miniKpi(minutos, 'MINUTOS', 'var(--text)') +
             miniKpi(amarillas, 'AMARILLAS', 'var(--amber)') +
             miniKpi(asistenciaPct != null ? asistenciaPct + '%' : '—', 'ASISTENCIA', 'var(--magenta)') +
+            miniKpi(capitanias, 'CAPITÁN', 'var(--amber-bright)') +
           '</div>' +
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">' +
             '<div class="panel"><span class="panel-title">Atributos</span>' +
@@ -86,7 +88,7 @@
       '</div>';
 
     main.querySelector('#edit-player-btn').addEventListener('click', function () {
-      SM.forms.openPlayerForm(p, function (data) { DATA = data; render(); });
+      SM.forms.openPlayerForm(p, function (data) { DATA = SM.team.filterData(data, SM.team.current()); render(); });
     });
   }
 
@@ -164,7 +166,7 @@
     main.innerHTML = '<div class="empty-state">Falta el parámetro de jugador. <a href="plantilla.html">Volver a la plantilla</a></div>';
   } else {
     SM.api.fetchAll().then(function (data) {
-      DATA = data;
+      DATA = SM.team.filterData(data, SM.team.current());
       SM.sidebar.applySettings(data.settings);
       render();
     }).catch(function (err) {

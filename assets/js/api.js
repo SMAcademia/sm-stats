@@ -45,19 +45,12 @@ SM.api = (function () {
     return prefix + Date.now().toString(36) + Math.floor(Math.random() * 1000);
   }
 
-  // Local-date (not UTC) yyyy-MM-dd — Date#toISOString shifts the calendar
-  // day for anyone west/east of UTC, which would silently misdate generated
-  // sessions/matches for a coach outside that timezone.
-  function isoFromLocalDate(d) {
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  }
-
   function applyMockAction(action, payload) {
     const d = cache;
     function createMockMatch(m) {
       const row = Object.assign({ id: nextMockId('m'), jugado: false, goles_favor: null, goles_contra: null }, m);
       d.matches.push(row);
-      d.sessions.push({ id: nextMockId('se'), fecha: row.fecha, hora: row.hora, tipo: 'partido', lugar: row.lugar, match_id: row.id });
+      d.sessions.push({ id: nextMockId('se'), fecha: row.fecha, hora: row.hora, tipo: 'partido', lugar: row.lugar, match_id: row.id, categoria: row.categoria });
       return row;
     }
     switch (action) {
@@ -96,11 +89,12 @@ SM.api = (function () {
           if (dias.indexOf(cur.getDay()) === -1) continue;
           const row = {
             id: nextMockId('se'),
-            fecha: isoFromLocalDate(cur),
+            fecha: SM.ui.formatDateIso(cur),
             hora: payload.hora || '',
             tipo: 'entrenamiento',
             lugar: payload.lugar || '',
-            match_id: ''
+            match_id: '',
+            categoria: payload.categoria || ''
           };
           d.sessions.push(row);
           created.push(row);
@@ -118,6 +112,9 @@ SM.api = (function () {
         return true;
       }
       case 'saveMatchReport': {
+        if ((payload.appearances || []).length < 7) {
+          throw new Error('Se necesitan al menos 7 jugadores convocados para guardar el acta.');
+        }
         const mi = d.matches.findIndex(function (m) { return m.id === payload.matchId; });
         if (mi >= 0) {
           const hasResult = payload.golesFavor != null && payload.golesContra != null;

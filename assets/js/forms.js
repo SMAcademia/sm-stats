@@ -32,7 +32,7 @@ SM.forms = (function () {
           field('Pie dominante', selectHtml('pie', [['Derecho', 'Derecho'], ['Izquierdo', 'Izquierdo'], ['Ambos', 'Ambos']], p.pie)) +
           field('Fecha de nacimiento', '<input name="fecha_nacimiento" type="date" value="' + esc(p.fecha_nacimiento) + '">') +
           field('Nacionalidad', '<input name="nacionalidad" value="' + esc(p.nacionalidad || 'España') + '">') +
-          field('Categoría', '<input name="categoria" value="' + esc(p.categoria || 'Senior') + '">') +
+          field('Categoría (equipo)', selectHtml('categoria', SM.team.CATEGORIES.map(function (c) { return [c.key, c.key]; }), p.categoria || SM.team.current())) +
           field('Altura (cm)', '<input name="altura_cm" type="number" value="' + esc(p.altura_cm) + '">') +
           field('Peso (kg)', '<input name="peso_kg" type="number" value="' + esc(p.peso_kg) + '">') +
           field('Contacto de emergencia', '<input name="contacto_emergencia" value="' + esc(p.contacto_emergencia) + '">', true) +
@@ -167,9 +167,7 @@ SM.forms = (function () {
   ];
   const DEFAULT_WEEKDAYS = [1, 3, 5];
 
-  // Local-date (not UTC) yyyy-MM-dd — avoids Date#toISOString shifting the
-  // day for anyone west/east of UTC.
-  function isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  const isoDate = SM.ui.formatDateIso;
 
   function recurringSessionFormHtml() {
     const today = new Date();
@@ -212,7 +210,7 @@ SM.forms = (function () {
       e.preventDefault();
       const dias = Array.prototype.slice.call(body.querySelectorAll('.toggle-day.active')).map(function (b) { return Number(b.getAttribute('data-day')); });
       if (!dias.length) { SM.ui.toast('Selecciona al menos un día de la semana.', 'error'); return; }
-      const payload = { diasSemana: dias };
+      const payload = { diasSemana: dias, categoria: SM.team.current() };
       new FormData(e.target).forEach(function (v, k) { payload[k] = v; });
       let createdCount = 0;
       SM.api.postAction('addRecurringSessions', payload).then(function (created) {

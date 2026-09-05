@@ -5,17 +5,16 @@
   SM.sidebar.mount(shell, 'partidos');
   const main = document.getElementById('main');
 
-  // Category duration (minutes) drives how minutes-played is capped/defaulted
-  // in the acta — per club rules: Alevín se juega a 35', Benjamín a 30'.
-  const CATEGORY_DURATION = { 'Alevín': 35, 'Benjamín': 30 };
-  const DEFAULT_DURATION = 90;
-  function matchDuration(match) { return CATEGORY_DURATION[match.categoria] || DEFAULT_DURATION; }
+  function matchDuration(match) { return SM.team.duration(match.categoria); }
+  function categoryOptions() {
+    return SM.team.CATEGORIES.map(function (c) { return [c.key, c.key + ' (' + c.duracion + '\')']; });
+  }
 
   let DATA = null;
   let filter = 'todos';
 
   SM.sidebar.onSettingsClick(function () {
-    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = data; render(); });
+    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = SM.team.filterData(data, SM.team.current()); render(); });
   });
 
   function render() {
@@ -154,7 +153,7 @@
           SM.forms.field('Condición', SM.forms.selectHtml('condicion', [['local', 'Local'], ['visitante', 'Visitante']], 'local')) +
           SM.forms.field('Jornada', '<input name="jornada" type="number" min="1">') +
           SM.forms.field('Competición', SM.forms.selectHtml('competicion', [['liga', 'Liga'], ['copa', 'Copa'], ['torneo', 'Torneo'], ['amistoso', 'Amistoso']], 'liga')) +
-          SM.forms.field('Categoría', SM.forms.selectHtml('categoria', [['Alevín', 'Alevín (35\')'], ['Benjamín', 'Benjamín (30\')']], 'Alevín')) +
+          SM.forms.field('Categoría', SM.forms.selectHtml('categoria', categoryOptions(), SM.team.current())) +
           SM.forms.field('Lugar', '<input name="lugar" placeholder="Campo Municipal La Ribera">', true) +
         '</div><div class="form-actions">' +
           '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
@@ -172,7 +171,7 @@
         handle.close();
         return SM.api.fetchAll(true);
       }).then(function (data) {
-        DATA = data;
+        DATA = SM.team.filterData(data, SM.team.current());
         render();
         SM.ui.toast('Partido añadido.', 'ok');
       }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
@@ -254,7 +253,7 @@
       html:
         '<div class="form-grid">' +
           SM.forms.field('Competición (para todos)', SM.forms.selectHtml('competicion', [['liga', 'Liga'], ['copa', 'Copa'], ['torneo', 'Torneo'], ['amistoso', 'Amistoso']], 'liga')) +
-          SM.forms.field('Categoría (para todos)', SM.forms.selectHtml('categoria', [['Alevín', 'Alevín (35\')'], ['Benjamín', 'Benjamín (30\')']], 'Alevín')) +
+          SM.forms.field('Categoría (para todos)', SM.forms.selectHtml('categoria', categoryOptions(), SM.team.current())) +
           SM.forms.field('Lugar por defecto (opcional)', '<input name="lugarDefecto" placeholder="Campo Municipal La Ribera">', true) +
         '</div>' +
         '<div style="margin-top:14px;">' +
@@ -302,7 +301,7 @@
         handle.close();
         return SM.api.fetchAll(true);
       }).then(function (data) {
-        DATA = data;
+        DATA = SM.team.filterData(data, SM.team.current());
         render();
         SM.ui.toast(matches.length + (matches.length === 1 ? ' partido importado.' : ' partidos importados.'), 'ok');
       }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
@@ -377,6 +376,7 @@
           '<td style="text-align:left;">' + SM.ui.escapeHtml(p.nombre) + '</td>' +
           '<td data-total="' + p.id + '" style="font-weight:700;">' + totalMinutes(p.id) + '\'</td>' +
           '<td data-intervals="' + p.id + '">' + intervalsHtml(p.id) + '</td>' +
+          '<td><input type="radio" name="capitan" value="' + p.id + '" title="Capitán"' + (app && app.capitan ? ' checked' : '') + '></td>' +
           '<td><input type="number" min="0" max="10" step="0.1" name="nota_' + p.id + '" value="' + (app && app.valoracion != null ? app.valoracion : '') + '" style="width:56px;"></td>' +
           '<td><input type="number" min="0" name="gol_' + p.id + '" value="' + ev.gol + '" style="width:48px;"></td>' +
           '<td><input type="number" min="0" name="asis_' + p.id + '" value="' + ev.asistencia + '" style="width:48px;"></td>' +
@@ -395,10 +395,10 @@
             SM.forms.field('Goles a favor', '<input name="golesFavor" type="number" min="0" value="' + (match.goles_favor != null ? match.goles_favor : '') + '">') +
             SM.forms.field('Goles en contra', '<input name="golesContra" type="number" min="0" value="' + (match.goles_contra != null ? match.goles_contra : '') + '">') +
           '</div>' +
-          '<div class="form-hint" style="margin:16px 0 8px;">Convocatoria y acta — marca quién jugó y sus cambios (minuto de entrada y salida; los minutos totales se calculan solos). Duración del partido: ' + duration + ' min' + (match.categoria ? ' (' + SM.ui.escapeHtml(match.categoria) + ')' : '') + '.</div>' +
+          '<div class="form-hint" style="margin:16px 0 8px;">Convocatoria y acta — marca quién jugó, sus cambios (minuto de entrada y salida; los minutos totales se calculan solos) y el capitán. Se necesitan al menos 7 convocados para guardar. Duración del partido: ' + duration + ' min' + (match.categoria ? ' (' + SM.ui.escapeHtml(match.categoria) + ')' : '') + '.</div>' +
           '<div style="overflow-x:auto;">' +
-            '<table class="data-table" style="min-width:740px;">' +
-              '<thead><tr><th>Conv.</th><th style="text-align:left;">Jugador</th><th>Min</th><th>Entrada – salida</th><th>Nota</th><th>G</th><th>A</th><th>Am</th><th>Roja</th></tr></thead>' +
+            '<table class="data-table" style="min-width:800px;">' +
+              '<thead><tr><th>Conv.</th><th style="text-align:left;">Jugador</th><th>Min</th><th>Entrada – salida</th><th>C</th><th>Nota</th><th>G</th><th>A</th><th>Am</th><th>Roja</th></tr></thead>' +
               '<tbody id="report-tbody">' + rows + '</tbody>' +
             '</table>' +
           '</div>' +
@@ -460,6 +460,7 @@
       const fd = new FormData(e.target);
       const golesFavor = fd.get('golesFavor') === '' ? null : Number(fd.get('golesFavor'));
       const golesContra = fd.get('golesContra') === '' ? null : Number(fd.get('golesContra'));
+      const capitanId = fd.get('capitan');
       const appearances = [];
       const events = [];
       const intervals = [];
@@ -468,7 +469,8 @@
         appearances.push({
           player_id: p.id,
           minutos: totalMinutes(p.id),
-          valoracion: fd.get('nota_' + p.id) ? Number(fd.get('nota_' + p.id)) : null
+          valoracion: fd.get('nota_' + p.id) ? Number(fd.get('nota_' + p.id)) : null,
+          capitan: p.id === capitanId
         });
         (intervalsState[p.id] || []).forEach(function (iv) {
           intervals.push({ player_id: p.id, entrada: iv.entrada, salida: iv.salida });
@@ -480,12 +482,16 @@
         if (fd.get('am_' + p.id)) events.push({ player_id: p.id, tipo: 'amarilla' });
         if (fd.get('ro_' + p.id)) events.push({ player_id: p.id, tipo: 'roja' });
       });
+      if (appearances.length < 7) {
+        SM.ui.toast('Se necesitan al menos 7 jugadores convocados para guardar el acta.', 'error');
+        return;
+      }
       SM.api.postAction('saveMatchReport', { matchId: match.id, golesFavor: golesFavor, golesContra: golesContra, appearances: appearances, events: events, intervals: intervals })
         .then(function () {
           handle.close();
           return SM.api.fetchAll(true);
         }).then(function (data) {
-          DATA = data;
+          DATA = SM.team.filterData(data, SM.team.current());
           render();
           SM.ui.toast('Acta guardada.', 'ok');
         }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
@@ -493,7 +499,7 @@
   }
 
   SM.api.fetchAll().then(function (data) {
-    DATA = data;
+    DATA = SM.team.filterData(data, SM.team.current());
     SM.sidebar.applySettings(data.settings);
     render();
   }).catch(function (err) {

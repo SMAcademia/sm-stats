@@ -7,7 +7,7 @@
   let DATA = null;
 
   SM.sidebar.onSettingsClick(function () {
-    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = data; render(data); });
+    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = SM.team.filterData(data, SM.team.current()); render(DATA); });
   });
 
   const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -222,9 +222,9 @@
   }
 
   SM.api.fetchAll().then(function (data) {
-    DATA = data;
-    SM.sidebar.applySettings(data.settings);
-    render(data);
+    DATA = SM.team.filterData(data, SM.team.current());
+    SM.sidebar.applySettings(DATA.settings);
+    render(DATA);
   }).catch(function (err) {
     main.innerHTML = '<div class="empty-state">' + err.message + '</div>';
   });

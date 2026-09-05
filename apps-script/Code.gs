@@ -32,11 +32,12 @@ const SHEETS = {
 
 const PLAYER_COLUMNS = ['id', 'nombre', 'dorsal', 'posicion', 'posicion_secundaria', 'pie', 'fecha_nacimiento', 'nacionalidad', 'altura_cm', 'peso_kg', 'contacto_emergencia', 'categoria', 'club_anterior', 'fecha_alta', 'foto_url', 'activo', 'ritmo', 'tiro', 'pase', 'regate', 'defensa', 'fisico'];
 const STAFF_COLUMNS = ['id', 'nombre', 'rol', 'licencia', 'fecha_alta', 'foto_url'];
-const SESSION_COLUMNS = ['id', 'fecha', 'hora', 'tipo', 'lugar', 'match_id'];
+const SESSION_COLUMNS = ['id', 'fecha', 'hora', 'tipo', 'lugar', 'match_id', 'categoria'];
 const ATTENDANCE_COLUMNS = ['id', 'session_id', 'player_id', 'estado'];
 const MATCH_COLUMNS = ['id', 'fecha', 'hora', 'rival', 'condicion', 'lugar', 'jornada', 'competicion', 'categoria', 'goles_favor', 'goles_contra', 'jugado'];
 const EVENT_COLUMNS = ['id', 'match_id', 'player_id', 'tipo'];
-const APPEARANCE_COLUMNS = ['id', 'match_id', 'player_id', 'minutos', 'valoracion'];
+const APPEARANCE_COLUMNS = ['id', 'match_id', 'player_id', 'minutos', 'valoracion', 'capitan'];
+const MIN_CONVOCADOS = 7;
 // One row per stretch a player spent on the pitch (unlimited substitutions):
 // entrada/salida are match minutes, e.g. 0-17 and 34-54 -> 37 minutes total.
 const INTERVAL_COLUMNS = ['id', 'match_id', 'player_id', 'entrada', 'salida'];
@@ -296,7 +297,7 @@ function createMatchWithSession(payload) {
   appendRow(SHEETS.matches, MATCH_COLUMNS, row);
   // Un partido es también una sesión, así aparece en la tabla de asistencia.
   appendRow(SHEETS.sessions, SESSION_COLUMNS, {
-    id: newId('se'), fecha: row.fecha, hora: row.hora, tipo: 'partido', lugar: row.lugar, match_id: row.id
+    id: newId('se'), fecha: row.fecha, hora: row.hora, tipo: 'partido', lugar: row.lugar, match_id: row.id, categoria: row.categoria
   });
   return row;
 }
@@ -325,7 +326,8 @@ function addRecurringSessions(payload) {
       hora: payload.hora || '',
       tipo: 'entrenamiento',
       lugar: payload.lugar || '',
-      match_id: ''
+      match_id: '',
+      categoria: payload.categoria || ''
     };
     appendRow(SHEETS.sessions, SESSION_COLUMNS, row);
     created.push(row);
@@ -351,6 +353,9 @@ function deleteSession(payload) {
 function saveMatchReport(payload) {
   const matchId = payload.matchId;
   if (!matchId) throw new Error('Falta el id del partido.');
+  if ((payload.appearances || []).length < MIN_CONVOCADOS) {
+    throw new Error('Se necesitan al menos ' + MIN_CONVOCADOS + ' jugadores convocados para guardar el acta.');
+  }
   const hasResult = payload.golesFavor !== null && payload.golesFavor !== undefined &&
     payload.golesContra !== null && payload.golesContra !== undefined;
   updateRowById(SHEETS.matches, MATCH_COLUMNS, matchId, {
@@ -409,6 +414,7 @@ function coerceMatch(m) {
 function coerceAppearance(a) {
   a.minutos = a.minutos === '' || a.minutos === undefined ? 0 : Number(a.minutos);
   a.valoracion = a.valoracion === '' || a.valoracion === undefined ? null : Number(a.valoracion);
+  a.capitan = a.capitan === true || a.capitan === 'TRUE' || a.capitan === 'true' || a.capitan === 1;
   return a;
 }
 

@@ -49,6 +49,14 @@ SM.sidebar = (function () {
             '<span class="club" id="sidebar-club-name">' + SM.ui.escapeHtml(s.club_nombre) + '</span>' +
           '</div>' +
         '</div>' +
+        '<div style="padding:0 20px 14px;">' +
+          '<select id="sidebar-team-select" title="Equipo activo" ' +
+            'style="width:100%;padding:8px 10px;border-radius:9px;background:var(--panel-2);border:1px solid var(--border-soft);color:var(--text);font-family:var(--font-ui);font-size:12.5px;font-weight:700;cursor:pointer;">' +
+            SM.team.CATEGORIES.map(function (c) {
+              return '<option value="' + c.key + '"' + (c.key === SM.team.current() ? ' selected' : '') + '>' + c.key + '</option>';
+            }).join('') +
+          '</select>' +
+        '</div>' +
         '<div class="sidebar-rule"></div>' +
         '<nav class="sidebar-nav">' + nav + '</nav>' +
         '<div class="sidebar-footer">' +
@@ -80,6 +88,13 @@ SM.sidebar = (function () {
     if (btn) {
       btn.addEventListener('mouseenter', function () { btn.style.background = 'var(--panel-2)'; btn.style.color = 'var(--text)'; });
       btn.addEventListener('mouseleave', function () { btn.style.background = 'transparent'; btn.style.color = 'var(--text-mute)'; });
+    }
+    const teamSelect = document.getElementById('sidebar-team-select');
+    if (teamSelect) {
+      teamSelect.addEventListener('change', function (e) {
+        SM.team.setCurrent(e.target.value);
+        window.location.reload();
+      });
     }
   }
 

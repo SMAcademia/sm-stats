@@ -56,6 +56,9 @@ SM.stats = (function () {
   function assistsForPlayer(data, playerId) { return eventsForPlayer(data, playerId, 'asistencia').length; }
   function yellowsForPlayer(data, playerId) { return eventsForPlayer(data, playerId, 'amarilla').length; }
   function redsForPlayer(data, playerId) { return eventsForPlayer(data, playerId, 'roja').length; }
+  function captainCount(data, playerId) {
+    return (data.matchAppearances || []).filter(function (a) { return a.player_id === playerId && a.capitan; }).length;
+  }
 
   function appearancesForPlayer(data, playerId) {
     const matchesById = byId(data.matches);
@@ -228,6 +231,7 @@ SM.stats = (function () {
     assistsForPlayer: assistsForPlayer,
     yellowsForPlayer: yellowsForPlayer,
     redsForPlayer: redsForPlayer,
+    captainCount: captainCount,
     appearancesForPlayer: appearancesForPlayer,
     appearancesCount: appearancesCount,
     minutesForPlayer: minutesForPlayer,

@@ -19,11 +19,14 @@
   let viewMonth = now.getMonth();
 
   SM.sidebar.onSettingsClick(function () {
-    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = data; });
+    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = SM.team.filterData(data, SM.team.current()); });
   });
 
   function render() {
-    const sessions = SM.stats.sessionsForMonth(DATA, viewYear, viewMonth);
+    const todayStr = SM.ui.formatDateIso(new Date());
+    // Sessions that haven't happened yet have nothing to record — showing
+    // them here would just be empty columns; see them in Calendario instead.
+    const sessions = SM.stats.sessionsForMonth(DATA, viewYear, viewMonth).filter(function (s) { return s.fecha <= todayStr; });
     const players = DATA.players.filter(function (p) { return p.activo; }).sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
     const monthAvg = avgForSessions(players, sessions);
     const trend = SM.stats.weeklyAttendanceTrend(DATA, 4);
@@ -77,14 +80,14 @@
     document.getElementById('prev-month').addEventListener('click', function () { shiftMonth(-1); });
     document.getElementById('next-month').addEventListener('click', function () { shiftMonth(1); });
     document.getElementById('take-attendance').addEventListener('click', function () {
-      SM.forms.openAttendanceModal(DATA, null, function (data) { DATA = data; render(); });
+      SM.forms.openAttendanceModal(DATA, null, function (data) { DATA = SM.team.filterData(data, SM.team.current()); render(); });
     });
     document.getElementById('new-session').addEventListener('click', function () {
-      SM.forms.openRecurringSessionForm(function (data) { DATA = data; render(); });
+      SM.forms.openRecurringSessionForm(function (data) { DATA = SM.team.filterData(data, SM.team.current()); render(); });
     });
     main.querySelectorAll('[data-session]').forEach(function (th) {
       th.addEventListener('click', function () {
-        SM.forms.openAttendanceModal(DATA, th.getAttribute('data-session'), function (data) { DATA = data; render(); });
+        SM.forms.openAttendanceModal(DATA, th.getAttribute('data-session'), function (data) { DATA = SM.team.filterData(data, SM.team.current()); render(); });
       });
     });
   }
@@ -152,7 +155,7 @@
   }
 
   SM.api.fetchAll().then(function (data) {
-    DATA = data;
+    DATA = SM.team.filterData(data, SM.team.current());
     SM.sidebar.applySettings(data.settings);
     render();
   }).catch(function (err) {

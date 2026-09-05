@@ -14,7 +14,7 @@
   let viewMonth = now.getMonth();
 
   SM.sidebar.onSettingsClick(function () {
-    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = data; });
+    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = SM.team.filterData(data, SM.team.current()); });
   });
 
   function render() {
@@ -51,11 +51,11 @@
     document.getElementById('prev-month').addEventListener('click', function () { shiftMonth(-1); });
     document.getElementById('next-month').addEventListener('click', function () { shiftMonth(1); });
     document.getElementById('new-session').addEventListener('click', function () {
-      SM.forms.openRecurringSessionForm(function (data) { DATA = data; render(); });
+      SM.forms.openRecurringSessionForm(function (data) { DATA = SM.team.filterData(data, SM.team.current()); render(); });
     });
     main.querySelectorAll('[data-open-session]').forEach(function (chip) {
       chip.addEventListener('click', function () {
-        SM.forms.openAttendanceModal(DATA, chip.getAttribute('data-open-session'), function (data) { DATA = data; render(); });
+        SM.forms.openAttendanceModal(DATA, chip.getAttribute('data-open-session'), function (data) { DATA = SM.team.filterData(data, SM.team.current()); render(); });
       });
     });
   }
@@ -85,8 +85,7 @@
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
     const leading = (firstOfMonth.getDay() + 6) % 7; // week starts Monday
     const totalCells = Math.ceil((leading + daysInMonth) / 7) * 7;
-    const todayNow = new Date();
-    const todayStr = todayNow.getFullYear() + '-' + String(todayNow.getMonth() + 1).padStart(2, '0') + '-' + String(todayNow.getDate()).padStart(2, '0');
+    const todayStr = SM.ui.formatDateIso(new Date());
 
     let cells = '';
     for (let i = 0; i < totalCells; i++) {
@@ -116,7 +115,7 @@
   }
 
   SM.api.fetchAll().then(function (data) {
-    DATA = data;
+    DATA = SM.team.filterData(data, SM.team.current());
     SM.sidebar.applySettings(data.settings);
     render();
   }).catch(function (err) {

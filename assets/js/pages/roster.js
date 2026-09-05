@@ -6,7 +6,7 @@
   const main = document.getElementById('main');
 
   SM.sidebar.onSettingsClick(function () {
-    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = data; });
+    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = SM.team.filterData(data, SM.team.current()); });
   });
 
   const POSITIONS = [
@@ -54,9 +54,9 @@
     });
     document.getElementById('btn-add').addEventListener('click', function () {
       if (tab === 'jugadores') {
-        SM.forms.openPlayerForm(null, function (data) { DATA = data; updateGrid(); });
+        SM.forms.openPlayerForm(null, function (data) { DATA = SM.team.filterData(data, SM.team.current()); updateGrid(); });
       } else {
-        SM.forms.openStaffForm(null, function (data) { DATA = data; updateGrid(); });
+        SM.forms.openStaffForm(null, function (data) { DATA = SM.team.filterData(data, SM.team.current()); updateGrid(); });
       }
     });
     if (tab === 'jugadores') {
@@ -151,7 +151,7 @@
   }
 
   SM.api.fetchAll().then(function (data) {
-    DATA = data;
+    DATA = SM.team.filterData(data, SM.team.current());
     SM.sidebar.applySettings(data.settings);
     render();
   }).catch(function (err) {

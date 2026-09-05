@@ -26,6 +26,13 @@ SM.ui = (function () {
     return node;
   }
 
+  // Local-date (not UTC) yyyy-MM-dd — Date#toISOString shifts the calendar
+  // day for anyone west/east of UTC, which would silently misdate things
+  // computed from "today" (e.g. hiding/showing sessions, default form dates).
+  function formatDateIso(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
   // "2026-09-14" -> "Sáb 14 Sep" (short, no year — matches design)
   function formatDateShort(iso) {
     if (!iso) return '—';
@@ -175,6 +182,7 @@ SM.ui = (function () {
   return {
     SILHOUETTE_SVG: SILHOUETTE_SVG,
     el: el,
+    formatDateIso: formatDateIso,
     formatDateShort: formatDateShort,
     formatDateLong: formatDateLong,
     ageFromBirthdate: ageFromBirthdate,
