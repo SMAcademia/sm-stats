@@ -99,13 +99,19 @@ function sheetToObjects(name) {
     .filter(function (r) { return r.some(function (c) { return c !== '' && c !== null; }); })
     .map(function (r) {
       const obj = {};
-      header.forEach(function (col, i) { obj[col] = normalizeCell(r[i]); });
+      header.forEach(function (col, i) { obj[col] = normalizeCell(r[i], col); });
       return obj;
     });
 }
 
-function normalizeCell(v) {
+// Sheets stores a "hora"-only cell as a Date on its time-value epoch
+// (1899-12-30) — format those as HH:mm, not as a (meaningless) date, or the
+// time gets silently dropped and "1899-12-30" leaks into the app instead.
+function normalizeCell(v, columnName) {
   if (v instanceof Date) {
+    if (columnName === 'hora') {
+      return Utilities.formatDate(v, Session.getScriptTimeZone(), 'HH:mm');
+    }
     return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   }
   return v;
@@ -168,7 +174,7 @@ function readSingletonRow(name, columns, defaults) {
   const header = values[0].map(String);
   const row = values[1];
   const obj = {};
-  header.forEach(function (col, i) { obj[col] = normalizeCell(row[i]); });
+  header.forEach(function (col, i) { obj[col] = normalizeCell(row[i], col); });
   columns.forEach(function (c) {
     if (obj[c] === '' || obj[c] === undefined || obj[c] === null) obj[c] = defaults[c];
   });
