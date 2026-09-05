@@ -108,12 +108,19 @@ function sheetToObjects(name) {
 // Sheets stores a "hora"-only cell as a Date on its time-value epoch
 // (1899-12-30) — format those as HH:mm, not as a (meaningless) date, or the
 // time gets silently dropped and "1899-12-30" leaks into the app instead.
+//
+// IMPORTANT: format using the SPREADSHEET's timezone, not the Apps Script
+// project's (Session.getScriptTimeZone()) — those two can differ, and since
+// Sheets stores a time-of-day as a timezone-less day-fraction, formatting it
+// in the wrong timezone silently shifts the hour (e.g. a project timezone
+// left on its default while the coach is in Canarias/GMT).
 function normalizeCell(v, columnName) {
   if (v instanceof Date) {
+    const tz = getSpreadsheet().getSpreadsheetTimeZone();
     if (columnName === 'hora') {
-      return Utilities.formatDate(v, Session.getScriptTimeZone(), 'HH:mm');
+      return Utilities.formatDate(v, tz, 'HH:mm');
     }
-    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
   }
   return v;
 }
@@ -322,7 +329,7 @@ function addRecurringSessions(payload) {
     if (dias.indexOf(d.getDay()) === -1) continue;
     const row = {
       id: newId('se'),
-      fecha: Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+      fecha: Utilities.formatDate(d, getSpreadsheet().getSpreadsheetTimeZone(), 'yyyy-MM-dd'),
       hora: payload.hora || '',
       tipo: 'entrenamiento',
       lugar: payload.lugar || '',
