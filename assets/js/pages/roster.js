@@ -17,6 +17,8 @@
     { code: 'DEL', label: 'Delanteros' }
   ];
 
+  const POSITION_ORDER = { POR: 0, DEF: 1, CEN: 2, DEL: 3 };
+
   let DATA = null;
   let tab = 'jugadores';
   let posFilter = 'TODOS';
@@ -80,7 +82,10 @@
       let players = DATA.players.filter(function (p) { return p.activo; });
       if (posFilter !== 'TODOS') players = players.filter(function (p) { return p.posicion === posFilter; });
       if (search) players = players.filter(function (p) { return p.nombre.toLowerCase().indexOf(search) !== -1; });
-      players.sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
+      players.sort(function (a, b) {
+        const posDiff = (POSITION_ORDER[a.posicion] ?? 99) - (POSITION_ORDER[b.posicion] ?? 99);
+        return posDiff !== 0 ? posDiff : (a.dorsal || 99) - (b.dorsal || 99);
+      });
       subtitle.textContent = DATA.players.filter(function (p) { return p.activo; }).length + ' jugadores registrados · Temporada 2026/27';
       grid.innerHTML = players.length ? players.map(playerCardHtml).join('') : '<div class="empty-state">No hay jugadores que coincidan con el filtro.</div>';
       grid.querySelectorAll('.player-card').forEach(function (card) {
