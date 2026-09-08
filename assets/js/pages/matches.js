@@ -11,10 +11,18 @@
   }
 
   let DATA = null;
+  // Unfiltered players (every categoría, not just the active team) — needed
+  // to offer call-ups from lower categories in the acta, since DATA itself
+  // is scoped to the active team only.
+  let ALL_PLAYERS = [];
+  function setData(data) {
+    DATA = SM.team.filterData(data, SM.team.current());
+    ALL_PLAYERS = data.players || [];
+  }
   let filter = 'todos';
 
   SM.sidebar.onSettingsClick(function () {
-    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = SM.team.filterData(data, SM.team.current()); render(); });
+    SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { setData(data); render(); });
   });
 
   function render() {
@@ -171,7 +179,7 @@
         handle.close();
         return SM.api.fetchAll(true);
       }).then(function (data) {
-        DATA = SM.team.filterData(data, SM.team.current());
+        setData(data);
         render();
         SM.ui.toast('Partido añadido.', 'ok');
       }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
@@ -301,16 +309,35 @@
         handle.close();
         return SM.api.fetchAll(true);
       }).then(function (data) {
-        DATA = SM.team.filterData(data, SM.team.current());
+        setData(data);
         render();
         SM.ui.toast(matches.length + (matches.length === 1 ? ' partido importado.' : ' partidos importados.'), 'ok');
       }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
     });
   }
 
+  // Categorías por debajo de la del partido (más jóvenes) — un entrenador
+  // de fútbol base a menudo sube jugadores de la categoría inferior para
+  // completar convocatoria. Solo tiene efecto cuando existen otras
+  // categorías con jugadores; con un único equipo, la lista sale vacía.
+  function lowerCategoryPlayers(match, exclude) {
+    const order = SM.team.CATEGORIES.map(function (c) { return c.key; });
+    const idx = order.indexOf(match.categoria);
+    if (idx === -1) return [];
+    const lowerKeys = order.slice(idx + 1);
+    if (!lowerKeys.length) return [];
+    const excludeIds = {};
+    (exclude || []).forEach(function (p) { excludeIds[p.id] = true; });
+    return ALL_PLAYERS.filter(function (p) {
+      return p.activo && lowerKeys.indexOf(p.categoria) !== -1 && !excludeIds[p.id];
+    }).sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
+  }
+
   function openMatchReportModal(match) {
     const duration = matchDuration(match);
-    const players = DATA.players.filter(function (p) { return p.activo; }).sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
+    const ownPlayers = DATA.players.filter(function (p) { return p.activo; }).sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
+    const extraPlayers = lowerCategoryPlayers(match, ownPlayers);
+    const players = ownPlayers.concat(extraPlayers);
     const appsByPlayer = {};
     DATA.matchAppearances.filter(function (a) { return a.match_id === match.id; }).forEach(function (a) { appsByPlayer[a.player_id] = a; });
     const eventsByPlayer = {};
@@ -366,14 +393,15 @@
       );
     }
 
-    function rowHtml(p) {
+    function rowHtml(p, categoryTag) {
       const app = appsByPlayer[p.id];
       const ev = eventsByPlayer[p.id] || { gol: 0, asistencia: 0, amarilla: 0, roja: 0 };
       const called = !!app || ev.gol || ev.asistencia || ev.amarilla || ev.roja || (intervalsState[p.id] && intervalsState[p.id].length);
+      const tagHtml = categoryTag ? ' <span style="font-size:9.5px;font-weight:700;color:var(--cyan-bright);background:' + SM.ui.alpha('var(--cyan)', 0.12) + ';padding:2px 6px;border-radius:5px;margin-left:6px;white-space:nowrap;">' + SM.ui.escapeHtml(categoryTag) + '</span>' : '';
       return (
         '<tr data-row="' + p.id + '">' +
           '<td><input type="checkbox" class="conv-cb" data-player="' + p.id + '" name="conv_' + p.id + '"' + (called ? ' checked' : '') + '></td>' +
-          '<td style="text-align:left;">' + SM.ui.escapeHtml(p.nombre) + '</td>' +
+          '<td style="text-align:left;">' + SM.ui.escapeHtml(p.nombre) + tagHtml + '</td>' +
           '<td data-total="' + p.id + '" style="font-weight:700;">' + totalMinutes(p.id) + '\'</td>' +
           '<td data-intervals="' + p.id + '">' + intervalsHtml(p.id) + '</td>' +
           '<td><input type="radio" name="capitan" value="' + p.id + '" title="Capitán"' + (app && app.capitan ? ' checked' : '') + '></td>' +
@@ -386,7 +414,9 @@
       );
     }
 
-    const rows = players.map(rowHtml).join('');
+    const extraDividerHtml = '<tr><td colspan="10" style="padding:10px 8px 6px;font-size:11px;font-weight:700;letter-spacing:.4px;color:var(--text-ghost);text-align:left;border-top:1px solid var(--border);">JUGADORES DE CATEGORÍAS INFERIORES</td></tr>';
+    const rows = ownPlayers.map(function (p) { return rowHtml(p); }).join('') +
+      (extraPlayers.length ? extraDividerHtml + extraPlayers.map(function (p) { return rowHtml(p, p.categoria); }).join('') : '');
 
     const body = SM.ui.el('div', {
       html:
@@ -395,7 +425,11 @@
             SM.forms.field('Goles a favor', '<input name="golesFavor" type="number" min="0" value="' + (match.goles_favor != null ? match.goles_favor : '') + '">') +
             SM.forms.field('Goles en contra', '<input name="golesContra" type="number" min="0" value="' + (match.goles_contra != null ? match.goles_contra : '') + '">') +
           '</div>' +
-          '<div class="form-hint" style="margin:16px 0 8px;">Convocatoria y acta — marca quién jugó, sus cambios (minuto de entrada y salida; los minutos totales se calculan solos) y el capitán. Se necesitan al menos 7 convocados para guardar. Duración del partido: ' + duration + ' min' + (match.categoria ? ' (' + SM.ui.escapeHtml(match.categoria) + ')' : '') + '.</div>' +
+          '<div class="form-hint" style="margin:16px 0 8px;">Convocatoria y acta — marca quién jugó, sus cambios (minuto de entrada y salida; los minutos totales se calculan solos) y el capitán. Se necesitan al menos 7 convocados para guardar' + (extraPlayers.length ? ', y puedes subir jugadores de categorías inferiores (al final de la lista)' : '') + '. Duración del partido: ' + duration + ' min' + (match.categoria ? ' (' + SM.ui.escapeHtml(match.categoria) + ')' : '') + '.</div>' +
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">' +
+            '<button type="button" class="btn btn-outline" id="select-all-btn" style="padding:6px 12px;font-size:12px;">Seleccionar todos</button>' +
+            '<button type="button" class="btn btn-outline" id="select-none-btn" style="padding:6px 12px;font-size:12px;">Ninguno</button>' +
+          '</div>' +
           '<div style="overflow-x:auto;">' +
             '<table class="data-table" style="min-width:800px;">' +
               '<thead><tr><th>Conv.</th><th style="text-align:left;">Jugador</th><th>Min</th><th>Entrada – salida</th><th>C</th><th>Nota</th><th>G</th><th>A</th><th>Am</th><th>Roja</th></tr></thead>' +
@@ -455,6 +489,20 @@
       }
     });
 
+    body.querySelector('#select-all-btn').addEventListener('click', function () {
+      tbody.querySelectorAll('.conv-cb').forEach(function (cb) {
+        cb.checked = true;
+        const playerId = cb.getAttribute('data-player');
+        if (!intervalsState[playerId] || !intervalsState[playerId].length) {
+          intervalsState[playerId] = [{ entrada: 0, salida: duration }];
+          refreshPlayerCells(playerId);
+        }
+      });
+    });
+    body.querySelector('#select-none-btn').addEventListener('click', function () {
+      tbody.querySelectorAll('.conv-cb').forEach(function (cb) { cb.checked = false; });
+    });
+
     body.querySelector('#report-form').addEventListener('submit', function (e) {
       e.preventDefault();
       const fd = new FormData(e.target);
@@ -497,7 +545,7 @@
           handle.close();
           return SM.api.fetchAll(true);
         }).then(function (data) {
-          DATA = SM.team.filterData(data, SM.team.current());
+          setData(data);
           render();
           SM.ui.toast('Acta guardada.', 'ok');
         }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
@@ -505,7 +553,7 @@
   }
 
   SM.api.fetchAll().then(function (data) {
-    DATA = SM.team.filterData(data, SM.team.current());
+    setData(data);
     SM.sidebar.applySettings(data.settings);
     render();
   }).catch(function (err) {
