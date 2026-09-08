@@ -316,20 +316,20 @@
     });
   }
 
-  // Categorías por debajo de la del partido (más jóvenes) — un entrenador
-  // de fútbol base a menudo sube jugadores de la categoría inferior para
-  // completar convocatoria. Solo tiene efecto cuando existen otras
-  // categorías con jugadores; con un único equipo, la lista sale vacía.
+  // Jugadores de la categoría inmediatamente inferior a la del partido (no
+  // de cualquier categoría más joven) — un entrenador de fútbol base a
+  // veces sube a un jugador del equipo justo por debajo para completar
+  // convocatoria. Solo tiene efecto cuando esa categoría tiene jugadores;
+  // con un único equipo dado de alta, la lista sale vacía.
   function lowerCategoryPlayers(match, exclude) {
     const order = SM.team.CATEGORIES.map(function (c) { return c.key; });
     const idx = order.indexOf(match.categoria);
-    if (idx === -1) return [];
-    const lowerKeys = order.slice(idx + 1);
-    if (!lowerKeys.length) return [];
+    if (idx === -1 || idx === order.length - 1) return [];
+    const immediateLower = order[idx + 1];
     const excludeIds = {};
     (exclude || []).forEach(function (p) { excludeIds[p.id] = true; });
     return ALL_PLAYERS.filter(function (p) {
-      return p.activo && lowerKeys.indexOf(p.categoria) !== -1 && !excludeIds[p.id];
+      return p.activo && p.categoria === immediateLower && !excludeIds[p.id];
     }).sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
   }
 
@@ -414,7 +414,7 @@
       );
     }
 
-    const extraDividerHtml = '<tr><td colspan="10" style="padding:10px 8px 6px;font-size:11px;font-weight:700;letter-spacing:.4px;color:var(--text-ghost);text-align:left;border-top:1px solid var(--border);">JUGADORES DE CATEGORÍAS INFERIORES</td></tr>';
+    const extraDividerHtml = '<tr><td colspan="10" style="padding:10px 8px 6px;font-size:11px;font-weight:700;letter-spacing:.4px;color:var(--text-ghost);text-align:left;border-top:1px solid var(--border);">JUGADORES DE LA CATEGORÍA INMEDIATAMENTE INFERIOR</td></tr>';
     const rows = ownPlayers.map(function (p) { return rowHtml(p); }).join('') +
       (extraPlayers.length ? extraDividerHtml + extraPlayers.map(function (p) { return rowHtml(p, p.categoria); }).join('') : '');
 
@@ -425,7 +425,7 @@
             SM.forms.field('Goles a favor', '<input name="golesFavor" type="number" min="0" value="' + (match.goles_favor != null ? match.goles_favor : '') + '">') +
             SM.forms.field('Goles en contra', '<input name="golesContra" type="number" min="0" value="' + (match.goles_contra != null ? match.goles_contra : '') + '">') +
           '</div>' +
-          '<div class="form-hint" style="margin:16px 0 8px;">Convocatoria y acta — marca quién jugó, sus cambios (minuto de entrada y salida; los minutos totales se calculan solos) y el capitán. Se necesitan al menos 7 convocados para guardar' + (extraPlayers.length ? ', y puedes subir jugadores de categorías inferiores (al final de la lista)' : '') + '. Duración del partido: ' + duration + ' min' + (match.categoria ? ' (' + SM.ui.escapeHtml(match.categoria) + ')' : '') + '.</div>' +
+          '<div class="form-hint" style="margin:16px 0 8px;">Marca quién va convocado y guarda la convocatoria en cualquier momento (solo hacen falta 7 convocados, sin rellenar minutos, goles ni tarjetas)' + (extraPlayers.length ? '. Puedes subir jugadores de la categoría inmediatamente inferior (al final de la lista)' : '') + '. Cuando tengas los datos del partido, rellena cambios (minuto de entrada y salida), capitán, nota y eventos, y usa "Guardar acta" — ahí sí hacen falta exactamente 7 titulares en el minuto 0. Duración del partido: ' + duration + ' min' + (match.categoria ? ' (' + SM.ui.escapeHtml(match.categoria) + ')' : '') + '.</div>' +
           '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">' +
             '<button type="button" class="btn btn-outline" id="select-all-btn" style="padding:6px 12px;font-size:12px;">Seleccionar todos</button>' +
             '<button type="button" class="btn btn-outline" id="select-none-btn" style="padding:6px 12px;font-size:12px;">Ninguno</button>' +
@@ -438,6 +438,7 @@
           '</div>' +
           '<div class="form-actions">' +
             '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
+            '<button type="button" class="btn btn-outline" id="save-callups-btn">Guardar convocatoria</button>' +
             '<button type="submit" class="btn btn-primary">Guardar acta</button>' +
           '</div>' +
         '</form>'
@@ -501,6 +502,38 @@
     });
     body.querySelector('#select-none-btn').addEventListener('click', function () {
       tbody.querySelectorAll('.conv-cb').forEach(function (cb) { cb.checked = false; });
+    });
+
+    // Guarda solo quién va convocado (y el capitán, si ya está decidido) —
+    // no exige minutos/goles/tarjetas, para poder prepararla antes de jugar.
+    body.querySelector('#save-callups-btn').addEventListener('click', function () {
+      const capitanId = (body.querySelector('input[name="capitan"]:checked') || {}).value;
+      const appearances = [];
+      players.forEach(function (p) {
+        const cb = body.querySelector('.conv-cb[data-player="' + p.id + '"]');
+        if (!cb || !cb.checked) return;
+        // Conserva minutos/nota si ya se habían guardado en una acta previa —
+        // esto solo decide quién va convocado, no debe borrar ese dato.
+        const existing = appsByPlayer[p.id];
+        appearances.push({
+          player_id: p.id,
+          minutos: existing ? existing.minutos : null,
+          valoracion: existing ? existing.valoracion : null,
+          capitan: p.id === capitanId
+        });
+      });
+      if (appearances.length < 7) {
+        SM.ui.toast('Se necesitan al menos 7 jugadores convocados para guardar la convocatoria.', 'error');
+        return;
+      }
+      SM.api.postAction('saveCallups', { matchId: match.id, appearances: appearances }).then(function () {
+        handle.close();
+        return SM.api.fetchAll(true);
+      }).then(function (data) {
+        setData(data);
+        render();
+        SM.ui.toast('Convocatoria guardada.', 'ok');
+      }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
     });
 
     body.querySelector('#report-form').addEventListener('submit', function (e) {

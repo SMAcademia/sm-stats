@@ -281,6 +281,7 @@ function doPost(e) {
       addRecurringSessions: addRecurringSessions,
       updateSession: updateSession,
       deleteSession: deleteSession,
+      saveCallups: saveCallups,
       saveMatchReport: saveMatchReport,
       saveAttendance: saveAttendance,
       updateSettings: updateSettings
@@ -407,6 +408,23 @@ function deleteSession(payload) {
   if (!payload.id) throw new Error('Falta el id de la sesión.');
   deleteRowsWhere(SHEETS.sessions, 'id', payload.id);
   deleteRowsWhere(SHEETS.attendance, 'session_id', payload.id);
+  return true;
+}
+
+// Guarda solo la convocatoria (quién va convocado y el capitán), sin exigir
+// los datos del partido (minutos, goles, tarjetas) — para poder prepararla
+// antes de jugar. Solo toca MatchAppearances; goles/eventos/intervalos se
+// deciden después con saveMatchReport, una vez jugado el partido.
+function saveCallups(payload) {
+  const matchId = payload.matchId;
+  if (!matchId) throw new Error('Falta el id del partido.');
+  if ((payload.appearances || []).length < MIN_CONVOCADOS) {
+    throw new Error('Se necesitan al menos ' + MIN_CONVOCADOS + ' jugadores convocados para guardar la convocatoria.');
+  }
+  deleteRowsWhere(SHEETS.matchAppearances, 'match_id', matchId);
+  (payload.appearances || []).forEach(function (a) {
+    appendRow(SHEETS.matchAppearances, APPEARANCE_COLUMNS, Object.assign({ id: newId('ma') }, a, { match_id: matchId }));
+  });
   return true;
 }
 

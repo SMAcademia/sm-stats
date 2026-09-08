@@ -128,6 +128,16 @@ SM.api = (function () {
         d.attendance = d.attendance.filter(function (a) { return a.session_id !== payload.id; });
         return true;
       }
+      case 'saveCallups': {
+        if ((payload.appearances || []).length < 7) {
+          throw new Error('Se necesitan al menos 7 jugadores convocados para guardar la convocatoria.');
+        }
+        d.matchAppearances = d.matchAppearances.filter(function (a) { return a.match_id !== payload.matchId; });
+        (payload.appearances || []).forEach(function (a) {
+          d.matchAppearances.push(Object.assign({ id: nextMockId('ma') }, a, { match_id: payload.matchId }));
+        });
+        return true;
+      }
       case 'saveMatchReport': {
         if ((payload.appearances || []).length < 7) {
           throw new Error('Se necesitan al menos 7 jugadores convocados para guardar el acta.');
