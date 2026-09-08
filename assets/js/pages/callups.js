@@ -80,6 +80,7 @@
 
   function callupPanelHtml(match, clubName) {
     const convocados = convocadosForMatch(match.id);
+    const staff = DATA.staff || [];
     const playersById = SM.stats.byId(DATA.players);
     const rows = convocados
       .map(function (a) { return { player: playersById[a.player_id], capitan: a.capitan }; })
@@ -98,7 +99,7 @@
           '<div class="callup-club">' + SM.ui.escapeHtml(clubName) + '</div>' +
           '<div class="callup-title">CONVOCATORIA' + (match.categoria ? ' · ' + SM.ui.escapeHtml(match.categoria) : '') + '</div>' +
           '<div class="callup-meta">' +
-            '<span><strong>Rival:</strong> ' + (match.condicion === 'local' ? SM.ui.escapeHtml(match.rival) : SM.ui.escapeHtml(clubName) + ' (visitante)') + '</span>' +
+            '<span><strong>Rival:</strong> ' + SM.ui.escapeHtml(match.rival) + (match.condicion === 'visitante' ? ' (visitante)' : '') + '</span>' +
             '<span><strong>Fecha:</strong> ' + SM.ui.formatDateLong(match.fecha) + '</span>' +
             '<span><strong>Hora:</strong> ' + (match.hora || '—') + '</span>' +
             '<span><strong>Lugar:</strong> ' + SM.ui.escapeHtml(match.lugar || '—') + '</span>' +
@@ -116,6 +117,17 @@
               '<tbody>' +
                 rows.map(function (r) {
                   return '<tr><td>' + (r.player.dorsal || '—') + '</td><td>' + SM.ui.escapeHtml(r.player.nombre) + '</td><td>' + (r.capitan ? 'C' : '') + '</td></tr>';
+                }).join('') +
+              '</tbody>' +
+            '</table>'
+          ) : '') +
+          (staff.length ? (
+            '<div class="callup-title" style="margin:22px 0 8px;font-size:14px;">CUERPO TÉCNICO</div>' +
+            '<table>' +
+              '<thead><tr><th style="text-align:left;">NOMBRE</th><th>ROL</th></tr></thead>' +
+              '<tbody>' +
+                staff.map(function (s) {
+                  return '<tr><td style="text-align:left;">' + SM.ui.escapeHtml(s.nombre) + '</td><td>' + SM.ui.escapeHtml(s.rol || '—') + '</td></tr>';
                 }).join('') +
               '</tbody>' +
             '</table>'
