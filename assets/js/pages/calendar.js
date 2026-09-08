@@ -43,7 +43,7 @@
 
       '<div style="display:flex;align-items:center;gap:22px;">' +
         '<div style="display:flex;align-items:center;gap:8px;"><div class="dot" style="background:var(--cyan);"></div><span style="font-size:12.5px;color:var(--text-dim);font-weight:600;">Entrenamiento — clic para tomar asistencia</span></div>' +
-        '<div style="display:flex;align-items:center;gap:8px;"><div class="dot" style="background:var(--magenta);"></div><span style="font-size:12.5px;color:var(--text-dim);font-weight:600;">Partido — clic para ir a Partidos</span></div>' +
+        '<div style="display:flex;align-items:center;gap:8px;"><div class="dot" style="background:var(--magenta);"></div><span style="font-size:12.5px;color:var(--text-dim);font-weight:600;">Partido — clic para editar hora, lugar, rival o fecha</span></div>' +
       '</div>' +
 
       '<div class="panel" style="padding:18px;">' + gridHtml(byDate, matchesById) + '</div>';
@@ -56,6 +56,12 @@
     main.querySelectorAll('[data-open-session]').forEach(function (chip) {
       chip.addEventListener('click', function () {
         SM.forms.openAttendanceModal(DATA, chip.getAttribute('data-open-session'), function (data) { DATA = SM.team.filterData(data, SM.team.current()); render(); });
+      });
+    });
+    main.querySelectorAll('[data-edit-match]').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        const match = DATA.matches.find(function (m) { return m.id === chip.getAttribute('data-edit-match'); });
+        if (match) SM.forms.openEditMatchForm(match, function (data) { DATA = SM.team.filterData(data, SM.team.current()); render(); });
       });
     });
   }
@@ -76,7 +82,7 @@
       '<div style="padding:4px 6px;border-radius:6px;background:' + SM.ui.alpha(color, 0.14) + ';border:1px solid ' + SM.ui.alpha(color, 0.4) + ';cursor:pointer;overflow:hidden;">' +
         '<span style="font-size:10.5px;font-weight:700;color:' + color + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;">' + (s.hora ? s.hora + ' · ' : '') + label + '</span>' +
       '</div>';
-    if (isMatch) return '<a href="partidos.html" style="text-decoration:none;display:block;">' + inner + '</a>';
+    if (isMatch) return '<div data-edit-match="' + s.match_id + '">' + inner + '</div>';
     return '<div data-open-session="' + s.id + '">' + inner + '</div>';
   }
 

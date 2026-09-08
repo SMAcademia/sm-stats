@@ -167,6 +167,28 @@ function updateRowById(name, columns, id, patch) {
   });
 }
 
+function findRowIndexByColumn(sheet, column, value) {
+  const values = sheet.getDataRange().getValues();
+  const col = values[0].indexOf(column);
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][col]) === String(value)) return i + 1;
+  }
+  return -1;
+}
+
+// Like updateRowById, but matches by any column — used to keep a match's
+// linked Sessions row (matched by match_id, not id) in sync.
+function updateRowByColumn(name, matchColumn, matchValue, patch) {
+  const sheet = getSheet(name);
+  const rowIndex = findRowIndexByColumn(sheet, matchColumn, matchValue);
+  if (rowIndex === -1) return false;
+  const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  header.forEach(function (col, i) {
+    if (patch[col] !== undefined) sheet.getRange(rowIndex, i + 1).setValue(patch[col]);
+  });
+  return true;
+}
+
 function deleteRowsWhere(name, matchColumn, matchValue) {
   const sheet = getSheet(name);
   const values = sheet.getDataRange().getValues();
@@ -253,6 +275,7 @@ function doPost(e) {
       addStaffMember: addStaffMember,
       addMatch: addMatch,
       addMatches: addMatches,
+      updateMatch: updateMatch,
       addSession: addSession,
       addRecurringSessions: addRecurringSessions,
       updateSession: updateSession,
@@ -308,6 +331,21 @@ function createMatchWithSession(payload) {
     id: newId('se'), fecha: row.fecha, hora: row.hora, tipo: 'partido', lugar: row.lugar, match_id: row.id, categoria: row.categoria
   });
   return row;
+}
+
+// Fixes a scheduled match's rival/fecha/hora/lugar — e.g. the league moves
+// a fixture, or it was mistyped. Keeps the linked Sessions row (used by the
+// calendar) in sync. Score and convocatoria are untouched here — those are
+// only edited via saveMatchReport once the match is played.
+function updateMatch(payload) {
+  if (!payload.id) throw new Error('Falta el id del partido.');
+  const patch = {};
+  ['rival', 'fecha', 'hora', 'lugar'].forEach(function (k) {
+    if (payload[k] !== undefined) patch[k] = payload[k];
+  });
+  updateRowById(SHEETS.matches, MATCH_COLUMNS, payload.id, patch);
+  updateRowByColumn(SHEETS.sessions, 'match_id', payload.id, patch);
+  return payload;
 }
 
 function addSession(payload) {

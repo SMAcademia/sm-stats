@@ -75,6 +75,15 @@ SM.api = (function () {
       case 'addMatches': {
         return (payload.matches || []).map(createMockMatch);
       }
+      case 'updateMatch': {
+        const patch = {};
+        ['rival', 'fecha', 'hora', 'lugar'].forEach(function (k) { if (payload[k] !== undefined) patch[k] = payload[k]; });
+        const mi = d.matches.findIndex(function (m) { return m.id === payload.id; });
+        if (mi >= 0) d.matches[mi] = Object.assign({}, d.matches[mi], patch);
+        const si = d.sessions.findIndex(function (s) { return s.match_id === payload.id; });
+        if (si >= 0) d.sessions[si] = Object.assign({}, d.sessions[si], patch);
+        return payload;
+      }
       case 'addSession': {
         const row = Object.assign({ id: nextMockId('se'), tipo: 'entrenamiento', match_id: '' }, payload);
         d.sessions.push(row);

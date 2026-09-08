@@ -216,6 +216,45 @@ SM.forms = (function () {
     });
   }
 
+  // Fixes a scheduled match's rival/fecha/hora/lugar from the calendar —
+  // e.g. the league moves a fixture, or it was mistyped when created.
+  // Result and convocatoria stay editable only from Partidos (acta).
+  function editMatchFormHtml(match) {
+    return (
+      '<form id="edit-match-form">' +
+        '<div class="form-grid">' +
+          field('Rival', '<input name="rival" required value="' + esc(match.rival) + '">', true) +
+          field('Fecha', '<input name="fecha" type="date" required value="' + esc(match.fecha) + '">') +
+          field('Hora', '<input name="hora" type="time" required value="' + esc(match.hora) + '">') +
+          field('Lugar', '<input name="lugar" value="' + esc(match.lugar) + '">', true) +
+        '</div>' +
+        '<div class="form-hint" style="margin-top:12px;">Resultado y convocatoria se editan desde Partidos (Editar partido / acta).</div>' +
+        '<div class="form-actions">' +
+          '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
+          '<button type="submit" class="btn btn-primary">Guardar</button>' +
+        '</div>' +
+      '</form>'
+    );
+  }
+
+  function openEditMatchForm(match, onSaved) {
+    const body = SM.ui.el('div', { html: editMatchFormHtml(match) });
+    const handle = SM.ui.openModal('Editar partido', body);
+    body.querySelector('#cancel-btn').addEventListener('click', handle.close);
+    body.querySelector('#edit-match-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const payload = { id: match.id };
+      new FormData(e.target).forEach(function (v, k) { payload[k] = v; });
+      SM.api.postAction('updateMatch', payload).then(function () {
+        handle.close();
+        return SM.api.fetchAll(true);
+      }).then(function (data) {
+        SM.ui.toast('Partido actualizado.', 'ok');
+        if (onSaved) onSaved(data);
+      }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+    });
+  }
+
   // ---- sessions: recurring creation + shared attendance-taking modal
   // (used by both asistencia.html and calendario.html, so the "fix a
   // mistake" flow — edit or delete a single session — lives in one place). ----
@@ -420,6 +459,7 @@ SM.forms = (function () {
     esc: esc, field: field, selectHtml: selectHtml,
     playerFormHtml: playerFormHtml, staffFormHtml: staffFormHtml, formToPayload: formToPayload,
     openPlayerForm: openPlayerForm, openStaffForm: openStaffForm, openSettingsForm: openSettingsForm,
-    openRecurringSessionForm: openRecurringSessionForm, openAttendanceModal: openAttendanceModal
+    openRecurringSessionForm: openRecurringSessionForm, openAttendanceModal: openAttendanceModal,
+    openEditMatchForm: openEditMatchForm
   };
 })();
