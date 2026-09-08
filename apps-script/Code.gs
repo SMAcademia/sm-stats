@@ -272,6 +272,7 @@ function doPost(e) {
     const handlers = {
       addPlayer: addPlayer,
       updatePlayer: updatePlayer,
+      deletePlayer: deletePlayer,
       addStaffMember: addStaffMember,
       addMatch: addMatch,
       addMatches: addMatches,
@@ -305,6 +306,19 @@ function updatePlayer(payload) {
   if (!payload.id) throw new Error('Falta el id del jugador.');
   updateRowById(SHEETS.players, PLAYER_COLUMNS, payload.id, payload);
   return payload;
+}
+
+// Deletes a player and everything linked to them (asistencia, convocatorias,
+// goles/tarjetas, minutos por partido) — e.g. a duplicated player created by
+// mistake. Matches themselves are untouched, only this player's rows in them.
+function deletePlayer(payload) {
+  if (!payload.id) throw new Error('Falta el id del jugador.');
+  deleteRowsWhere(SHEETS.players, 'id', payload.id);
+  deleteRowsWhere(SHEETS.attendance, 'player_id', payload.id);
+  deleteRowsWhere(SHEETS.matchAppearances, 'player_id', payload.id);
+  deleteRowsWhere(SHEETS.matchEvents, 'player_id', payload.id);
+  deleteRowsWhere(SHEETS.matchIntervals, 'player_id', payload.id);
+  return true;
 }
 
 function addStaffMember(payload) {

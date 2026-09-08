@@ -64,6 +64,14 @@ SM.api = (function () {
         if (i >= 0) d.players[i] = Object.assign({}, d.players[i], payload);
         return d.players[i];
       }
+      case 'deletePlayer': {
+        d.players = d.players.filter(function (p) { return p.id !== payload.id; });
+        d.attendance = d.attendance.filter(function (a) { return a.player_id !== payload.id; });
+        d.matchAppearances = d.matchAppearances.filter(function (a) { return a.player_id !== payload.id; });
+        d.matchEvents = d.matchEvents.filter(function (e) { return e.player_id !== payload.id; });
+        d.matchIntervals = (d.matchIntervals || []).filter(function (iv) { return iv.player_id !== payload.id; });
+        return true;
+      }
       case 'addStaffMember': {
         const row = Object.assign({ id: nextMockId('s') }, payload);
         d.staff.push(row);

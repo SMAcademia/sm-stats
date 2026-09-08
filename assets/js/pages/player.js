@@ -90,6 +90,13 @@
     main.querySelector('#edit-player-btn').addEventListener('click', function () {
       SM.forms.openPlayerForm(p, function (data) { DATA = SM.team.filterData(data, SM.team.current()); render(); });
     });
+    main.querySelector('#delete-player-btn').addEventListener('click', function () {
+      if (!window.confirm('¿Eliminar a ' + p.nombre + '? También se borrará su asistencia, convocatorias, goles/tarjetas y minutos jugados. No se puede deshacer.')) return;
+      SM.api.postAction('deletePlayer', { id: p.id }).then(function () {
+        SM.ui.toast('Jugador eliminado.', 'ok');
+        window.location.href = 'plantilla.html';
+      }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+    });
   }
 
   function leftCardHtml(p, meta, rating, age) {
@@ -126,6 +133,7 @@
           dataRow('Club anterior', SM.ui.escapeHtml(p.club_anterior) || '—') +
         '</div>' +
         '<button id="edit-player-btn" class="btn btn-outline" style="width:100%;margin-top:22px;">Editar ficha</button>' +
+        '<button id="delete-player-btn" class="btn btn-outline" style="width:100%;margin-top:10px;color:var(--red-bright);border-color:' + SM.ui.alpha('var(--red)', 0.4) + ';">Eliminar jugador</button>' +
       '</div>'
     );
   }
