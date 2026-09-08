@@ -99,6 +99,7 @@
           '<div style="font-size:13.5px;color:var(--text-dim);font-weight:600;">' + SM.ui.escapeHtml(match.lugar) + '</div>' +
         '</div>' +
         '<div style="display:flex;justify-content:center;gap:14px;margin-top:24px;">' +
+          '<a class="btn btn-outline" href="registro-vivo.html?id=' + match.id + '">Registrar en vivo</a>' +
           '<button class="btn btn-primary" data-match="' + match.id + '">Editar partido / acta</button>' +
         '</div>' +
       '</div>'
@@ -418,6 +419,14 @@
     const rows = ownPlayers.map(function (p) { return rowHtml(p); }).join('') +
       (extraPlayers.length ? extraDividerHtml + extraPlayers.map(function (p) { return rowHtml(p, p.categoria); }).join('') : '');
 
+    // Registro en vivo (registro-vivo.html) es independiente del acta — si
+    // hay eventos reales (no solo marcadores de fase) para este partido,
+    // ofrece precargarlos aquí para revisar y confirmar, sin guardar nada
+    // automáticamente.
+    const liveEvents = (DATA.matchLiveEvents || []).filter(function (e) { return e.match_id === match.id; });
+    const MARKER_TYPES = { inicio_1: true, fin_1: true, inicio_2: true, fin_2: true };
+    const hasLiveData = liveEvents.some(function (e) { return !MARKER_TYPES[e.tipo]; });
+
     const body = SM.ui.el('div', {
       html:
         '<form id="report-form">' +
@@ -426,9 +435,10 @@
             SM.forms.field('Goles en contra', '<input name="golesContra" type="number" min="0" value="' + (match.goles_contra != null ? match.goles_contra : '') + '">') +
           '</div>' +
           '<div class="form-hint" style="margin:16px 0 8px;">Marca quién va convocado y guarda la convocatoria en cualquier momento (solo hacen falta 7 convocados, sin rellenar minutos, goles ni tarjetas)' + (extraPlayers.length ? '. Puedes subir jugadores de la categoría inmediatamente inferior (al final de la lista)' : '') + '. Cuando tengas los datos del partido, rellena cambios (minuto de entrada y salida), capitán, nota y eventos, y usa "Guardar acta" — ahí sí hacen falta exactamente 7 titulares en el minuto 0. Duración del partido: ' + duration + ' min' + (match.categoria ? ' (' + SM.ui.escapeHtml(match.categoria) + ')' : '') + '.</div>' +
-          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">' +
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
             '<button type="button" class="btn btn-outline" id="select-all-btn" style="padding:6px 12px;font-size:12px;">Seleccionar todos</button>' +
             '<button type="button" class="btn btn-outline" id="select-none-btn" style="padding:6px 12px;font-size:12px;">Ninguno</button>' +
+            (hasLiveData ? '<button type="button" class="btn btn-outline" id="load-live-btn" style="padding:6px 12px;font-size:12px;color:var(--cyan-bright);">Cargar desde registro en vivo</button>' : '') +
           '</div>' +
           '<div style="overflow-x:auto;">' +
             '<table class="data-table" style="min-width:800px;">' +
@@ -503,6 +513,42 @@
     body.querySelector('#select-none-btn').addEventListener('click', function () {
       tbody.querySelectorAll('.conv-cb').forEach(function (cb) { cb.checked = false; });
     });
+
+    const loadLiveBtn = body.querySelector('#load-live-btn');
+    if (loadLiveBtn) {
+      loadLiveBtn.addEventListener('click', function () {
+        const golesFavor = liveEvents.filter(function (e) { return e.tipo === 'gol' && e.team === 'propio'; }).length;
+        const golesContra = liveEvents.filter(function (e) { return e.tipo === 'gol' && e.team === 'rival'; }).length;
+        body.querySelector('[name="golesFavor"]').value = golesFavor;
+        body.querySelector('[name="golesContra"]').value = golesContra;
+        const touchedPlayers = {};
+        liveEvents.forEach(function (e) {
+          if (e.team !== 'propio' || !e.player_id) return;
+          touchedPlayers[e.player_id] = true;
+          if (e.tipo === 'gol') {
+            const inp = body.querySelector('[name="gol_' + e.player_id + '"]');
+            if (inp) inp.value = (Number(inp.value) || 0) + 1;
+          } else if (e.tipo === 'asistencia') {
+            const inp = body.querySelector('[name="asis_' + e.player_id + '"]');
+            if (inp) inp.value = (Number(inp.value) || 0) + 1;
+          } else if (e.tipo === 'amarilla') {
+            const inp = body.querySelector('[name="am_' + e.player_id + '"]');
+            if (inp) inp.checked = true;
+          } else if (e.tipo === 'roja') {
+            const inp = body.querySelector('[name="ro_' + e.player_id + '"]');
+            if (inp) inp.checked = true;
+          }
+        });
+        Object.keys(touchedPlayers).forEach(function (playerId) {
+          const cb = body.querySelector('.conv-cb[data-player="' + playerId + '"]');
+          if (cb && !cb.checked) {
+            cb.checked = true;
+            cb.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        });
+        SM.ui.toast('Datos cargados desde el registro en vivo — revisa y guarda el acta.', 'ok');
+      });
+    }
 
     // Guarda solo quién va convocado (y el capitán, si ya está decidido) —
     // no exige minutos/goles/tarjetas, para poder prepararla antes de jugar.

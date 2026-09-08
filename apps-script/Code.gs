@@ -27,6 +27,7 @@ const SHEETS = {
   matchEvents: 'MatchEvents',
   matchAppearances: 'MatchAppearances',
   matchIntervals: 'MatchIntervals',
+  matchLiveEvents: 'MatchLiveEvents',
   settings: 'Settings'
 };
 
@@ -42,6 +43,13 @@ const TITULARES_MINUTO_CERO = 7;
 // One row per stretch a player spent on the pitch (unlimited substitutions):
 // entrada/salida are match minutes, e.g. 0-17 and 34-54 -> 37 minutes total.
 const INTERVAL_COLUMNS = ['id', 'match_id', 'player_id', 'entrada', 'salida'];
+// Registro en vivo (taps durante el partido) — independiente del acta.
+// team: 'propio' | 'rival'. tipo: marcadores de fase (inicio_1, fin_1,
+// inicio_2, fin_2, sin equipo/jugador) o eventos (gol, asistencia,
+// amarilla, roja, falta_hecha, falta_recibida, tiro, tiro_puerta,
+// llegada_izq, llegada_cen, llegada_der, corner). player_id solo para
+// team=propio; dorsal_rival (opcional, solo número) para team=rival.
+const LIVE_EVENT_COLUMNS = ['id', 'match_id', 'team', 'player_id', 'dorsal_rival', 'tipo', 'minuto', 'parte', 'ts'];
 // Settings is a singleton sheet: header row + exactly one data row (row 2).
 const SETTINGS_COLUMNS = ['club_nombre', 'entrenador_nombre', 'entrenador_rol', 'liga_nombre'];
 const DEFAULT_SETTINGS = { club_nombre: 'Mi Club', entrenador_nombre: 'Nombre del entrenador', entrenador_rol: 'Entrenador', liga_nombre: 'Liga Regional · Grupo B' };
@@ -60,6 +68,7 @@ function setupSheets() {
     [SHEETS.matchEvents, EVENT_COLUMNS],
     [SHEETS.matchAppearances, APPEARANCE_COLUMNS],
     [SHEETS.matchIntervals, INTERVAL_COLUMNS],
+    [SHEETS.matchLiveEvents, LIVE_EVENT_COLUMNS],
     [SHEETS.settings, SETTINGS_COLUMNS]
   ];
   defs.forEach(function (def) {
@@ -104,6 +113,15 @@ function sheetToObjects(name) {
       header.forEach(function (col, i) { obj[col] = normalizeCell(r[i], col); });
       return obj;
     });
+}
+
+// Like sheetToObjects, but returns [] instead of throwing when the sheet
+// doesn't exist yet — used for MatchLiveEvents so an existing Sheet that
+// hasn't re-run setupSheets() after this feature was added still loads the
+// rest of the app instead of failing doGet entirely.
+function sheetToObjectsOrEmpty(name) {
+  const sheet = getSpreadsheet().getSheetByName(name);
+  return sheet ? sheetToObjects(name) : [];
 }
 
 // Sheets stores a "hora"-only cell as a Date on its time-value epoch
@@ -257,6 +275,7 @@ function doGet(e) {
       matchEvents: sheetToObjects(SHEETS.matchEvents),
       matchAppearances: sheetToObjects(SHEETS.matchAppearances).map(coerceAppearance),
       matchIntervals: sheetToObjects(SHEETS.matchIntervals).map(coerceInterval),
+      matchLiveEvents: sheetToObjectsOrEmpty(SHEETS.matchLiveEvents).map(coerceLiveEvent),
       settings: readSingletonRow(SHEETS.settings, SETTINGS_COLUMNS, DEFAULT_SETTINGS)
     };
     return jsonResponse({ ok: true, result: data });
@@ -281,6 +300,9 @@ function doPost(e) {
       addRecurringSessions: addRecurringSessions,
       updateSession: updateSession,
       deleteSession: deleteSession,
+      addLiveEvent: addLiveEvent,
+      deleteLiveEvent: deleteLiveEvent,
+      clearLiveEvents: clearLiveEvents,
       saveCallups: saveCallups,
       saveMatchReport: saveMatchReport,
       saveAttendance: saveAttendance,
@@ -411,6 +433,42 @@ function deleteSession(payload) {
   return true;
 }
 
+// Registro en vivo (taps durante el partido) — cada tap es una escritura
+// inmediata, independiente del acta. addLiveEvent cubre tanto los eventos
+// (gol, tiro, falta...) como los marcadores de fase del reloj (inicio_1,
+// fin_1, inicio_2, fin_2).
+function addLiveEvent(payload) {
+  if (!payload.matchId) throw new Error('Falta el id del partido.');
+  if (!payload.tipo) throw new Error('Falta el tipo de evento.');
+  const row = {
+    id: newId('le'),
+    match_id: payload.matchId,
+    team: payload.team || '',
+    player_id: payload.player_id || '',
+    dorsal_rival: payload.dorsal_rival != null ? payload.dorsal_rival : '',
+    tipo: payload.tipo,
+    minuto: payload.minuto != null ? payload.minuto : 0,
+    parte: payload.parte != null ? payload.parte : '',
+    ts: new Date().toISOString()
+  };
+  appendRow(SHEETS.matchLiveEvents, LIVE_EVENT_COLUMNS, row);
+  return row;
+}
+
+// Deshacer un tap concreto (normalmente el último).
+function deleteLiveEvent(payload) {
+  if (!payload.id) throw new Error('Falta el id del evento.');
+  deleteRowsWhere(SHEETS.matchLiveEvents, 'id', payload.id);
+  return true;
+}
+
+// Reinicia por completo el registro en vivo de un partido (empezar de cero).
+function clearLiveEvents(payload) {
+  if (!payload.matchId) throw new Error('Falta el id del partido.');
+  deleteRowsWhere(SHEETS.matchLiveEvents, 'match_id', payload.matchId);
+  return true;
+}
+
 // Guarda solo la convocatoria (quién va convocado y el capitán), sin exigir
 // los datos del partido (minutos, goles, tarjetas) — para poder prepararla
 // antes de jugar. Solo toca MatchAppearances; goles/eventos/intervalos se
@@ -506,4 +564,11 @@ function coerceInterval(iv) {
   iv.entrada = iv.entrada === '' || iv.entrada === undefined ? 0 : Number(iv.entrada);
   iv.salida = iv.salida === '' || iv.salida === undefined ? 0 : Number(iv.salida);
   return iv;
+}
+
+function coerceLiveEvent(le) {
+  le.minuto = le.minuto === '' || le.minuto === undefined ? 0 : Number(le.minuto);
+  le.parte = le.parte === '' || le.parte === undefined ? null : Number(le.parte);
+  le.dorsal_rival = le.dorsal_rival === '' || le.dorsal_rival === undefined ? null : Number(le.dorsal_rival);
+  return le;
 }

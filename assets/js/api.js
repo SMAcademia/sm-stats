@@ -128,6 +128,30 @@ SM.api = (function () {
         d.attendance = d.attendance.filter(function (a) { return a.session_id !== payload.id; });
         return true;
       }
+      case 'addLiveEvent': {
+        const row = {
+          id: nextMockId('le'),
+          match_id: payload.matchId,
+          team: payload.team || '',
+          player_id: payload.player_id || '',
+          dorsal_rival: payload.dorsal_rival != null ? payload.dorsal_rival : null,
+          tipo: payload.tipo,
+          minuto: payload.minuto != null ? payload.minuto : 0,
+          parte: payload.parte != null ? payload.parte : null,
+          ts: new Date().toISOString()
+        };
+        d.matchLiveEvents = d.matchLiveEvents || [];
+        d.matchLiveEvents.push(row);
+        return row;
+      }
+      case 'deleteLiveEvent': {
+        d.matchLiveEvents = (d.matchLiveEvents || []).filter(function (le) { return le.id !== payload.id; });
+        return true;
+      }
+      case 'clearLiveEvents': {
+        d.matchLiveEvents = (d.matchLiveEvents || []).filter(function (le) { return le.match_id !== payload.matchId; });
+        return true;
+      }
       case 'saveCallups': {
         if ((payload.appearances || []).length < 7) {
           throw new Error('Se necesitan al menos 7 jugadores convocados para guardar la convocatoria.');

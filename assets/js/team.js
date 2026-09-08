@@ -60,7 +60,8 @@ SM.team = (function () {
       attendance: (data.attendance || []).filter(function (a) { return sessionIds[a.session_id]; }),
       matchEvents: (data.matchEvents || []).filter(function (e) { return matchIds[e.match_id]; }),
       matchAppearances: (data.matchAppearances || []).filter(function (a) { return matchIds[a.match_id]; }),
-      matchIntervals: (data.matchIntervals || []).filter(function (iv) { return matchIds[iv.match_id]; })
+      matchIntervals: (data.matchIntervals || []).filter(function (iv) { return matchIds[iv.match_id]; }),
+      matchLiveEvents: (data.matchLiveEvents || []).filter(function (le) { return matchIds[le.match_id]; })
     });
   }
 
