@@ -6,6 +6,6 @@
 window.SM = window.SM || {};
 
 SM.config = {
-  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzHUHUGLg1-cMZsLYQfFXNCmUO-aSuUD7hW51V67WbcR8y60U3IfsqVBKoK8CY_hbVogw/exec',
+  APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyIiXxSJju4Y-HYA-dCHuqwffO8baVtTlhtcibKO6DKsOn9E1bo2-gBgGfnr1EfX9wgEw/exec',
   TOKEN: ''
 };
