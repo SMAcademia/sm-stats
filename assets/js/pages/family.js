@@ -125,24 +125,26 @@
     );
   }
 
-  // Enlace directo a la encuesta de bienestar (encuesta.html) para el
-  // entrenamiento de hoy, sin esperar a que el entrenador comparta el
-  // enlace por su cuenta. Solo aparece si se cumplen las tres condiciones:
-  // hoy hay entrenamiento (no partido, que tiene su propio flujo), el
-  // jugador asistió, y todavía no ha respondido la encuesta de hoy.
+  // Enlace directo a la encuesta de bienestar (encuesta.html) para la
+  // sesión de hoy (entrenamiento o partido), sin esperar a que el
+  // entrenador comparta el enlace por su cuenta. Solo aparece si se
+  // cumplen las tres condiciones: hoy hay sesión, el jugador asistió (la
+  // asistencia se toma igual para entrenos y partidos, ver asistencia.html),
+  // y todavía no ha respondido la encuesta de hoy.
   function todaySessionHtml(scoped, p) {
     const today = SM.ui.formatDateIso(new Date());
-    const todaySession = (scoped.sessions || []).find(function (s) { return s.fecha === today && s.tipo === 'entrenamiento'; });
+    const todaySession = (scoped.sessions || []).find(function (s) { return s.fecha === today; });
     if (!todaySession) return '';
     const asistio = (scoped.attendance || []).some(function (a) { return a.session_id === todaySession.id && a.player_id === p.id && a.estado === 'presente'; });
     if (!asistio) return '';
     const already = (scoped.checkins || []).some(function (c) { return c.session_id === todaySession.id && c.player_id === p.id; });
     if (already) return '';
+    const isMatch = todaySession.tipo === 'partido';
     const link = 'encuesta.html?session=' + todaySession.id + '&player=' + p.id;
     return (
       '<div class="panel">' +
         '<span class="panel-title">Bienestar de hoy</span>' +
-        '<div style="margin-top:10px;font-size:13px;color:var(--text-faint);font-weight:600;">¿Qué tal ha ido hoy? Cuéntanoslo en un minuto.</div>' +
+        '<div style="margin-top:10px;font-size:13px;color:var(--text-faint);font-weight:600;">' + (isMatch ? '¿Qué tal el partido de hoy? Cuéntanoslo en un minuto.' : '¿Qué tal ha ido hoy? Cuéntanoslo en un minuto.') + '</div>' +
         '<a href="' + link + '" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px;">Rellenar satisfacción de hoy</a>' +
       '</div>'
     );
