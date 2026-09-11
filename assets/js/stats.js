@@ -8,6 +8,14 @@ window.SM = window.SM || {};
 
 SM.stats = (function () {
   const ATTR_KEYS = ['ritmo', 'tiro', 'pase', 'regate', 'defensa', 'fisico'];
+  // Valores del jugador dentro de la metodología del club (compañerismo,
+  // sacrificio...) — un radar aparte del de atributos técnicos, no entra
+  // en overallRating: es una valoración de comportamiento, no de nivel.
+  const VALUE_KEYS = ['companerismo', 'sacrificio', 'respeto', 'motivacion', 'esfuerzo', 'constancia'];
+  const VALUE_LABELS = {
+    companerismo: 'Compañerismo', sacrificio: 'Sacrificio', respeto: 'Respeto',
+    motivacion: 'Motivación', esfuerzo: 'Esfuerzo', constancia: 'Constancia'
+  };
 
   // 0-10 overall rating derived from the six 0-100 attributes (avoids storing
   // a redundant "rating" field that could drift from the attributes).
@@ -95,15 +103,17 @@ SM.stats = (function () {
     return (data.attendance || []).filter(function (a) { return a.session_id === sessionId; });
   }
 
-  // % of past sessions where the player was marked "presente" (justificado counts as excused, not counted against them).
+  // % of past sessions where the player was marked "presente". Las
+  // justificadas SÍ restan (cuentan como falta en el denominador) — solo
+  // "presente" suma, para que el % refleje la disponibilidad real del
+  // jugador a la hora de decidir titularidades, convocatorias y capitanías.
   function attendancePct(data, playerId, sessions) {
     const rows = (sessions || sessionsUpTo(data)).map(function (s) {
       return (data.attendance || []).find(function (a) { return a.session_id === s.id && a.player_id === playerId; });
     }).filter(Boolean);
-    const counted = rows.filter(function (r) { return r.estado === 'presente' || r.estado === 'ausente'; });
-    if (!counted.length) return null;
-    const presentes = counted.filter(function (r) { return r.estado === 'presente'; }).length;
-    return Math.round((presentes / counted.length) * 100);
+    if (!rows.length) return null;
+    const presentes = rows.filter(function (r) { return r.estado === 'presente'; }).length;
+    return Math.round((presentes / rows.length) * 100);
   }
 
   function teamAttendancePct(data) {
@@ -207,7 +217,7 @@ SM.stats = (function () {
     const recentKeys = order.slice(-(weeks || 4));
     return recentKeys.map(function (key) {
       const sessionIds = groups[key].map(function (s) { return s.id; });
-      const rows = (data.attendance || []).filter(function (a) { return sessionIds.indexOf(a.session_id) !== -1 && (a.estado === 'presente' || a.estado === 'ausente'); });
+      const rows = (data.attendance || []).filter(function (a) { return sessionIds.indexOf(a.session_id) !== -1; });
       const presentes = rows.filter(function (r) { return r.estado === 'presente'; }).length;
       const pct = rows.length ? Math.round((presentes / rows.length) * 100) : null;
       return { week: key, pct: pct };
@@ -244,6 +254,8 @@ SM.stats = (function () {
 
   return {
     ATTR_KEYS: ATTR_KEYS,
+    VALUE_KEYS: VALUE_KEYS,
+    VALUE_LABELS: VALUE_LABELS,
     overallRating: overallRating,
     byId: byId,
     playedMatches: playedMatches,

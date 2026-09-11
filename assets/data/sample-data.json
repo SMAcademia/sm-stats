@@ -28,7 +28,13 @@
       "pase": 58,
       "regate": 40,
       "defensa": 62,
-      "fisico": 70
+      "fisico": 70,
+      "companerismo": 80,
+      "sacrificio": 75,
+      "respeto": 85,
+      "motivacion": 78,
+      "esfuerzo": 82,
+      "constancia": 88
     },
     {
       "id": "p2",
@@ -52,7 +58,13 @@
       "pase": 62,
       "regate": 50,
       "defensa": 78,
-      "fisico": 74
+      "fisico": 74,
+      "companerismo": 72,
+      "sacrificio": 80,
+      "respeto": 70,
+      "motivacion": 74,
+      "esfuerzo": 85,
+      "constancia": 79
     },
     {
       "id": "p3",
@@ -76,7 +88,13 @@
       "pase": 55,
       "regate": 42,
       "defensa": 74,
-      "fisico": 71
+      "fisico": 71,
+      "companerismo": 68,
+      "sacrificio": 74,
+      "respeto": 72,
+      "motivacion": 70,
+      "esfuerzo": 78,
+      "constancia": 75
     },
     {
       "id": "p4",
@@ -100,7 +118,13 @@
       "pase": 84,
       "regate": 70,
       "defensa": 58,
-      "fisico": 68
+      "fisico": 68,
+      "companerismo": 85,
+      "sacrificio": 70,
+      "respeto": 80,
+      "motivacion": 88,
+      "esfuerzo": 75,
+      "constancia": 72
     },
     {
       "id": "p5",
@@ -124,7 +148,13 @@
       "pase": 88,
       "regate": 75,
       "defensa": 60,
-      "fisico": 78
+      "fisico": 78,
+      "companerismo": 78,
+      "sacrificio": 82,
+      "respeto": 75,
+      "motivacion": 85,
+      "esfuerzo": 80,
+      "constancia": 76
     },
     {
       "id": "p6",
@@ -148,7 +178,13 @@
       "pase": 66,
       "regate": 71,
       "defensa": 42,
-      "fisico": 60
+      "fisico": 60,
+      "companerismo": 74,
+      "sacrificio": 68,
+      "respeto": 78,
+      "motivacion": 72,
+      "esfuerzo": 70,
+      "constancia": 74
     },
     {
       "id": "p7",
@@ -172,7 +208,13 @@
       "pase": 55,
       "regate": 78,
       "defensa": 30,
-      "fisico": 72
+      "fisico": 72,
+      "companerismo": 70,
+      "sacrificio": 72,
+      "respeto": 74,
+      "motivacion": 76,
+      "esfuerzo": 68,
+      "constancia": 70
     },
     {
       "id": "p8",
@@ -196,7 +238,13 @@
       "pase": 52,
       "regate": 66,
       "defensa": 28,
-      "fisico": 75
+      "fisico": 75,
+      "companerismo": 76,
+      "sacrificio": 78,
+      "respeto": 70,
+      "motivacion": 80,
+      "esfuerzo": 74,
+      "constancia": 72
     },
     {
       "id": "p9",
@@ -220,7 +268,13 @@
       "pase": 50,
       "regate": 35,
       "defensa": 55,
-      "fisico": 65
+      "fisico": 65,
+      "companerismo": 65,
+      "sacrificio": 70,
+      "respeto": 80,
+      "motivacion": 68,
+      "esfuerzo": 72,
+      "constancia": 76
     },
     {
       "id": "p10",
@@ -244,7 +298,13 @@
       "pase": 58,
       "regate": 45,
       "defensa": 76,
-      "fisico": 72
+      "fisico": 72,
+      "companerismo": 72,
+      "sacrificio": 76,
+      "respeto": 74,
+      "motivacion": 70,
+      "esfuerzo": 78,
+      "constancia": 80
     }
   ],
   "staff": [

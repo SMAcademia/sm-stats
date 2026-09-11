@@ -49,6 +49,10 @@
       { label: 'DEFENSA', value: p.defensa || 0 }, { label: 'FÍSICO', value: p.fisico || 0 }
     ];
 
+    const radarValues = SM.stats.VALUE_KEYS.map(function (k) {
+      return { label: SM.stats.VALUE_LABELS[k].toUpperCase(), value: p[k] || 0 };
+    });
+
     const evolution = SM.stats.evolutionForPlayer(DATA, p.id, 6).map(function (a) {
       return { label: 'J' + (a.match.jornada != null ? a.match.jornada : '?'), value: a.valoracion };
     });
@@ -84,11 +88,14 @@
             '<div class="panel"><span class="panel-title">Atributos</span>' +
               '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarAttrs, { color: meta.color }) + '</div>' +
             '</div>' +
-            '<div class="panel">' +
-              '<div style="display:flex;align-items:center;justify-content:space-between;"><span class="panel-title">Evolución del rendimiento</span>' +
-              '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Últimos partidos</span></div>' +
-              SM.charts.evolutionChart(evolution, { color: meta.color }) +
+            '<div class="panel"><span class="panel-title">Valores</span>' +
+              '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarValues, { color: 'var(--amber)' }) + '</div>' +
             '</div>' +
+          '</div>' +
+          '<div class="panel">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;"><span class="panel-title">Evolución del rendimiento</span>' +
+            '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Últimos partidos</span></div>' +
+            SM.charts.evolutionChart(evolution, { color: meta.color }) +
           '</div>' +
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">' +
             '<div class="panel">' +

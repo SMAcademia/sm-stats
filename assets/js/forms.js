@@ -59,6 +59,12 @@ SM.forms = (function () {
             return field(k.charAt(0).toUpperCase() + k.slice(1), '<input name="' + k + '" type="number" min="0" max="100" value="' + esc(p[k] != null ? p[k] : 60) + '">');
           }).join('') +
         '</div>' +
+        '<div class="form-hint" style="margin-top:16px;">Valores (0-100) — compañerismo, sacrificio, respeto... alimentan el radar de valores del perfil del jugador.</div>' +
+        '<div class="form-grid">' +
+          SM.stats.VALUE_KEYS.map(function (k) {
+            return field(SM.stats.VALUE_LABELS[k], '<input name="' + k + '" type="number" min="0" max="100" value="' + esc(p[k] != null ? p[k] : 60) + '">');
+          }).join('') +
+        '</div>' +
         '<div class="form-actions">' +
           '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
           '<button type="submit" class="btn btn-primary">Guardar</button>' +
@@ -90,7 +96,7 @@ SM.forms = (function () {
   function formToPayload(form) {
     const payload = {};
     new FormData(form).forEach(function (value, key) { payload[key] = value; });
-    ['dorsal', 'altura_cm', 'peso_kg'].concat(SM.stats.ATTR_KEYS).forEach(function (k) {
+    ['dorsal', 'altura_cm', 'peso_kg'].concat(SM.stats.ATTR_KEYS).concat(SM.stats.VALUE_KEYS).forEach(function (k) {
       if (payload[k] !== undefined && payload[k] !== '') payload[k] = Number(payload[k]);
     });
     return payload;
