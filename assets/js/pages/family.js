@@ -50,6 +50,19 @@
     return '<div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:12.5px;color:var(--text-faint);font-weight:600;">' + label + '</span><span style="font-size:13.5px;color:var(--text);font-weight:700;text-align:right;">' + value + '</span></div>';
   }
 
+  // Etiqueta(s) del punto que más destaca, sin cifra — si hay empate entre
+  // varias, se muestran todas. Sin datos todavía -> estado vacío neutro.
+  function highlightBadgesHtml(labels, color) {
+    if (!labels.length) return '<div class="empty-state">Sin valorar todavía.</div>';
+    return (
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;">' +
+        labels.map(function (label) {
+          return '<span class="badge" style="background:' + SM.ui.alpha(color, 0.14) + ';border:1px solid ' + SM.ui.alpha(color, 0.5) + ';color:' + color + ';">' + SM.ui.escapeHtml(label) + '</span>';
+        }).join('') +
+      '</div>'
+    );
+  }
+
   function miniKpi(value, label, color) {
     return '<div class="panel" style="padding:14px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-family:var(--font-display);font-weight:800;font-size:22px;color:' + color + ';">' + value + '</span><span style="font-size:10px;color:var(--text-mute);font-weight:600;letter-spacing:.3px;">' + label + '</span></div>';
   }
@@ -178,14 +191,14 @@
     const asistenciaPct = SM.stats.attendancePct(scoped, p.id);
     const age = SM.ui.ageFromBirthdate(p.fecha_nacimiento);
 
+    // Nada de cifras ni radares aquí: comparar números entre compañeros
+    // genera competitividad tóxica a estas edades. En su lugar, solo el
+    // punto que más destaca de cada jugador, como etiqueta.
     const isGk = p.posicion === 'POR';
     const attrKeys = SM.stats.attrKeysFor(p);
     const attrLabels = isGk ? SM.stats.GK_ATTR_LABELS : SM.stats.ATTR_LABELS;
-    const hasAttrs = attrKeys.some(function (k) { return p[k] != null && p[k] !== ''; });
-    const radarAttrs = attrKeys.map(function (k) { return { label: attrLabels[k].toUpperCase(), value: p[k] || 0 }; });
-
-    const hasValues = SM.stats.VALUE_KEYS.some(function (k) { return p[k] != null && p[k] !== ''; });
-    const radarValues = SM.stats.VALUE_KEYS.map(function (k) { return { label: SM.stats.VALUE_LABELS[k].toUpperCase(), value: p[k] || 0 }; });
+    const topAttrLabels = SM.stats.topKeys(p, attrKeys).map(function (k) { return attrLabels[k]; });
+    const topValueLabels = SM.stats.topKeys(p, SM.stats.VALUE_KEYS).map(function (k) { return SM.stats.VALUE_LABELS[k]; });
 
     const recentApps = SM.stats.appearancesForPlayer(scoped, p.id).slice(-5).reverse();
 
@@ -212,17 +225,15 @@
             '<div style="margin-top:8px;">' + agendaHtml(scoped) + '</div>' +
           '</div>' +
           '<div class="two-col-grid">' +
-            '<div class="panel"><span class="panel-title">Atributos' + (isGk ? ' de portero' : '') + '</span>' +
-              (hasAttrs
-                ? '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarAttrs, { color: meta.color }) + '</div>'
-                : '<div class="empty-state">Sin valorar todavía.</div>'
-              ) +
+            '<div class="panel">' +
+              '<span class="panel-title">Punto fuerte</span>' +
+              '<div style="font-size:11.5px;color:var(--text-faint);font-weight:600;margin-top:2px;">Lo que mejor se le da en el campo</div>' +
+              highlightBadgesHtml(topAttrLabels, meta.color) +
             '</div>' +
-            '<div class="panel"><span class="panel-title">Valores</span>' +
-              (hasValues
-                ? '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarValues, { color: 'var(--amber)' }) + '</div>'
-                : '<div class="empty-state">Sin valorar todavía.</div>'
-              ) +
+            '<div class="panel">' +
+              '<span class="panel-title">Valor que más destaca</span>' +
+              '<div style="font-size:11.5px;color:var(--text-faint);font-weight:600;margin-top:2px;">Lo que más practica dentro y fuera del campo</div>' +
+              highlightBadgesHtml(topValueLabels, 'var(--amber)') +
             '</div>' +
           '</div>' +
           '<div class="two-col-grid">' +

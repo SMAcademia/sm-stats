@@ -138,6 +138,10 @@ existen en la Sheet.
   ficha reducida de su hijo/a con calendario de próximas sesiones y si está
   convocado al próximo partido — **sin** la nota de evaluación de partidos
   ni el gráfico de evolución de rendimiento, que se queda a nivel interno.
+  Tampoco se muestran los radares de atributos/valores con cifras (para no
+  fomentar comparaciones entre compañeros): en su lugar, dos etiquetas
+  automáticas sin número — "Punto fuerte" y "Valor que más destaca" — con
+  el atributo/valor en el que más puntúa ese jugador.
 - **Cuerpo técnico** — mismo esquema pero con la fecha de alta en vez de
   la de nacimiento (p. ej. `MARC2022`). Entran directamente a la app
   completa, con el mismo acceso que tú.

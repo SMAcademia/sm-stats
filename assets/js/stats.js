@@ -29,6 +29,19 @@ SM.stats = (function () {
     return player.posicion === 'POR' ? GK_ATTR_KEYS : ATTR_KEYS;
   }
 
+  // Claves con el valor más alto entre `keys` para ese jugador (empate ->
+  // se devuelven todas). No expone la cifra — pensado para mostrar solo la
+  // etiqueta ("destaca en Regate") sin el número, que es lo que se compara
+  // entre jugadores y genera competitividad tóxica en la vista de familia.
+  function topKeys(player, keys) {
+    const scored = keys
+      .filter(function (k) { return player[k] != null && player[k] !== ''; })
+      .map(function (k) { return { key: k, value: Number(player[k]) }; });
+    if (!scored.length) return [];
+    const max = Math.max.apply(null, scored.map(function (s) { return s.value; }));
+    return scored.filter(function (s) { return s.value === max; }).map(function (s) { return s.key; });
+  }
+
   // 0-10 overall rating derived from the six 0-100 attributes (avoids storing
   // a redundant "rating" field that could drift from the attributes) — uses
   // the GK-specific set for porteros, the outfield set for everyone else.
@@ -271,6 +284,7 @@ SM.stats = (function () {
     GK_ATTR_KEYS: GK_ATTR_KEYS,
     GK_ATTR_LABELS: GK_ATTR_LABELS,
     attrKeysFor: attrKeysFor,
+    topKeys: topKeys,
     VALUE_KEYS: VALUE_KEYS,
     VALUE_LABELS: VALUE_LABELS,
     overallRating: overallRating,
