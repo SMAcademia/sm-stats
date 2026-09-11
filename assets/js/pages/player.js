@@ -22,6 +22,23 @@
   const id = SM.ui.qs('id');
   let DATA = null;
 
+  // Mismo orden que la rejilla de Plantilla (posición, luego dorsal), para
+  // que "Anterior"/"Siguiente" recorra los jugadores en el orden en que el
+  // entrenador ya los ve ahí. Circular: desde el último se vuelve al primero.
+  const POSITION_ORDER = { POR: 0, DEF: 1, CEN: 2, DEL: 3 };
+  function orderedRoster() {
+    return DATA.players.filter(function (pl) { return pl.activo; }).sort(function (a, b) {
+      const posDiff = (POSITION_ORDER[a.posicion] ?? 99) - (POSITION_ORDER[b.posicion] ?? 99);
+      return posDiff !== 0 ? posDiff : (a.dorsal || 99) - (b.dorsal || 99);
+    });
+  }
+  function neighbourIds(playerId) {
+    const list = orderedRoster();
+    const idx = list.findIndex(function (pl) { return pl.id === playerId; });
+    if (idx === -1 || list.length < 2) return { prev: null, next: null };
+    return { prev: list[(idx - 1 + list.length) % list.length].id, next: list[(idx + 1) % list.length].id };
+  }
+
   SM.sidebar.onSettingsClick(function () {
     SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = SM.team.filterData(data, SM.team.current()); });
   });
@@ -64,13 +81,26 @@
     const satisfaccionEvo = checkins.map(function (c) { return { label: shortDay(c.session.fecha), value: c.satisfaccion }; });
     const rendimientoEvo = checkins.map(function (c) { return { label: shortDay(c.session.fecha), value: c.rendimiento }; });
 
+    const neighbours = neighbourIds(p.id);
+
     main.innerHTML =
-      '<div style="display:flex;align-items:center;gap:10px;">' +
-        '<a href="plantilla.html" style="width:34px;height:34px;border-radius:9px;background:var(--panel);border:1px solid var(--border-soft);display:flex;align-items:center;justify-content:center;">' +
-          '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa2b0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></a>' +
-        '<span style="font-size:13.5px;color:var(--text-mute);font-weight:600;">Plantilla</span>' +
-        '<span style="font-size:13.5px;color:var(--text-ghost);">/</span>' +
-        '<span style="font-size:13.5px;color:var(--text-dim);font-weight:600;">' + SM.ui.escapeHtml(p.nombre) + '</span>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">' +
+        '<div style="display:flex;align-items:center;gap:10px;">' +
+          '<a href="plantilla.html" style="width:34px;height:34px;border-radius:9px;background:var(--panel);border:1px solid var(--border-soft);display:flex;align-items:center;justify-content:center;">' +
+            '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa2b0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></a>' +
+          '<span style="font-size:13.5px;color:var(--text-mute);font-weight:600;">Plantilla</span>' +
+          '<span style="font-size:13.5px;color:var(--text-ghost);">/</span>' +
+          '<span style="font-size:13.5px;color:var(--text-dim);font-weight:600;">' + SM.ui.escapeHtml(p.nombre) + '</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:10px;">' +
+          '<button type="button" id="prev-player-btn" class="btn btn-outline" style="padding:8px 14px;font-size:12.5px;"' + (neighbours.prev ? '' : ' disabled') + '>‹ Anterior</button>' +
+          '<button type="button" id="next-player-btn" class="btn btn-outline" style="padding:8px 14px;font-size:12.5px;"' + (neighbours.next ? '' : ' disabled') + '>Siguiente ›</button>' +
+          '<div class="search-box" style="width:210px;position:relative;">' +
+            '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b7382" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>' +
+            '<input id="player-search" type="text" placeholder="Buscar jugador..." autocomplete="off">' +
+            '<div id="player-search-results" class="player-search-results" style="display:none;"></div>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
 
       '<div style="display:grid;grid-template-columns:320px 1fr;gap:22px;">' +
@@ -129,6 +159,44 @@
         SM.ui.toast('Jugador eliminado.', 'ok');
         window.location.href = 'plantilla.html';
       }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+    });
+
+    const prevBtn = main.querySelector('#prev-player-btn');
+    if (neighbours.prev) prevBtn.addEventListener('click', function () { window.location.href = 'jugador.html?id=' + neighbours.prev; });
+    const nextBtn = main.querySelector('#next-player-btn');
+    if (neighbours.next) nextBtn.addEventListener('click', function () { window.location.href = 'jugador.html?id=' + neighbours.next; });
+
+    const searchInput = main.querySelector('#player-search');
+    const resultsBox = main.querySelector('#player-search-results');
+    function renderResults() {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) { resultsBox.style.display = 'none'; resultsBox.innerHTML = ''; return; }
+      const matches = DATA.players.filter(function (pl) {
+        return pl.activo && pl.id !== p.id && pl.nombre.toLowerCase().indexOf(q) !== -1;
+      }).slice(0, 8);
+      resultsBox.innerHTML = matches.length
+        ? matches.map(function (pl) {
+            return '<div class="player-search-item" data-player="' + pl.id + '">' +
+              '<span class="dorsal">' + (pl.dorsal != null ? pl.dorsal : '—') + '</span>' +
+              '<span>' + SM.ui.escapeHtml(pl.nombre) + '</span>' +
+            '</div>';
+          }).join('')
+        : '<div style="padding:10px 14px;font-size:12.5px;color:var(--text-ghost);">Sin resultados</div>';
+      resultsBox.style.display = 'block';
+      resultsBox.querySelectorAll('.player-search-item').forEach(function (item) {
+        item.addEventListener('click', function () { window.location.href = 'jugador.html?id=' + item.getAttribute('data-player'); });
+      });
+    }
+    searchInput.addEventListener('input', renderResults);
+    searchInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { resultsBox.style.display = 'none'; searchInput.blur(); return; }
+      if (e.key === 'Enter') {
+        const first = resultsBox.querySelector('.player-search-item');
+        if (first) window.location.href = 'jugador.html?id=' + first.getAttribute('data-player');
+      }
+    });
+    document.addEventListener('click', function (e) {
+      if (!resultsBox.contains(e.target) && e.target !== searchInput) resultsBox.style.display = 'none';
     });
   }
 
