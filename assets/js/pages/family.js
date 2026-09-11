@@ -125,6 +125,29 @@
     );
   }
 
+  // Sesión de hoy (si la hay) para poder enlazar directo a la encuesta de
+  // bienestar (encuesta.html) sin tener que esperar a que el entrenador
+  // comparta el enlace por su cuenta cada vez.
+  function todaySessionHtml(scoped, p) {
+    const today = SM.ui.formatDateIso(new Date());
+    const todaySession = (scoped.sessions || []).find(function (s) { return s.fecha === today; });
+    if (!todaySession) return '';
+    const already = (scoped.checkins || []).some(function (c) { return c.session_id === todaySession.id && c.player_id === p.id; });
+    const link = 'encuesta.html?session=' + todaySession.id + '&player=' + p.id;
+    return (
+      '<div class="panel">' +
+        '<span class="panel-title">Bienestar de hoy</span>' +
+        (already
+          ? '<div style="margin-top:10px;font-size:13px;color:var(--text-dim);font-weight:600;">Ya has respondido hoy — ¡gracias!</div>'
+          : (
+            '<div style="margin-top:10px;font-size:13px;color:var(--text-faint);font-weight:600;">¿Qué tal ha ido hoy? Cuéntanoslo en un minuto.</div>' +
+            '<a href="' + link + '" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px;">Rellenar satisfacción de hoy</a>'
+          )
+        ) +
+      '</div>'
+    );
+  }
+
   function agendaHtml(scoped) {
     const upcoming = SM.stats.upcomingSessions(scoped, { n: 6 });
     if (!upcoming.length) return '<div class="empty-state">No hay próximas sesiones programadas.</div>';
@@ -219,6 +242,7 @@
             miniKpi(minutos, 'MINUTOS', 'var(--text)') +
             miniKpi(asistenciaPct != null ? asistenciaPct + '%' : '—', 'ASISTENCIA', 'var(--magenta)') +
           '</div>' +
+          todaySessionHtml(scoped, p) +
           '<div class="panel"><span class="panel-title">Próximo partido</span>' +
             '<div style="margin-top:12px;">' + nextMatchHtml(scoped, p) + '</div>' +
           '</div>' +

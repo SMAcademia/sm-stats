@@ -8,6 +8,9 @@
 (function () {
   const root = document.getElementById('live-root');
   const sessionId = SM.ui.qs('session');
+  // Si llega con ?player=<id> (enlace directo desde el portal de familia,
+  // que ya sabe quién ha iniciado sesión), se salta el paso "¿Quién eres?".
+  const preselectedPlayerId = SM.ui.qs('player');
 
   let DATA = null;
   let session = null;
@@ -204,7 +207,13 @@
     if (session && session.tipo === 'partido' && session.match_id) {
       match = (DATA.matches || []).find(function (m) { return m.id === session.match_id; }) || null;
     }
-    if (session) loadPlayers();
+    if (session) {
+      loadPlayers();
+      if (preselectedPlayerId) {
+        const preselected = players.find(function (p) { return p.id === preselectedPlayerId; });
+        if (preselected) { player = preselected; step = 'satisfaccion'; }
+      }
+    }
     render();
   }).catch(function (err) {
     root.innerHTML = '<div class="live-loading">' + err.message + '</div>';
