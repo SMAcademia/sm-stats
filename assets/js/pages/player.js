@@ -49,6 +49,7 @@
       { label: 'DEFENSA', value: p.defensa || 0 }, { label: 'FÍSICO', value: p.fisico || 0 }
     ];
 
+    const hasValues = SM.stats.VALUE_KEYS.some(function (k) { return p[k] != null && p[k] !== ''; });
     const radarValues = SM.stats.VALUE_KEYS.map(function (k) {
       return { label: SM.stats.VALUE_LABELS[k].toUpperCase(), value: p[k] || 0 };
     });
@@ -89,7 +90,10 @@
               '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarAttrs, { color: meta.color }) + '</div>' +
             '</div>' +
             '<div class="panel"><span class="panel-title">Valores</span>' +
-              '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarValues, { color: 'var(--amber)' }) + '</div>' +
+              (hasValues
+                ? '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarValues, { color: 'var(--amber)' }) + '</div>'
+                : '<div class="empty-state">Sin valorar todavía — edita la ficha para puntuar compañerismo, sacrificio, respeto...</div>'
+              ) +
             '</div>' +
           '</div>' +
           '<div class="panel">' +

@@ -86,6 +86,10 @@ function setupSheets() {
     if (sheet.getLastRow() === 0) {
       sheet.getRange(1, 1, 1, columns.length).setValues([columns]);
       sheet.setFrozenRows(1);
+    } else {
+      // La pestaña ya existía (con datos) antes de que se añadieran estas
+      // columnas — hay que ampliar su cabecera, no solo crearla de cero.
+      ensureHeader(sheet, columns);
     }
   });
   // Settings needs exactly one data row to edit — seed it with placeholders
@@ -187,7 +191,10 @@ function updateRowById(name, columns, id, patch) {
   const sheet = getSheet(name);
   const rowIndex = findRowIndexById(sheet, id);
   if (rowIndex === -1) throw new Error('No se encontró la fila con id ' + id + ' en ' + name + '.');
-  const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  // ensureHeader (no solo leer la cabecera tal cual) — si `columns` incluye
+  // un campo añadido después de que esta fila existiera, hay que crear esa
+  // columna antes de poder escribir en ella, o el valor se pierde en silencio.
+  const header = ensureHeader(sheet, columns);
   header.forEach(function (col, i) {
     if (patch[col] !== undefined) sheet.getRange(rowIndex, i + 1).setValue(patch[col]);
   });
@@ -204,11 +211,11 @@ function findRowIndexByColumn(sheet, column, value) {
 
 // Like updateRowById, but matches by any column — used to keep a match's
 // linked Sessions row (matched by match_id, not id) in sync.
-function updateRowByColumn(name, matchColumn, matchValue, patch) {
+function updateRowByColumn(name, columns, matchColumn, matchValue, patch) {
   const sheet = getSheet(name);
   const rowIndex = findRowIndexByColumn(sheet, matchColumn, matchValue);
   if (rowIndex === -1) return false;
-  const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const header = ensureHeader(sheet, columns);
   header.forEach(function (col, i) {
     if (patch[col] !== undefined) sheet.getRange(rowIndex, i + 1).setValue(patch[col]);
   });
@@ -391,7 +398,7 @@ function updateMatch(payload) {
     if (payload[k] !== undefined) patch[k] = payload[k];
   });
   updateRowById(SHEETS.matches, MATCH_COLUMNS, payload.id, patch);
-  updateRowByColumn(SHEETS.sessions, 'match_id', payload.id, patch);
+  updateRowByColumn(SHEETS.sessions, SESSION_COLUMNS, 'match_id', payload.id, patch);
   return payload;
 }
 
