@@ -94,6 +94,22 @@
     } else {
       subtitle.textContent = DATA.staff.length + ' miembros del staff · Temporada 2026/27';
       grid.innerHTML = DATA.staff.length ? DATA.staff.map(staffCardHtml).join('') : '<div class="empty-state">Todavía no hay miembros del cuerpo técnico.</div>';
+      grid.querySelectorAll('.copy-staff-access-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const s = DATA.staff.find(function (st) { return st.id === btn.getAttribute('data-staff'); });
+          if (!s) return;
+          const creds = SM.auth.staffCredentials(s);
+          const link = window.location.origin + window.location.pathname.replace(/plantilla\.html$/, 'acceso.html');
+          const text = 'Acceso SM Stats (cuerpo técnico)\nEnlace: ' + link + '\nUsuario: ' + creds.username + '\nContraseña: ' + creds.password;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+              SM.ui.toast('Acceso copiado al portapapeles.', 'ok');
+            }).catch(function () { SM.ui.toast('No se pudo copiar. Cópialo manualmente.', 'error'); });
+          } else {
+            SM.ui.toast('Usuario: ' + creds.username + ' · Contraseña: ' + creds.password, 'ok');
+          }
+        });
+      });
     }
   }
 
@@ -132,6 +148,7 @@
   }
 
   function staffCardHtml(s) {
+    const creds = SM.auth.staffCredentials(s);
     return (
       '<div class="player-card" style="cursor:default;">' +
         '<div class="accent-bar" style="background:var(--cyan);box-shadow:0 0 10px var(--cyan);"></div>' +
@@ -145,6 +162,12 @@
         '<div style="display:flex;flex-direction:column;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:12px;color:var(--text-faint);font-weight:600;">Licencia / formación</span><span style="font-size:12.5px;color:var(--text);font-weight:700;">' + SM.ui.escapeHtml(s.licencia || '—') + '</span></div>' +
           '<div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:12px;color:var(--text-faint);font-weight:600;">En el club desde</span><span style="font-size:12.5px;color:var(--text);font-weight:700;">' + (s.fecha_alta || '—') + '</span></div>' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">' +
+          '<span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-ghost);">ACCESO A LA APP</span>' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:12px;color:var(--text-faint);font-weight:600;">Usuario</span><span style="font-size:12.5px;color:var(--text);font-weight:700;">' + SM.ui.escapeHtml(creds.username) + '</span></div>' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:12px;color:var(--text-faint);font-weight:600;">Contraseña</span><span style="font-size:12.5px;color:var(--text);font-weight:700;">' + SM.ui.escapeHtml(creds.password) + '</span></div>' +
+          '<button type="button" class="btn btn-outline copy-staff-access-btn" data-staff="' + s.id + '" style="width:100%;font-size:12px;padding:8px;margin-top:2px;">Copiar acceso</button>' +
         '</div>' +
       '</div>'
     );

@@ -64,6 +64,7 @@ SM.sidebar = (function () {
         '<div class="sidebar-rule"></div>' +
         '<nav class="sidebar-nav">' + nav + '</nav>' +
         '<div class="sidebar-footer">' +
+          '<a href="acceso.html" target="_blank" rel="noopener" style="display:block;font-size:11.5px;font-weight:600;color:var(--text-mute);margin-bottom:14px;">Acceso familias / staff ↗</a>' +
           '<div class="sidebar-rule" style="margin:0 0 16px 0;"></div>' +
           '<div style="display:flex;align-items:center;gap:6px;">' +
             '<div class="sidebar-user" style="flex:1 1 auto;min-width:0;">' +

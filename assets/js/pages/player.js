@@ -165,6 +165,18 @@
         window.location.href = 'plantilla.html';
       }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
     });
+    main.querySelector('#copy-family-access-btn').addEventListener('click', function () {
+      const creds = SM.auth.playerCredentials(p);
+      const link = window.location.origin + window.location.pathname.replace(/jugador\.html$/, 'acceso.html');
+      const text = 'Acceso privado SM Stats\nEnlace: ' + link + '\nUsuario: ' + creds.username + '\nContraseña: ' + creds.password;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          SM.ui.toast('Acceso copiado al portapapeles.', 'ok');
+        }).catch(function () { SM.ui.toast('No se pudo copiar. Cópialo manualmente.', 'error'); });
+      } else {
+        SM.ui.toast('Usuario: ' + creds.username + ' · Contraseña: ' + creds.password, 'ok');
+      }
+    });
 
     const prevBtn = main.querySelector('#prev-player-btn');
     if (neighbours.prev) prevBtn.addEventListener('click', function () { window.location.href = 'jugador.html?id=' + neighbours.prev; });
@@ -240,6 +252,26 @@
         '</div>' +
         '<button id="edit-player-btn" class="btn btn-outline" style="width:100%;margin-top:22px;">Editar ficha</button>' +
         '<button id="delete-player-btn" class="btn btn-outline" style="width:100%;margin-top:10px;color:var(--red-bright);border-color:' + SM.ui.alpha('var(--red)', 0.4) + ';">Eliminar jugador</button>' +
+        '<div style="width:100%;height:1px;background:var(--border);margin:20px 0;"></div>' +
+        familyAccessHtml(p) +
+      '</div>'
+    );
+  }
+
+  // Acceso privado de familia — las credenciales se derivan del nombre y la
+  // fecha de nacimiento (ver assets/js/auth.js), no se guardan en ningún
+  // sitio, así que se muestran aquí para que el entrenador se las pueda
+  // pasar a la familia (comparte también acceso.html).
+  function familyAccessHtml(p) {
+    const creds = SM.auth.playerCredentials(p);
+    return (
+      '<div style="width:100%;display:flex;flex-direction:column;gap:10px;">' +
+        '<span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-ghost);align-self:flex-start;">ACCESO FAMILIA</span>' +
+        '<div style="width:100%;background:var(--panel-2);border:1px solid var(--border-soft);border-radius:9px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;">' +
+          dataRow('Usuario', creds.username) +
+          dataRow('Contraseña', creds.password) +
+        '</div>' +
+        '<button type="button" id="copy-family-access-btn" class="btn btn-outline" style="width:100%;font-size:12.5px;padding:9px;">Copiar acceso</button>' +
       '</div>'
     );
   }

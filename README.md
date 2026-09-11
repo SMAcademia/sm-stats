@@ -107,6 +107,8 @@ jugador.html            Ficha de un jugador (?id=...)
 asistencia.html         Control de asistencia
 partidos.html           Partidos (próximo, jugados, acta)
 estadisticas.html       Estadísticas comparativas del equipo
+acceso.html             Login privado para familias/jugadores y staff
+mi-jugador.html         Portal reducido de familia (?id=...)
 assets/
   css/theme.css          Tokens de diseño (colores, tipografía) y componentes
   js/config.js            URL del Apps Script + token
@@ -114,12 +116,37 @@ assets/
   js/stats.js              Cálculo de estadísticas a partir de los datos crudos
   js/charts.js             Gráficos SVG (radar, evolución, gauge, barras)
   js/forms.js              Formularios reutilizados (jugador, staff)
+  js/auth.js               Credenciales de familia/staff (ver más abajo)
   js/sidebar.js            Navegación lateral compartida
   js/ui.js                 Helpers varios (fechas, avatares, toasts, modal)
   js/pages/*.js             Lógica de cada página
   data/sample-data.json    Dataset de ejemplo (modo demo)
 apps-script/Code.gs      Backend de Google Apps Script
 ```
+
+## Acceso de familias y cuerpo técnico
+
+Además de la app completa (para ti como entrenador), hay un acceso privado
+reducido en `acceso.html`, pensado para compartir con las familias y con el
+resto del cuerpo técnico. No hace falta tocar el Apps Script ni guardar
+ninguna contraseña: las credenciales se calculan a partir de datos que ya
+existen en la Sheet.
+
+- **Familias/jugadores** — usuario: el nombre del jugador en mayúsculas
+  (p. ej. `DIEGO PRIETO`); contraseña: las 4 primeras letras del nombre +
+  el año de nacimiento (p. ej. `DIEG2015`). Entran a `mi-jugador.html`, una
+  ficha reducida de su hijo/a con calendario de próximas sesiones y si está
+  convocado al próximo partido — **sin** la nota de evaluación de partidos
+  ni el gráfico de evolución de rendimiento, que se queda a nivel interno.
+- **Cuerpo técnico** — mismo esquema pero con la fecha de alta en vez de
+  la de nacimiento (p. ej. `MARC2022`). Entran directamente a la app
+  completa, con el mismo acceso que tú.
+
+Desde la ficha de cada jugador (`jugador.html`) y desde la tarjeta de cada
+miembro del staff en Plantilla puedes ver y copiar sus credenciales con un
+clic ("Copiar acceso"), para pasárselas por el canal que prefieras. El
+enlace `acceso.html` también está siempre accesible desde el pie de la
+barra lateral ("Acceso familias / staff").
 
 ## Notas
 
