@@ -8,6 +8,14 @@ window.SM = window.SM || {};
 
 SM.stats = (function () {
   const ATTR_KEYS = ['ritmo', 'tiro', 'pase', 'regate', 'defensa', 'fisico'];
+  const ATTR_LABELS = { ritmo: 'Ritmo', tiro: 'Tiro', pase: 'Pase', regate: 'Regate', defensa: 'Defensa', fisico: 'Físico' };
+  // Atributos específicos de portero — sustituyen (no se suman) a los de
+  // jugador de campo, ya que ritmo/tiro/regate apenas describen el rol.
+  const GK_ATTR_KEYS = ['blocaje', 'despeje', 'comunicacion', 'posicionamiento', 'unoxuno', 'abp'];
+  const GK_ATTR_LABELS = {
+    blocaje: 'Blocaje', despeje: 'Despeje', comunicacion: 'Comunicación',
+    posicionamiento: 'Posicionamiento', unoxuno: '1x1', abp: 'ABP'
+  };
   // Valores del jugador dentro de la metodología del club (compañerismo,
   // sacrificio...) — un radar aparte del de atributos técnicos, no entra
   // en overallRating: es una valoración de comportamiento, no de nivel.
@@ -17,10 +25,15 @@ SM.stats = (function () {
     motivacion: 'Motivación', esfuerzo: 'Esfuerzo', constancia: 'Constancia'
   };
 
+  function attrKeysFor(player) {
+    return player.posicion === 'POR' ? GK_ATTR_KEYS : ATTR_KEYS;
+  }
+
   // 0-10 overall rating derived from the six 0-100 attributes (avoids storing
-  // a redundant "rating" field that could drift from the attributes).
+  // a redundant "rating" field that could drift from the attributes) — uses
+  // the GK-specific set for porteros, the outfield set for everyone else.
   function overallRating(player) {
-    const vals = ATTR_KEYS.map(function (k) { return Number(player[k]) || 0; });
+    const vals = attrKeysFor(player).map(function (k) { return Number(player[k]) || 0; });
     const avg = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
     return Math.round(avg) / 10;
   }
@@ -254,6 +267,10 @@ SM.stats = (function () {
 
   return {
     ATTR_KEYS: ATTR_KEYS,
+    ATTR_LABELS: ATTR_LABELS,
+    GK_ATTR_KEYS: GK_ATTR_KEYS,
+    GK_ATTR_LABELS: GK_ATTR_LABELS,
+    attrKeysFor: attrKeysFor,
     VALUE_KEYS: VALUE_KEYS,
     VALUE_LABELS: VALUE_LABELS,
     overallRating: overallRating,

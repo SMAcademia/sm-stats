@@ -34,7 +34,13 @@
       "respeto": 85,
       "motivacion": 78,
       "esfuerzo": 82,
-      "constancia": 88
+      "constancia": 88,
+      "blocaje": 78,
+      "despeje": 74,
+      "comunicacion": 82,
+      "posicionamiento": 80,
+      "unoxuno": 76,
+      "abp": 72
     },
     {
       "id": "p2",
@@ -274,7 +280,13 @@
       "respeto": 80,
       "motivacion": 68,
       "esfuerzo": 72,
-      "constancia": 76
+      "constancia": 76,
+      "blocaje": 62,
+      "despeje": 58,
+      "comunicacion": 70,
+      "posicionamiento": 65,
+      "unoxuno": 60,
+      "abp": 55
     },
     {
       "id": "p10",

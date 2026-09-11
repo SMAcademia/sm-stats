@@ -53,10 +53,16 @@ SM.forms = (function () {
           field('En el club desde', '<input name="fecha_alta" type="date" value="' + esc(p.fecha_alta) + '">') +
           field('Foto (URL, opcional)', '<input name="foto_url" type="url" placeholder="https://..." value="' + esc(p.foto_url) + '">', true) +
         '</div>' +
-        '<div class="form-hint" style="margin-top:16px;">Atributos (0-100) — alimentan el radar del perfil del jugador.</div>' +
-        '<div class="form-grid">' +
+        '<div class="form-hint" id="attrs-outfield-hint" style="margin-top:16px;">Atributos (0-100) — alimentan el radar del perfil del jugador.</div>' +
+        '<div class="form-grid" id="attrs-outfield-block">' +
           SM.stats.ATTR_KEYS.map(function (k) {
             return field(k.charAt(0).toUpperCase() + k.slice(1), '<input name="' + k + '" type="number" min="0" max="100" value="' + esc(p[k] != null ? p[k] : 60) + '">');
+          }).join('') +
+        '</div>' +
+        '<div class="form-hint" id="attrs-gk-hint" style="margin-top:16px;">Atributos de portero (0-100) — sustituyen a los de jugador de campo mientras la posición principal sea Portero.</div>' +
+        '<div class="form-grid" id="attrs-gk-block">' +
+          SM.stats.GK_ATTR_KEYS.map(function (k) {
+            return field(SM.stats.GK_ATTR_LABELS[k], '<input name="' + k + '" type="number" min="0" max="100" value="' + esc(p[k] != null ? p[k] : 60) + '">');
           }).join('') +
         '</div>' +
         '<div class="form-hint" style="margin-top:16px;">Valores (0-100) — compañerismo, sacrificio, respeto... alimentan el radar de valores del perfil del jugador.</div>' +
@@ -96,7 +102,7 @@ SM.forms = (function () {
   function formToPayload(form) {
     const payload = {};
     new FormData(form).forEach(function (value, key) { payload[key] = value; });
-    ['dorsal', 'altura_cm', 'peso_kg'].concat(SM.stats.ATTR_KEYS).concat(SM.stats.VALUE_KEYS).forEach(function (k) {
+    ['dorsal', 'altura_cm', 'peso_kg'].concat(SM.stats.ATTR_KEYS).concat(SM.stats.GK_ATTR_KEYS).concat(SM.stats.VALUE_KEYS).forEach(function (k) {
       if (payload[k] !== undefined && payload[k] !== '') payload[k] = Number(payload[k]);
     });
     return payload;
@@ -128,11 +134,32 @@ SM.forms = (function () {
       primary: p.posicion || null,
       secondary: (p.posicion_secundaria || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean)
     };
+    // El bloque de atributos oculto también se deshabilita, no solo se
+    // esconde — si no, sus inputs (con su valor por defecto) viajarían en
+    // el FormData y pisarían el otro conjunto de atributos al guardar.
+    function syncAttrBlocks() {
+      const isGk = state.primary === 'POR';
+      const outfieldBlock = body.querySelector('#attrs-outfield-block');
+      const gkBlock = body.querySelector('#attrs-gk-block');
+      const outfieldHint = body.querySelector('#attrs-outfield-hint');
+      const gkHint = body.querySelector('#attrs-gk-hint');
+      if (outfieldBlock) {
+        outfieldBlock.hidden = isGk;
+        if (outfieldHint) outfieldHint.hidden = isGk;
+        outfieldBlock.querySelectorAll('input').forEach(function (inp) { inp.disabled = isGk; });
+      }
+      if (gkBlock) {
+        gkBlock.hidden = !isGk;
+        if (gkHint) gkHint.hidden = !isGk;
+        gkBlock.querySelectorAll('input').forEach(function (inp) { inp.disabled = !isGk; });
+      }
+    }
     function sync() {
       body.querySelector('#pitch-picker').innerHTML = SM.pitch.render(state, { interactive: true, width: 160 });
       body.querySelector('#pitch-legend').innerHTML = pitchLegendHtml(state);
       body.querySelector('#posicion-input').value = state.primary || '';
       body.querySelector('#posicion-secundaria-input').value = state.secondary.join(',');
+      syncAttrBlocks();
       body.querySelectorAll('.pitch-dot').forEach(function (dot) {
         dot.addEventListener('click', function () {
           state = SM.pitch.toggle(state, dot.getAttribute('data-group'));

@@ -35,8 +35,9 @@ SM.charts = (function () {
     opts = opts || {};
     const height = opts.size || 230;
     // viewBox is wider than tall to leave room for the left/right axis labels
-    // (DEFENSA, FÍSICO, TIRO, PASE) without clipping them.
-    const vbX = -50, vbY = -15, vbW = 300, vbH = 230;
+    // without clipping them — wide enough for the longest side labels in use
+    // (e.g. "COMUNICACIÓN", "POSICIONAMIENTO" on the goalkeeper radar).
+    const vbX = -65, vbY = -15, vbW = 330, vbH = 230;
     const width = Math.round(height * (vbW / vbH));
     const color = opts.color || 'var(--magenta)';
     const cx = 100, cy = 100, R = 80;
@@ -104,8 +105,11 @@ SM.charts = (function () {
       return '<text x="' + xAt(i).toFixed(1) + '" y="' + (bottom + 20) + '" text-anchor="middle" ' +
         'font-family="Rajdhani, sans-serif" font-weight="600" font-size="11" fill="var(--text-mute)">' + p.label + '</text>';
     }).join('');
+    // viewBox debe llegar hasta más allá de las etiquetas del eje (dibujadas
+    // en bottom+20) o el SVG las recorta por abajo.
+    const vbH = bottom + 35;
     return (
-      '<svg width="100%" height="' + h + '" viewBox="0 0 ' + w + ' ' + (h - 20) + '">' +
+      '<svg width="100%" height="' + h + '" viewBox="0 0 ' + w + ' ' + vbH + '">' +
         '<defs><linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">' +
           '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.35"/>' +
           '<stop offset="100%" stop-color="' + color + '" stop-opacity="0"/>' +

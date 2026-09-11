@@ -60,11 +60,13 @@
     const capitanias = SM.stats.captainCount(DATA, p.id);
     const age = SM.ui.ageFromBirthdate(p.fecha_nacimiento);
 
-    const radarAttrs = [
-      { label: 'RITMO', value: p.ritmo || 0 }, { label: 'TIRO', value: p.tiro || 0 },
-      { label: 'PASE', value: p.pase || 0 }, { label: 'REGATE', value: p.regate || 0 },
-      { label: 'DEFENSA', value: p.defensa || 0 }, { label: 'FÍSICO', value: p.fisico || 0 }
-    ];
+    const isGk = p.posicion === 'POR';
+    const attrKeys = SM.stats.attrKeysFor(p);
+    const attrLabels = isGk ? SM.stats.GK_ATTR_LABELS : SM.stats.ATTR_LABELS;
+    const hasAttrs = attrKeys.some(function (k) { return p[k] != null && p[k] !== ''; });
+    const radarAttrs = attrKeys.map(function (k) {
+      return { label: attrLabels[k].toUpperCase(), value: p[k] || 0 };
+    });
 
     const hasValues = SM.stats.VALUE_KEYS.some(function (k) { return p[k] != null && p[k] !== ''; });
     const radarValues = SM.stats.VALUE_KEYS.map(function (k) {
@@ -116,8 +118,11 @@
             miniKpi(capitanias, 'CAPITÁN', 'var(--amber-bright)') +
           '</div>' +
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">' +
-            '<div class="panel"><span class="panel-title">Atributos</span>' +
-              '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarAttrs, { color: meta.color }) + '</div>' +
+            '<div class="panel"><span class="panel-title">Atributos' + (isGk ? ' de portero' : '') + '</span>' +
+              (hasAttrs
+                ? '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarAttrs, { color: meta.color }) + '</div>'
+                : '<div class="empty-state">Sin valorar todavía — edita la ficha para puntuar' + (isGk ? ' blocaje, despeje, comunicación...' : ' ritmo, tiro, pase...') + '</div>'
+              ) +
             '</div>' +
             '<div class="panel"><span class="panel-title">Valores</span>' +
               (hasValues
