@@ -13,6 +13,12 @@
     return MONTHS[d.getMonth()] + ' ' + d.getFullYear();
   }
 
+  function shortDay(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    if (isNaN(d)) return iso;
+    return d.getDate() + '/' + (d.getMonth() + 1);
+  }
+
   const id = SM.ui.qs('id');
   let DATA = null;
 
@@ -49,6 +55,10 @@
 
     const recentApps = SM.stats.appearancesForPlayer(DATA, p.id).slice(-5).reverse();
 
+    const checkins = SM.stats.checkinsForPlayer(DATA, p.id, 8);
+    const satisfaccionEvo = checkins.map(function (c) { return { label: shortDay(c.session.fecha), value: c.satisfaccion }; });
+    const rendimientoEvo = checkins.map(function (c) { return { label: shortDay(c.session.fecha), value: c.rendimiento }; });
+
     main.innerHTML =
       '<div style="display:flex;align-items:center;gap:10px;">' +
         '<a href="plantilla.html" style="width:34px;height:34px;border-radius:9px;background:var(--panel);border:1px solid var(--border-soft);display:flex;align-items:center;justify-content:center;">' +
@@ -78,6 +88,18 @@
               '<div style="display:flex;align-items:center;justify-content:space-between;"><span class="panel-title">Evolución del rendimiento</span>' +
               '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Últimos partidos</span></div>' +
               SM.charts.evolutionChart(evolution, { color: meta.color }) +
+            '</div>' +
+          '</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">' +
+            '<div class="panel">' +
+              '<div style="display:flex;align-items:center;justify-content:space-between;"><span class="panel-title">Satisfacción</span>' +
+              '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Bienestar</span></div>' +
+              SM.charts.evolutionChart(satisfaccionEvo, { color: 'var(--cyan)', min: 1, max: 4 }) +
+            '</div>' +
+            '<div class="panel">' +
+              '<div style="display:flex;align-items:center;justify-content:space-between;"><span class="panel-title">Rendimiento percibido</span>' +
+              '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Bienestar</span></div>' +
+              SM.charts.evolutionChart(rendimientoEvo, { color: 'var(--magenta)', min: 1, max: 4 }) +
             '</div>' +
           '</div>' +
           '<div class="panel">' +

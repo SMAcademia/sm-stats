@@ -34,6 +34,8 @@
   --magenta-bright: oklch(0.78 0.19 335);
   --amber: oklch(0.80 0.17 80);
   --amber-bright: oklch(0.83 0.15 80);
+  --orange: oklch(0.75 0.19 48);
+  --orange-bright: oklch(0.80 0.17 48);
   --red: oklch(0.68 0.20 25);
   --red-bright: oklch(0.75 0.17 25);
 

@@ -145,6 +145,19 @@ SM.stats = (function () {
     return apps.slice(-(n || 6));
   }
 
+  // Check-ins de bienestar de un jugador (ver encuesta.html), en orden
+  // cronológico — cada uno lleva su sesión adjunta para poder etiquetar
+  // el punto en el gráfico de evolución.
+  function checkinsForPlayer(data, playerId, n) {
+    const sessionsById = byId(data.sessions);
+    const rows = (data.checkins || [])
+      .filter(function (c) { return c.player_id === playerId; })
+      .map(function (c) { return Object.assign({}, c, { session: sessionsById[c.session_id] }); })
+      .filter(function (c) { return c.session; })
+      .sort(function (a, b) { return a.session.fecha.localeCompare(b.session.fecha); });
+    return rows.slice(-(n || 8));
+  }
+
   function fullPlayerRow(data, player) {
     return {
       player: player,
@@ -255,6 +268,7 @@ SM.stats = (function () {
     topScorers: topScorers,
     topAssisters: topAssisters,
     evolutionForPlayer: evolutionForPlayer,
+    checkinsForPlayer: checkinsForPlayer,
     fullStatsTable: fullStatsTable,
     attendanceByPosition: attendanceByPosition,
     weeklyAttendanceTrend: weeklyAttendanceTrend,

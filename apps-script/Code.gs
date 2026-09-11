@@ -28,6 +28,7 @@ const SHEETS = {
   matchAppearances: 'MatchAppearances',
   matchIntervals: 'MatchIntervals',
   matchLiveEvents: 'MatchLiveEvents',
+  checkins: 'Checkins',
   settings: 'Settings'
 };
 
@@ -50,6 +51,12 @@ const INTERVAL_COLUMNS = ['id', 'match_id', 'player_id', 'entrada', 'salida'];
 // llegada_izq, llegada_cen, llegada_der, corner). player_id solo para
 // team=propio; dorsal_rival (opcional, solo número) para team=rival.
 const LIVE_EVENT_COLUMNS = ['id', 'match_id', 'team', 'player_id', 'dorsal_rival', 'tipo', 'minuto', 'parte', 'ts'];
+// Check-in de bienestar — lo rellena el propio jugador tras un entrenamiento
+// o partido (session_id cubre ambos) desde un enlace sin login, eligiendo su
+// nombre de la plantilla. satisfaccion/rendimiento: 1=rojo, 2=naranja,
+// 3=amarillo, 4=verde. Un jugador solo tiene una fila por sesión — reenviar
+// sobrescribe la anterior.
+const CHECKIN_COLUMNS = ['id', 'session_id', 'player_id', 'satisfaccion', 'comentario_satisfaccion', 'rendimiento', 'comentario_rendimiento', 'ts'];
 // Settings is a singleton sheet: header row + exactly one data row (row 2).
 const SETTINGS_COLUMNS = ['club_nombre', 'entrenador_nombre', 'entrenador_rol', 'liga_nombre'];
 const DEFAULT_SETTINGS = { club_nombre: 'Mi Club', entrenador_nombre: 'Nombre del entrenador', entrenador_rol: 'Entrenador', liga_nombre: 'Liga Regional · Grupo B' };
@@ -69,6 +76,7 @@ function setupSheets() {
     [SHEETS.matchAppearances, APPEARANCE_COLUMNS],
     [SHEETS.matchIntervals, INTERVAL_COLUMNS],
     [SHEETS.matchLiveEvents, LIVE_EVENT_COLUMNS],
+    [SHEETS.checkins, CHECKIN_COLUMNS],
     [SHEETS.settings, SETTINGS_COLUMNS]
   ];
   defs.forEach(function (def) {
@@ -276,6 +284,7 @@ function doGet(e) {
       matchAppearances: sheetToObjects(SHEETS.matchAppearances).map(coerceAppearance),
       matchIntervals: sheetToObjects(SHEETS.matchIntervals).map(coerceInterval),
       matchLiveEvents: sheetToObjectsOrEmpty(SHEETS.matchLiveEvents).map(coerceLiveEvent),
+      checkins: sheetToObjectsOrEmpty(SHEETS.checkins).map(coerceCheckin),
       settings: readSingletonRow(SHEETS.settings, SETTINGS_COLUMNS, DEFAULT_SETTINGS)
     };
     return jsonResponse({ ok: true, result: data });
@@ -303,6 +312,7 @@ function doPost(e) {
       addLiveEvent: addLiveEvent,
       deleteLiveEvent: deleteLiveEvent,
       clearLiveEvents: clearLiveEvents,
+      saveCheckin: saveCheckin,
       saveCallups: saveCallups,
       saveMatchReport: saveMatchReport,
       saveAttendance: saveAttendance,
@@ -469,6 +479,36 @@ function clearLiveEvents(payload) {
   return true;
 }
 
+// Check-in de bienestar de un jugador para una sesión (entreno o partido).
+// Reenviar (mismo session_id + player_id) sobrescribe la respuesta anterior
+// en vez de acumular filas — así un jugador puede corregirse.
+function saveCheckin(payload) {
+  if (!payload.sessionId) throw new Error('Falta la sesión.');
+  if (!payload.playerId) throw new Error('Falta el jugador.');
+  if (!payload.satisfaccion || !payload.rendimiento) throw new Error('Faltan las caritas de satisfacción y rendimiento.');
+  const sheet = getSheet(SHEETS.checkins);
+  const header = ensureHeader(sheet, CHECKIN_COLUMNS);
+  const values = sheet.getDataRange().getValues();
+  const sessionCol = header.indexOf('session_id'), playerCol = header.indexOf('player_id');
+  for (let i = values.length - 1; i >= 1; i--) {
+    if (String(values[i][sessionCol]) === String(payload.sessionId) && String(values[i][playerCol]) === String(payload.playerId)) {
+      sheet.deleteRow(i + 1);
+    }
+  }
+  const row = {
+    id: newId('ck'),
+    session_id: payload.sessionId,
+    player_id: payload.playerId,
+    satisfaccion: payload.satisfaccion,
+    comentario_satisfaccion: payload.comentarioSatisfaccion || '',
+    rendimiento: payload.rendimiento,
+    comentario_rendimiento: payload.comentarioRendimiento || '',
+    ts: new Date().toISOString()
+  };
+  appendRow(SHEETS.checkins, CHECKIN_COLUMNS, row);
+  return row;
+}
+
 // Guarda solo la convocatoria (quién va convocado y el capitán), sin exigir
 // los datos del partido (minutos, goles, tarjetas) — para poder prepararla
 // antes de jugar. Solo toca MatchAppearances; goles/eventos/intervalos se
@@ -571,4 +611,10 @@ function coerceLiveEvent(le) {
   le.parte = le.parte === '' || le.parte === undefined ? null : Number(le.parte);
   le.dorsal_rival = le.dorsal_rival === '' || le.dorsal_rival === undefined ? null : Number(le.dorsal_rival);
   return le;
+}
+
+function coerceCheckin(ck) {
+  ck.satisfaccion = ck.satisfaccion === '' || ck.satisfaccion === undefined ? null : Number(ck.satisfaccion);
+  ck.rendimiento = ck.rendimiento === '' || ck.rendimiento === undefined ? null : Number(ck.rendimiento);
+  return ck;
 }

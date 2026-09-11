@@ -119,6 +119,45 @@ SM.ui = (function () {
     return POSITION_META[code] || { label: code || '—', color: 'var(--text-dim)', bright: 'var(--text-dim)' };
   }
 
+  // Escala de bienestar (check-in post entreno/partido) — 4 caritas.
+  const FACES = [
+    { value: 1, key: 'rojo', label: 'Mal', color: 'var(--red)' },
+    { value: 2, key: 'naranja', label: 'Regular', color: 'var(--orange)' },
+    { value: 3, key: 'amarillo', label: 'Bien', color: 'var(--amber)' },
+    { value: 4, key: 'verde', label: 'Genial', color: 'var(--green)' }
+  ];
+  const FACES_BY_KEY = {};
+  const FACES_BY_VALUE = {};
+  FACES.forEach(function (f) { FACES_BY_KEY[f.key] = f; FACES_BY_VALUE[f.value] = f; });
+
+  const FACE_MOUTHS = {
+    rojo: 'M14 27q6-6 12 0',
+    naranja: 'M14 25.5q6-3 12 0',
+    amarillo: 'M14 25h12',
+    verde: 'M14 23q6 6 12 0'
+  };
+
+  // Small hand-drawn face icon (not an emoji, to stay consistent with the
+  // rest of the app's line/SVG icon language) for a given FACES key.
+  function faceSvg(key, size) {
+    size = size || 40;
+    const meta = FACES_BY_KEY[key];
+    const color = meta ? meta.color : 'var(--text-dim)';
+    const mouth = FACE_MOUTHS[key] || FACE_MOUTHS.amarillo;
+    return (
+      '<svg width="' + size + '" height="' + size + '" viewBox="0 0 40 40">' +
+        '<circle cx="20" cy="20" r="18" fill="' + color + '" fill-opacity="0.85"/>' +
+        '<circle cx="14" cy="16" r="2.2" fill="#04140f"/>' +
+        '<circle cx="26" cy="16" r="2.2" fill="#04140f"/>' +
+        '<path d="' + mouth + '" stroke="#04140f" stroke-width="2.4" fill="none" stroke-linecap="round"/>' +
+      '</svg>'
+    );
+  }
+
+  function faceMeta(value) {
+    return FACES_BY_VALUE[value] || null;
+  }
+
   // Translucent variant of a token (CSS variable or oklch(...) string) via
   // relative color syntax, e.g. alpha('var(--cyan)', 0.12) -> a 12%-opacity tint.
   function alpha(colorToken, a) {
@@ -192,6 +231,9 @@ SM.ui = (function () {
     escapeHtml: escapeHtml,
     avatarHtml: avatarHtml,
     positionMeta: positionMeta,
+    FACES: FACES,
+    faceSvg: faceSvg,
+    faceMeta: faceMeta,
     alpha: alpha,
     toast: toast,
     openModal: openModal,

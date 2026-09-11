@@ -152,6 +152,24 @@ SM.api = (function () {
         d.matchLiveEvents = (d.matchLiveEvents || []).filter(function (le) { return le.match_id !== payload.matchId; });
         return true;
       }
+      case 'saveCheckin': {
+        if (!payload.satisfaccion || !payload.rendimiento) {
+          throw new Error('Faltan las caritas de satisfacción y rendimiento.');
+        }
+        d.checkins = (d.checkins || []).filter(function (c) { return !(c.session_id === payload.sessionId && c.player_id === payload.playerId); });
+        const row = {
+          id: nextMockId('ck'),
+          session_id: payload.sessionId,
+          player_id: payload.playerId,
+          satisfaccion: payload.satisfaccion,
+          comentario_satisfaccion: payload.comentarioSatisfaccion || '',
+          rendimiento: payload.rendimiento,
+          comentario_rendimiento: payload.comentarioRendimiento || '',
+          ts: new Date().toISOString()
+        };
+        d.checkins.push(row);
+        return row;
+      }
       case 'saveCallups': {
         if ((payload.appearances || []).length < 7) {
           throw new Error('Se necesitan al menos 7 jugadores convocados para guardar la convocatoria.');
