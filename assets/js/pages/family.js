@@ -67,17 +67,16 @@
     return '<div class="panel" style="padding:14px;display:flex;flex-direction:column;align-items:center;gap:4px;"><span style="font-family:var(--font-display);font-weight:800;font-size:22px;color:' + color + ';">' + value + '</span><span style="font-size:10px;color:var(--text-mute);font-weight:600;letter-spacing:.3px;">' + label + '</span></div>';
   }
 
-  function leftCardHtml(p, meta, rating, age) {
+  // Sin rating ni cualquier otra cifra numérica aquí — es la ficha que ve
+  // la familia, y un número (aunque sea uno solo) vuelve a ser algo
+  // comparable entre compañeros, justo lo que se quiere evitar.
+  function leftCardHtml(p, meta, age) {
     return (
       '<div class="panel" style="padding:28px 24px;display:flex;flex-direction:column;align-items:center;align-self:start;">' +
         '<div class="badge" style="background:' + SM.ui.alpha(meta.color, 0.14) + ';border:1px solid ' + SM.ui.alpha(meta.color, 0.5) + ';color:' + meta.bright + ';margin-bottom:18px;">' + meta.label.toUpperCase() + '</div>' +
         SM.ui.avatarHtml(p.foto_url, 116) +
         '<div style="font-size:22px;font-weight:700;color:var(--text-strong);margin-top:16px;">' + SM.ui.escapeHtml(p.nombre) + '</div>' +
-        '<div style="display:flex;align-items:center;gap:10px;margin-top:6px;">' +
-          '<span style="font-family:var(--font-display);font-weight:800;font-size:15px;color:var(--text-dim);">#' + p.dorsal + '</span>' +
-          '<div style="width:4px;height:4px;border-radius:50%;background:var(--text-ghost);"></div>' +
-          '<span style="font-family:var(--font-display);font-weight:800;font-size:15px;color:' + meta.bright + ';">RATING ' + rating.toFixed(1) + '</span>' +
-        '</div>' +
+        '<div style="font-family:var(--font-display);font-weight:800;font-size:15px;color:var(--text-dim);margin-top:6px;">#' + p.dorsal + '</div>' +
         '<div style="width:100%;height:1px;background:var(--border);margin:22px 0;"></div>' +
         '<span style="font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-ghost);align-self:flex-start;margin-bottom:10px;">POSICIONES</span>' +
         SM.pitch.render({ primary: p.posicion, secondary: (p.posicion_secundaria || '').split(',').map(function (s) { return s.trim(); }).filter(function (g) { return g && g !== p.posicion; }) }, { interactive: false, width: 130 }) +
@@ -108,11 +107,14 @@
     const convocado = (scoped.matchAppearances || []).find(function (a) { return a.match_id === match.id && a.player_id === p.id; });
     const clubName = (scoped.settings && scoped.settings.club_nombre) || 'Mi club';
     const rival = match.condicion === 'local' ? SM.ui.escapeHtml(clubName) + ' vs ' + SM.ui.escapeHtml(match.rival) : SM.ui.escapeHtml(match.rival) + ' vs ' + SM.ui.escapeHtml(clubName);
+    // Solo se muestra una etiqueta cuando hay algo positivo que anunciar
+    // (que está convocado); si la convocatoria aún no está decidida, un
+    // texto neutro en vez de una etiqueta con aspecto de "no elegido".
     let statusHtml;
     if (convocado) {
       statusHtml = '<div class="badge" style="background:' + SM.ui.alpha('var(--green)', 0.14) + ';border:1px solid ' + SM.ui.alpha('var(--green)', 0.5) + ';color:var(--green);">CONVOCADO' + (convocado.capitan ? ' · CAPITÁN' : '') + '</div>';
     } else {
-      statusHtml = '<div class="badge" style="background:' + SM.ui.alpha('var(--text-ghost)', 0.14) + ';border:1px solid var(--border-soft);color:var(--text-mute);">CONVOCATORIA PENDIENTE</div>';
+      statusHtml = '<div style="font-size:12.5px;color:var(--text-mute);font-weight:600;">La convocatoria se confirmará antes del partido.</div>';
     }
     return (
       '<div style="display:flex;flex-direction:column;gap:10px;">' +
@@ -183,7 +185,6 @@
     const scoped = SM.team.filterData(DATA, p.categoria || SM.team.CATEGORIES[0].key);
     const clubName = (DATA.settings && DATA.settings.club_nombre) || 'Mi club';
     const meta = SM.ui.positionMeta(p.posicion);
-    const rating = SM.stats.overallRating(p);
     const goles = SM.stats.goalsForPlayer(scoped, p.id);
     const asistencias = SM.stats.assistsForPlayer(scoped, p.id);
     const pj = SM.stats.appearancesCount(scoped, p.id);
@@ -209,7 +210,7 @@
     main.innerHTML =
       headerHtml(clubName, p) +
       '<div class="profile-grid" style="margin-top:20px;">' +
-        leftCardHtml(p, meta, rating, age) +
+        leftCardHtml(p, meta, age) +
         '<div style="display:flex;flex-direction:column;gap:20px;">' +
           '<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(90px,1fr));gap:12px;">' +
             miniKpi(goles, 'GOLES', 'var(--green)') +
