@@ -125,25 +125,25 @@
     );
   }
 
-  // Sesión de hoy (si la hay) para poder enlazar directo a la encuesta de
-  // bienestar (encuesta.html) sin tener que esperar a que el entrenador
-  // comparta el enlace por su cuenta cada vez.
+  // Enlace directo a la encuesta de bienestar (encuesta.html) para el
+  // entrenamiento de hoy, sin esperar a que el entrenador comparta el
+  // enlace por su cuenta. Solo aparece si se cumplen las tres condiciones:
+  // hoy hay entrenamiento (no partido, que tiene su propio flujo), el
+  // jugador asistió, y todavía no ha respondido la encuesta de hoy.
   function todaySessionHtml(scoped, p) {
     const today = SM.ui.formatDateIso(new Date());
-    const todaySession = (scoped.sessions || []).find(function (s) { return s.fecha === today; });
+    const todaySession = (scoped.sessions || []).find(function (s) { return s.fecha === today && s.tipo === 'entrenamiento'; });
     if (!todaySession) return '';
+    const asistio = (scoped.attendance || []).some(function (a) { return a.session_id === todaySession.id && a.player_id === p.id && a.estado === 'presente'; });
+    if (!asistio) return '';
     const already = (scoped.checkins || []).some(function (c) { return c.session_id === todaySession.id && c.player_id === p.id; });
+    if (already) return '';
     const link = 'encuesta.html?session=' + todaySession.id + '&player=' + p.id;
     return (
       '<div class="panel">' +
         '<span class="panel-title">Bienestar de hoy</span>' +
-        (already
-          ? '<div style="margin-top:10px;font-size:13px;color:var(--text-dim);font-weight:600;">Ya has respondido hoy — ¡gracias!</div>'
-          : (
-            '<div style="margin-top:10px;font-size:13px;color:var(--text-faint);font-weight:600;">¿Qué tal ha ido hoy? Cuéntanoslo en un minuto.</div>' +
-            '<a href="' + link + '" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px;">Rellenar satisfacción de hoy</a>'
-          )
-        ) +
+        '<div style="margin-top:10px;font-size:13px;color:var(--text-faint);font-weight:600;">¿Qué tal ha ido hoy? Cuéntanoslo en un minuto.</div>' +
+        '<a href="' + link + '" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px;">Rellenar satisfacción de hoy</a>' +
       '</div>'
     );
   }
