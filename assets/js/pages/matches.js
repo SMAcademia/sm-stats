@@ -447,6 +447,7 @@
             '</table>' +
           '</div>' +
           '<div class="form-actions">' +
+            '<button type="button" class="btn btn-outline" id="delete-match-btn" style="margin-right:auto;color:var(--red-bright);border-color:' + SM.ui.alpha('var(--red)', 0.4) + ';">Eliminar partido</button>' +
             '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
             '<button type="button" class="btn btn-outline" id="save-callups-btn">Guardar convocatoria</button>' +
             '<button type="submit" class="btn btn-primary">Guardar acta</button>' +
@@ -455,6 +456,22 @@
     });
     const handle = SM.ui.openModal('Acta · vs ' + match.rival, body);
     body.querySelector('#cancel-btn').addEventListener('click', handle.close);
+
+    // Borra el partido y TODO lo que cuelga de él: sesión/asistencia,
+    // convocatoria, minutos, goles/tarjetas, check-ins de bienestar de esa
+    // sesión y el registro en vivo — pensado para deshacer una prueba real
+    // o un partido creado por error. No se puede deshacer.
+    body.querySelector('#delete-match-btn').addEventListener('click', function () {
+      if (!window.confirm('¿Eliminar este partido? Se borrará también la convocatoria, minutos, goles/tarjetas, asistencia, bienestar y registro en vivo asociados. No se puede deshacer.')) return;
+      SM.api.postAction('deleteMatch', { id: match.id }).then(function () {
+        handle.close();
+        return SM.api.fetchAll(true);
+      }).then(function (data) {
+        setData(data);
+        render();
+        SM.ui.toast('Partido eliminado.', 'ok');
+      }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+    });
 
     function refreshPlayerCells(playerId) {
       const cell = body.querySelector('[data-intervals="' + playerId + '"]');

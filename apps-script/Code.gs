@@ -231,6 +231,14 @@ function deleteRowsWhere(name, matchColumn, matchValue) {
   }
 }
 
+// Like deleteRowsWhere, but a no-op if the sheet doesn't exist yet — used
+// for sheets added after this feature (Checkins, MatchLiveEvents) so an
+// older workbook that hasn't re-run setupSheets() doesn't throw here.
+function deleteRowsWhereIfExists(name, matchColumn, matchValue) {
+  if (!getSpreadsheet().getSheetByName(name)) return;
+  deleteRowsWhere(name, matchColumn, matchValue);
+}
+
 function readSingletonRow(name, columns, defaults) {
   const sheet = getSpreadsheet().getSheetByName(name);
   if (!sheet || sheet.getLastRow() < 2) return Object.assign({}, defaults);
@@ -312,6 +320,7 @@ function doPost(e) {
       addMatch: addMatch,
       addMatches: addMatches,
       updateMatch: updateMatch,
+      deleteMatch: deleteMatch,
       addSession: addSession,
       addRecurringSessions: addRecurringSessions,
       updateSession: updateSession,
@@ -400,6 +409,27 @@ function updateMatch(payload) {
   updateRowById(SHEETS.matches, MATCH_COLUMNS, payload.id, patch);
   updateRowByColumn(SHEETS.sessions, SESSION_COLUMNS, 'match_id', payload.id, patch);
   return payload;
+}
+
+// Elimina un partido y TODO lo que cuelga de él: la sesión asociada (con su
+// asistencia y check-ins de bienestar de esa sesión), convocatoria, minutos,
+// goles/tarjetas y el registro en vivo. Pensado para deshacer una prueba o
+// un partido creado por error — no se puede deshacer.
+function deleteMatch(payload) {
+  if (!payload.id) throw new Error('Falta el id del partido.');
+  const matchId = payload.id;
+  const sessions = sheetToObjects(SHEETS.sessions).filter(function (s) { return s.match_id === matchId; });
+  sessions.forEach(function (s) {
+    deleteRowsWhereIfExists(SHEETS.attendance, 'session_id', s.id);
+    deleteRowsWhereIfExists(SHEETS.checkins, 'session_id', s.id);
+  });
+  deleteRowsWhere(SHEETS.sessions, 'match_id', matchId);
+  deleteRowsWhere(SHEETS.matchEvents, 'match_id', matchId);
+  deleteRowsWhere(SHEETS.matchAppearances, 'match_id', matchId);
+  deleteRowsWhere(SHEETS.matchIntervals, 'match_id', matchId);
+  deleteRowsWhereIfExists(SHEETS.matchLiveEvents, 'match_id', matchId);
+  deleteRowsWhere(SHEETS.matches, 'id', matchId);
+  return true;
 }
 
 function addSession(payload) {

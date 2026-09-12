@@ -116,6 +116,18 @@ SM.api = (function () {
         if (si >= 0) d.sessions[si] = Object.assign({}, d.sessions[si], patch);
         return payload;
       }
+      case 'deleteMatch': {
+        const sessionIds = d.sessions.filter(function (s) { return s.match_id === payload.id; }).map(function (s) { return s.id; });
+        d.attendance = d.attendance.filter(function (a) { return sessionIds.indexOf(a.session_id) === -1; });
+        d.checkins = (d.checkins || []).filter(function (c) { return sessionIds.indexOf(c.session_id) === -1; });
+        d.sessions = d.sessions.filter(function (s) { return s.match_id !== payload.id; });
+        d.matchEvents = d.matchEvents.filter(function (e) { return e.match_id !== payload.id; });
+        d.matchAppearances = d.matchAppearances.filter(function (a) { return a.match_id !== payload.id; });
+        d.matchIntervals = (d.matchIntervals || []).filter(function (iv) { return iv.match_id !== payload.id; });
+        d.matchLiveEvents = (d.matchLiveEvents || []).filter(function (le) { return le.match_id !== payload.id; });
+        d.matches = d.matches.filter(function (m) { return m.id !== payload.id; });
+        return true;
+      }
       case 'addSession': {
         const row = Object.assign({ id: nextMockId('se'), tipo: 'entrenamiento', match_id: '' }, payload);
         d.sessions.push(row);
