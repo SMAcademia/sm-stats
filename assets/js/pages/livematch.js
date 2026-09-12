@@ -41,6 +41,13 @@
   let overlay = null; // { kind: 'player' | 'dorsal' }
   let pendingTipo = null;
   let tickTimer = null;
+  // Estado de "guardando..." y último error — sin esto, un fallo de red (muy
+  // real en un campo de fútbol) hacía que pulsar un botón no diera NINGUNA
+  // señal: ni error ni cambio visible, como si el botón no funcionara. Con
+  // esto, cada acción muestra "Guardando..." al instante y, si falla, un
+  // aviso fijo (no un toast que desaparece solo) con botón para reintentar.
+  let saving = false;
+  let lastError = null;
 
   // ---- reloj: derivado de los eventos-marcador, no de un contador propio,
   // así que sobrevive a un refresco de página o a que el móvil se bloquee. ----
@@ -141,12 +148,35 @@
 
   // ---- acciones ----
 
+  // Envoltorio común para toda escritura: bloquea nuevas acciones mientras
+  // hay una en curso (evita duplicar taps si la red va lenta), muestra
+  // "Guardando..." al instante, y si falla deja un aviso FIJO en pantalla
+  // (lastError) en vez de un toast que desaparece solo — así una mala
+  // conexión en el campo se nota de verdad, no parece que "no hace nada".
+  function runAction(promiseFactory) {
+    if (saving) return;
+    saving = true;
+    lastError = null;
+    render();
+    promiseFactory()
+      .then(function () {
+        saving = false;
+        return refresh();
+      })
+      .catch(function (err) {
+        saving = false;
+        lastError = err.message;
+        SM.ui.toast(err.message, 'error');
+        render();
+      });
+  }
+
   function logMarker(tipo) {
-    const cm = currentMinuteParte();
-    const parte = (tipo === 'inicio_2' || tipo === 'fin_2') ? 2 : (cm.parte || 1);
-    return SM.api.postAction('addLiveEvent', { matchId: matchId, tipo: tipo, minuto: cm.minuto, parte: parte })
-      .then(refresh)
-      .catch(function (err) { SM.ui.toast(err.message, 'error'); });
+    runAction(function () {
+      const cm = currentMinuteParte();
+      const parte = (tipo === 'inicio_2' || tipo === 'fin_2') ? 2 : (cm.parte || 1);
+      return SM.api.postAction('addLiveEvent', { matchId: matchId, tipo: tipo, minuto: cm.minuto, parte: parte });
+    });
   }
 
   function onEventTap(tipo) {
@@ -162,7 +192,7 @@
     const payload = Object.assign({ matchId: matchId, team: activeTeam, tipo: pendingTipo, minuto: cm.minuto, parte: cm.parte }, extra || {});
     pendingTipo = null;
     overlay = null;
-    return SM.api.postAction('addLiveEvent', payload).then(refresh).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+    runAction(function () { return SM.api.postAction('addLiveEvent', payload); });
   }
 
   function closeOverlay() { pendingTipo = null; overlay = null; render(); }
@@ -171,7 +201,7 @@
     if (!events.length) return;
     const last = events[events.length - 1];
     if (!window.confirm('¿Deshacer "' + eventFeedText(last) + '"?')) return;
-    SM.api.postAction('deleteLiveEvent', { id: last.id }).then(refresh).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+    runAction(function () { return SM.api.postAction('deleteLiveEvent', { id: last.id }); });
   }
 
   // ---- reloj en vivo: solo actualiza el número, no repinta toda la pantalla ----
@@ -211,10 +241,11 @@
     const phase = phaseOf(m);
     const clock = clockLabel(elapsedMs(m, phase));
     const phaseBtn = (function () {
-      if (phase === 'no_iniciado') return '<button class="live-phase-btn primary" id="phase-btn">Iniciar partido</button>';
-      if (phase === 'primera') return '<button class="live-phase-btn" id="phase-btn">Fin 1ª parte</button>';
-      if (phase === 'descanso') return '<button class="live-phase-btn primary" id="phase-btn">Iniciar 2ª parte</button>';
-      if (phase === 'segunda') return '<button class="live-phase-btn danger" id="phase-btn">Finalizar partido</button>';
+      const dis = saving ? ' disabled' : '';
+      if (phase === 'no_iniciado') return '<button class="live-phase-btn primary" id="phase-btn"' + dis + '>' + (saving ? 'Guardando…' : 'Iniciar partido') + '</button>';
+      if (phase === 'primera') return '<button class="live-phase-btn" id="phase-btn"' + dis + '>' + (saving ? 'Guardando…' : 'Fin 1ª parte') + '</button>';
+      if (phase === 'descanso') return '<button class="live-phase-btn primary" id="phase-btn"' + dis + '>' + (saving ? 'Guardando…' : 'Iniciar 2ª parte') + '</button>';
+      if (phase === 'segunda') return '<button class="live-phase-btn danger" id="phase-btn"' + dis + '>' + (saving ? 'Guardando…' : 'Finalizar partido') + '</button>';
       return '';
     })();
     return (
@@ -233,7 +264,7 @@
 
   function teamTabsHtml() {
     const phase = phaseOf(markers());
-    const enabled = phase === 'primera' || phase === 'segunda';
+    const enabled = (phase === 'primera' || phase === 'segunda') && !saving;
     return (
       '<div class="live-teamtabs">' +
         '<button class="live-teamtab propio' + (activeTeam === 'propio' ? ' active' : '') + '" data-team="propio"' + (enabled ? '' : ' disabled') + '>NUESTRO EQUIPO</button>' +
@@ -242,9 +273,21 @@
     );
   }
 
+  // Aviso fijo (no un toast que se esfuma solo) cuando la última acción ha
+  // fallado — con el mensaje real del error y un botón para cerrarlo.
+  function errorBannerHtml() {
+    if (!lastError) return '';
+    return (
+      '<div class="live-error-banner" id="live-error-banner">' +
+        '<span>⚠ ' + SM.ui.escapeHtml(lastError) + '</span>' +
+        '<button type="button" id="dismiss-error-btn">Cerrar</button>' +
+      '</div>'
+    );
+  }
+
   function eventGridHtml() {
     const phase = phaseOf(markers());
-    const enabled = phase === 'primera' || phase === 'segunda';
+    const enabled = (phase === 'primera' || phase === 'segunda') && !saving;
     return (
       '<div class="live-eventgrid">' +
         EVENT_TYPES.map(function (ev) {
@@ -271,7 +314,7 @@
               '<span class="live-feed-minute">' + e.minuto + '\'</span>' +
               (isMarker ? '<span class="live-feed-dot" style="background:var(--text-ghost);"></span>' : '<span class="live-feed-dot ' + e.team + '"></span>') +
               '<span class="live-feed-text">' + SM.ui.escapeHtml(eventFeedText(e)) + '</span>' +
-              (i === 0 ? '<button class="live-feed-undo" id="undo-btn">Deshacer</button>' : '') +
+              (i === 0 ? '<button class="live-feed-undo" id="undo-btn"' + (saving ? ' disabled' : '') + '>Deshacer</button>' : '') +
             '</div>'
           );
         }).join('') : '<div class="live-feed-empty">Todavía no hay eventos.</div>') +
@@ -337,13 +380,18 @@
     const phase = phaseOf(markers());
     root.innerHTML =
       headerHtml() +
+      errorBannerHtml() +
       scoreboardHtml() +
       (phase === 'finalizado' ? summaryHtml() : (teamTabsHtml() + eventGridHtml() + feedHtml())) +
       overlayHtml();
 
+    const dismissBtn = document.getElementById('dismiss-error-btn');
+    if (dismissBtn) dismissBtn.addEventListener('click', function () { lastError = null; render(); });
+
     const phaseBtn = document.getElementById('phase-btn');
     if (phaseBtn) {
       phaseBtn.addEventListener('click', function () {
+        if (saving) return;
         if (phase === 'no_iniciado') logMarker('inicio_1');
         else if (phase === 'primera') logMarker('fin_1');
         else if (phase === 'descanso') logMarker('inicio_2');

@@ -13,6 +13,26 @@ SM.api = (function () {
     return !!(SM.config && SM.config.APPS_SCRIPT_URL && SM.config.APPS_SCRIPT_URL.trim());
   }
 
+  // Sin esto, un fetch a una hoja/wifi lenta (típico en un campo de fútbol)
+  // se puede quedar colgado indefinidamente sin dar ningún error — la
+  // página parece simplemente "no hacer nada" al pulsar un botón. Con
+  // timeout, el fallo llega en un tiempo acotado con un mensaje claro.
+  const NETWORK_TIMEOUT_MS = 20000;
+  async function fetchWithTimeout(url, opts) {
+    const controller = new AbortController();
+    const timer = setTimeout(function () { controller.abort(); }, NETWORK_TIMEOUT_MS);
+    try {
+      return await fetch(url, Object.assign({}, opts, { signal: controller.signal }));
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        throw new Error('Sin respuesta del servidor — comprueba tu wifi/datos e inténtalo de nuevo.');
+      }
+      throw new Error('No hay conexión con el servidor — comprueba tu wifi/datos e inténtalo de nuevo.');
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   // A "force" refresh only makes sense against a live Apps Script — in demo
   // mode there is no server to refetch from, and the in-memory cache is
   // already the freshest copy (postAction mutates it directly), so a forced
@@ -24,7 +44,7 @@ SM.api = (function () {
     if (cachePromise && !(force && isLive())) return cachePromise;
     cachePromise = (async () => {
       if (isLive()) {
-        const res = await fetch(SM.config.APPS_SCRIPT_URL + '?action=data', { cache: 'no-store' });
+        const res = await fetchWithTimeout(SM.config.APPS_SCRIPT_URL + '?action=data', { cache: 'no-store' });
         if (!res.ok) throw new Error('No se pudo conectar con la hoja de cálculo.');
         const json = await res.json();
         if (!json || json.ok === false) throw new Error((json && json.error) || 'No se pudo leer la hoja de cálculo.');
@@ -36,6 +56,10 @@ SM.api = (function () {
       }
       return cache;
     })();
+    // Si la llamada falla, no dejar la promesa fallida en caché — o cualquier
+    // reintento posterior (p.ej. tras recuperar cobertura) devolvería
+    // siempre el mismo error viejo en vez de intentarlo de nuevo de verdad.
+    cachePromise.catch(function () { cachePromise = null; });
     return cachePromise;
   }
 
@@ -229,7 +253,7 @@ SM.api = (function () {
 
   async function postAction(action, payload) {
     if (isLive()) {
-      const res = await fetch(SM.config.APPS_SCRIPT_URL, {
+      const res = await fetchWithTimeout(SM.config.APPS_SCRIPT_URL, {
         method: 'POST',
         // text/plain avoids a CORS preflight against Apps Script Web Apps
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
