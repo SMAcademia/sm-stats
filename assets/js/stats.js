@@ -133,8 +133,18 @@ SM.stats = (function () {
   // justificadas SÍ restan (cuentan como falta en el denominador) — solo
   // "presente" suma, para que el % refleje la disponibilidad real del
   // jugador a la hora de decidir titularidades, convocatorias y capitanías.
+  //
+  // Las sesiones anteriores a la fecha de alta del jugador no cuentan —
+  // no podía asistir a algo antes de estar en el club, así que ni entran en
+  // el % ni deberían tener fila de asistencia (defensa extra por si alguna
+  // se guardó por error).
   function attendancePct(data, playerId, sessions) {
-    const rows = (sessions || sessionsUpTo(data)).map(function (s) {
+    const player = byId(data.players)[playerId];
+    const altaDate = player && player.fecha_alta;
+    const list = altaDate
+      ? (sessions || sessionsUpTo(data)).filter(function (s) { return s.fecha >= altaDate; })
+      : (sessions || sessionsUpTo(data));
+    const rows = list.map(function (s) {
       return (data.attendance || []).find(function (a) { return a.session_id === s.id && a.player_id === playerId; });
     }).filter(Boolean);
     if (!rows.length) return null;

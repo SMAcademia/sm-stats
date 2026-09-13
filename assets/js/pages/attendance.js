@@ -138,6 +138,12 @@
     const rows = players.map(function (p) {
       const pct = SM.stats.attendancePct(DATA, p.id, sessions);
       const cells = sessions.map(function (s) {
+        // Antes de su fecha de alta el jugador no podía asistir — celda en
+        // blanco (no el punto neutro de "sin registrar todavía"), para que
+        // no parezca una falta de asistencia pendiente de rellenar.
+        if (p.fecha_alta && s.fecha < p.fecha_alta) {
+          return '<div style="display:flex;justify-content:center;"><div style="width:24px;height:24px;"></div></div>';
+        }
         const row = DATA.attendance.find(function (a) { return a.session_id === s.id && a.player_id === p.id; });
         return '<div style="display:flex;justify-content:center;">' + statusIcon(row ? row.estado : null) + '</div>';
       }).join('');

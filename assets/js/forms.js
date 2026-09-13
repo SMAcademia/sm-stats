@@ -440,7 +440,13 @@ SM.forms = (function () {
 
     const state = {};
     function loadSession(sessionId) {
-      const players = data.players.filter(function (p) { return p.activo; }).sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
+      const session = data.sessions.find(function (s) { return s.id === sessionId; });
+      // Un jugador dado de alta después de esta sesión no pudo asistir a
+      // ella — no debe poder marcarse (ni por descuido quedar "presente"
+      // por defecto) en una fecha anterior a su alta en el club.
+      const players = data.players.filter(function (p) {
+        return p.activo && (!session || !p.fecha_alta || p.fecha_alta <= session.fecha);
+      }).sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
       players.forEach(function (p) {
         const row = data.attendance.find(function (a) { return a.session_id === sessionId && a.player_id === p.id; });
         state[p.id] = row ? row.estado : 'presente';
