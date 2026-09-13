@@ -371,6 +371,7 @@ SM.forms = (function () {
 
     const body = SM.ui.el('div', {
       html:
+        '<div id="attendance-error" style="display:none;margin-bottom:14px;padding:10px 14px;border-radius:9px;background:' + SM.ui.alpha('var(--red)', 0.12) + ';border:1px solid ' + SM.ui.alpha('var(--red)', 0.4) + ';color:var(--red-bright);font-size:12.5px;font-weight:600;"></div>' +
         '<div class="form-field span-2" style="margin-bottom:12px;"><label>Sesión</label>' +
           '<select id="session-select">' + allSessions.map(function (s) {
             const label = SM.ui.formatDateLong(s.fecha) + ' · ' + (s.tipo === 'partido' ? 'Partido' : 'Entrenamiento') + (s.hora ? ' · ' + s.hora : '');
@@ -383,6 +384,36 @@ SM.forms = (function () {
     });
     const handle = SM.ui.openModal('Tomar asistencia', body);
     body.querySelector('#cancel-btn').addEventListener('click', handle.close);
+
+    // Mismo problema (y misma solución) que "Iniciar partido" y "Guardar
+    // acta": sin esto, un fallo al guardar solo mostraba un toast de 3s,
+    // fácil de perder, y el botón no daba ninguna señal mientras guardaba.
+    let attSaving = false;
+    function showAttError(msg) {
+      const el = body.querySelector('#attendance-error');
+      if (msg) { el.textContent = '⚠ ' + msg; el.style.display = 'block'; }
+      else { el.style.display = 'none'; el.textContent = ''; }
+    }
+    // Envuelve un botón de guardado: bloquea el doble tap, cambia su texto a
+    // "Guardando..." mientras la petición está en curso, y si falla deja el
+    // error a la vista (además del toast) y restaura el botón para reintentar.
+    function withSaving(btn, action) {
+      return function () {
+        if (attSaving) return;
+        showAttError(null);
+        attSaving = true;
+        const label = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Guardando…';
+        action().catch(function (err) {
+          attSaving = false;
+          btn.disabled = false;
+          btn.textContent = label;
+          showAttError(err.message);
+          SM.ui.toast(err.message, 'error');
+        });
+      };
+    }
 
     function currentSession() {
       const id = body.querySelector('#session-select').value;
@@ -404,15 +435,18 @@ SM.forms = (function () {
           '<button type="button" class="btn btn-outline" id="delete-session-btn" style="padding:6px 12px;font-size:12.5px;color:var(--red-bright);">Eliminar sesión</button>' +
         '</div>';
       actions.querySelector('#edit-session-btn').addEventListener('click', function () { showEditFields(s); });
-      actions.querySelector('#delete-session-btn').addEventListener('click', function () {
-        if (!window.confirm('¿Eliminar esta sesión y su asistencia registrada? No se puede deshacer.')) return;
-        SM.api.postAction('deleteSession', { id: s.id }).then(function () {
+      const deleteBtn = actions.querySelector('#delete-session-btn');
+      const doDelete = withSaving(deleteBtn, function () {
+        return SM.api.postAction('deleteSession', { id: s.id }).then(function () {
           handle.close();
           return SM.api.fetchAll(true);
         }).then(function (newData) {
           SM.ui.toast('Sesión eliminada.', 'ok');
           if (onSaved) onSaved(newData);
-        }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+        });
+      });
+      deleteBtn.addEventListener('click', function () {
+        if (window.confirm('¿Eliminar esta sesión y su asistencia registrada? No se puede deshacer.')) doDelete();
       });
     }
 
@@ -425,17 +459,18 @@ SM.forms = (function () {
           field('Lugar', '<input name="lugar" value="' + esc(s.lugar || '') + '">', true) +
         '</div>' +
         '<button type="button" class="btn btn-primary" id="save-session-edit" style="padding:6px 14px;font-size:12.5px;margin-bottom:12px;">Guardar cambios de la sesión</button>';
-      box.querySelector('#save-session-edit').addEventListener('click', function () {
+      const saveEditBtn = box.querySelector('#save-session-edit');
+      saveEditBtn.addEventListener('click', withSaving(saveEditBtn, function () {
         const patch = { id: s.id };
         box.querySelectorAll('input').forEach(function (input) { patch[input.name] = input.value; });
-        SM.api.postAction('updateSession', patch).then(function () {
+        return SM.api.postAction('updateSession', patch).then(function () {
           handle.close();
           return SM.api.fetchAll(true);
         }).then(function (newData) {
           SM.ui.toast('Sesión actualizada.', 'ok');
           if (onSaved) onSaved(newData);
-        }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
-      });
+        });
+      }));
     }
 
     const state = {};
@@ -481,17 +516,18 @@ SM.forms = (function () {
     body.querySelector('#session-select').addEventListener('change', function (e) { loadSession(e.target.value); });
     loadSession(initialId);
 
-    body.querySelector('#save-btn').addEventListener('click', function () {
+    const saveBtn = body.querySelector('#save-btn');
+    saveBtn.addEventListener('click', withSaving(saveBtn, function () {
       const sessionId = body.querySelector('#session-select').value;
       const rows = Object.keys(state).map(function (playerId) { return { player_id: playerId, estado: state[playerId] }; });
-      SM.api.postAction('saveAttendance', { sessionId: sessionId, rows: rows }).then(function () {
+      return SM.api.postAction('saveAttendance', { sessionId: sessionId, rows: rows }).then(function () {
         handle.close();
         return SM.api.fetchAll(true);
       }).then(function (newData) {
         SM.ui.toast('Asistencia guardada.', 'ok');
         if (onSaved) onSaved(newData);
-      }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
-    });
+      });
+    }));
   }
 
   return {
