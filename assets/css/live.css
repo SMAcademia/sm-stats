@@ -67,34 +67,42 @@
   font-weight: 600;
 }
 
-/* ---------- aviso de error ----------
-   Fijo hasta que se cierra a mano — a diferencia del toast genérico
-   (SM.ui.toast), que desaparece solo a los 3s y es fácil de perder en
-   plena banda. Sirve para que un fallo de guardado (típico de mala
-   cobertura en el campo) sea imposible de pasar por alto. */
-.live-error-banner {
+/* ---------- estado de sincronización ----------
+   Cada tap se guarda al instante en localStorage y se sube a la hoja en
+   segundo plano por lotes — este indicador es la única forma de saber si
+   de verdad está llegando a la hoja o se ha quedado esperando cobertura,
+   así nunca vuelve a parecer que "no hace nada" al pulsar un botón. */
+.live-sync-wrap {
+  flex: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 14px;
-  background: oklch(0.68 0.20 25 / 0.14);
-  border-bottom: 1px solid oklch(0.68 0.20 25 / 0.5);
-  color: var(--red-bright);
-  font-size: 12.5px;
-  font-weight: 600;
+  gap: 8px;
 }
 
-.live-error-banner button {
+.live-sync-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.live-sync-badge.ok { background: oklch(0.80 0.19 150 / 0.14); color: var(--green); }
+.live-sync-badge.syncing { background: oklch(0.80 0.15 205 / 0.14); color: var(--cyan-bright); }
+.live-sync-badge.pending { background: oklch(0.80 0.17 80 / 0.14); color: var(--amber-bright); }
+.live-sync-badge.error { background: oklch(0.68 0.20 25 / 0.14); color: var(--red-bright); }
+
+.retry-sync-btn {
   flex: none;
   background: transparent;
   border: 1px solid oklch(0.68 0.20 25 / 0.5);
   color: var(--red-bright);
   border-radius: 7px;
   padding: 5px 10px;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 /* ---------- scoreboard ---------- */

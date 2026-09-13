@@ -3,7 +3,16 @@
    pensada para móvil: reloj derivado de eventos-marcador
    (inicio_1/fin_1/inicio_2/fin_2), taps por tipo de evento + jugador
    (propio) o dorsal (rival), deshacer último tap. Independiente del
-   acta — al finalizar, remite a Partidos para revisar y confirmar. */
+   acta — al finalizar, remite a Partidos para revisar y confirmar.
+
+   Cada tap se guarda AL INSTANTE en localStorage (id generado aquí mismo)
+   y se pinta en pantalla sin esperar a la red — la sincronización con la
+   hoja de cálculo pasa en segundo plano, por lotes, cada pocos segundos.
+   Así la consola funciona igual con buena cobertura que en un campo con
+   wifi/datos flojos: un tap nunca se queda "colgado" esperando al
+   servidor. Si se cierra la pestaña con eventos sin sincronizar, se
+   recuperan de localStorage la próxima vez que se abra esta misma
+   consola en este mismo dispositivo. */
 
 (function () {
   const root = document.getElementById('live-root');
@@ -34,26 +43,79 @@
     finalizado: 'Partido finalizado'
   };
 
+  const STORAGE_KEY = 'sm_stats_live_pending_' + matchId;
+  const CACHE_KEY = 'sm_stats_live_cache_' + matchId;
+  const SYNC_INTERVAL_MS = 10000;
+  const SYNC_DEBOUNCE_MS = 1200;
+
   let DATA = null;
   let match = null;
-  let events = [];
+  let confirmedEvents = [];   // eventos que sabemos guardados en la hoja
+  let pendingAdds = [];       // taps hechos aquí, todavía sin sincronizar
+  let pendingDeleteIds = [];  // deshacer de un evento ya confirmado, pendiente de borrar en la hoja
+  let needsReconcile = false; // arrancamos sin red: no sabemos qué había ya confirmado
   let activeTeam = 'propio';
   let overlay = null; // { kind: 'player' | 'dorsal' }
   let pendingTipo = null;
   let tickTimer = null;
-  // Estado de "guardando..." y último error — sin esto, un fallo de red (muy
-  // real en un campo de fútbol) hacía que pulsar un botón no diera NINGUNA
-  // señal: ni error ni cambio visible, como si el botón no funcionara. Con
-  // esto, cada acción muestra "Guardando..." al instante y, si falla, un
-  // aviso fijo (no un toast que desaparece solo) con botón para reintentar.
-  let saving = false;
-  let lastError = null;
+  let syncTimer = null;
+  let syncDebounceTimer = null;
+  let syncing = false;
+  let lastSyncError = null;
+
+  // ---- vista fusionada: confirmados + pendientes de subir, sin los
+  // pendientes de borrar — es lo único que el resto del código consulta. ----
+  function mergedEvents() {
+    const deleted = {};
+    pendingDeleteIds.forEach(function (id) { deleted[id] = true; });
+    return confirmedEvents.concat(pendingAdds)
+      .filter(function (e) { return !deleted[e.id]; })
+      .sort(function (a, b) { return new Date(a.ts) - new Date(b.ts); });
+  }
+
+  function hasPending() { return pendingAdds.length > 0 || pendingDeleteIds.length > 0; }
+
+  function localEventId() {
+    return 'le' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  // ---- localStorage: cola de sincronización + última copia conocida del
+  // partido (para poder abrir la consola aunque falle la carga inicial). ----
+  function savePending() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ pendingAdds: pendingAdds, pendingDeleteIds: pendingDeleteIds }));
+    } catch (e) { /* localStorage bloqueado — no es crítico, solo se pierde la recuperación tras cerrar */ }
+  }
+
+  function loadPending() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      pendingAdds = parsed.pendingAdds || [];
+      pendingDeleteIds = parsed.pendingDeleteIds || [];
+    } catch (e) { /* noop */ }
+  }
+
+  function saveCache() {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ match: match, players: DATA.players, settings: DATA.settings }));
+    } catch (e) { /* noop */ }
+  }
+
+  function loadCache() {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
 
   // ---- reloj: derivado de los eventos-marcador, no de un contador propio,
   // así que sobrevive a un refresco de página o a que el móvil se bloquee. ----
 
   function markers() {
-    function find(tipo) { return events.find(function (e) { return e.tipo === tipo; }); }
+    const list = mergedEvents();
+    function find(tipo) { return list.find(function (e) { return e.tipo === tipo; }); }
     return { i1: find('inicio_1'), f1: find('fin_1'), i2: find('inicio_2'), f2: find('fin_2') };
   }
 
@@ -96,33 +158,12 @@
 
   function score() {
     let propio = 0, rival = 0;
-    events.forEach(function (e) {
+    mergedEvents().forEach(function (e) {
       if (e.tipo !== 'gol') return;
       if (e.team === 'propio') propio++;
       else if (e.team === 'rival') rival++;
     });
     return { propio: propio, rival: rival };
-  }
-
-  // ---- datos ----
-
-  function loadEventsFromData() {
-    events = (DATA.matchLiveEvents || [])
-      .filter(function (e) { return e.match_id === matchId; })
-      .sort(function (a, b) { return new Date(a.ts) - new Date(b.ts); });
-  }
-
-  function setData(data) {
-    DATA = SM.team.filterData(data, SM.team.current());
-    match = DATA.matches.find(function (m) { return m.id === matchId; }) || null;
-    loadEventsFromData();
-  }
-
-  function refresh() {
-    return SM.api.fetchAll(true).then(function (data) {
-      setData(data);
-      render();
-    });
   }
 
   function ownPlayers() {
@@ -146,37 +187,77 @@
     return label + teamTag + who;
   }
 
-  // ---- acciones ----
+  // ---- sincronización en segundo plano ----
 
-  // Envoltorio común para toda escritura: bloquea nuevas acciones mientras
-  // hay una en curso (evita duplicar taps si la red va lenta), muestra
-  // "Guardando..." al instante, y si falla deja un aviso FIJO en pantalla
-  // (lastError) en vez de un toast que desaparece solo — así una mala
-  // conexión en el campo se nota de verdad, no parece que "no hace nada".
-  function runAction(promiseFactory) {
-    if (saving) return;
-    saving = true;
-    lastError = null;
+  function syncPending() {
+    if (syncing || !hasPending()) { render(); return; }
+    syncing = true;
     render();
-    promiseFactory()
-      .then(function () {
-        saving = false;
-        return refresh();
-      })
-      .catch(function (err) {
-        saving = false;
-        lastError = err.message;
-        SM.ui.toast(err.message, 'error');
+    const addsBatch = pendingAdds.slice();
+    const deleteBatch = pendingDeleteIds.slice();
+    const tasks = [];
+    if (addsBatch.length) {
+      tasks.push(SM.api.postAction('addLiveEvents', { matchId: matchId, events: addsBatch }).then(function () {
+        pendingAdds = pendingAdds.filter(function (e) { return addsBatch.indexOf(e) === -1; });
+        confirmedEvents = confirmedEvents.concat(addsBatch);
+      }));
+    }
+    if (deleteBatch.length) {
+      tasks.push(SM.api.postAction('deleteLiveEvents', { ids: deleteBatch }).then(function () {
+        pendingDeleteIds = pendingDeleteIds.filter(function (id) { return deleteBatch.indexOf(id) === -1; });
+        confirmedEvents = confirmedEvents.filter(function (e) { return deleteBatch.indexOf(e.id) === -1; });
+      }));
+    }
+    Promise.all(tasks).then(function () {
+      lastSyncError = null;
+      savePending();
+      syncing = false;
+      if (!needsReconcile) { render(); return; }
+      // Arrancamos sin red y no sabíamos qué había ya en la hoja — ahora que
+      // hay conexión, se refresca una vez para no dar por perdido lo que
+      // otra sesión (u otro día) hubiera guardado ya de este partido.
+      needsReconcile = false;
+      return SM.api.fetchAll(true).then(function (data) {
+        const scoped = SM.team.filterData(data, SM.team.current());
+        const pendingIds = {};
+        pendingAdds.forEach(function (e) { pendingIds[e.id] = true; });
+        confirmedEvents = (scoped.matchLiveEvents || [])
+          .filter(function (e) { return e.match_id === matchId && !pendingIds[e.id]; });
         render();
-      });
+      }).catch(function () { render(); });
+    }).catch(function (err) {
+      syncing = false;
+      lastSyncError = err.message;
+      savePending();
+      render();
+    });
   }
 
+  function scheduleSync(delayMs) {
+    clearTimeout(syncDebounceTimer);
+    syncDebounceTimer = setTimeout(syncPending, delayMs != null ? delayMs : SYNC_DEBOUNCE_MS);
+  }
+
+  function startSyncLoop() {
+    scheduleSync(500);
+    clearInterval(syncTimer);
+    syncTimer = setInterval(syncPending, SYNC_INTERVAL_MS);
+  }
+
+  // ---- acciones: instantáneas — se guardan en local y se pintan ya; la
+  // sincronización con la hoja pasa en segundo plano (ver arriba). ----
+
   function logMarker(tipo) {
-    runAction(function () {
-      const cm = currentMinuteParte();
-      const parte = (tipo === 'inicio_2' || tipo === 'fin_2') ? 2 : (cm.parte || 1);
-      return SM.api.postAction('addLiveEvent', { matchId: matchId, tipo: tipo, minuto: cm.minuto, parte: parte });
-    });
+    const cm = currentMinuteParte();
+    const parte = (tipo === 'inicio_2' || tipo === 'fin_2') ? 2 : (cm.parte || 1);
+    const row = {
+      id: localEventId(), match_id: matchId, team: '', player_id: '', dorsal_rival: null,
+      tipo: tipo, minuto: cm.minuto, parte: parte, ts: new Date().toISOString()
+    };
+    pendingAdds.push(row);
+    savePending();
+    render();
+    scheduleSync(tipo === 'fin_2' ? 0 : SYNC_DEBOUNCE_MS);
   }
 
   function onEventTap(tipo) {
@@ -189,19 +270,36 @@
 
   function commitEvent(extra) {
     const cm = currentMinuteParte();
-    const payload = Object.assign({ matchId: matchId, team: activeTeam, tipo: pendingTipo, minuto: cm.minuto, parte: cm.parte }, extra || {});
+    const row = Object.assign(
+      { id: localEventId(), match_id: matchId, team: activeTeam, tipo: pendingTipo, player_id: '', dorsal_rival: null, minuto: cm.minuto, parte: cm.parte, ts: new Date().toISOString() },
+      extra || {}
+    );
     pendingTipo = null;
     overlay = null;
-    runAction(function () { return SM.api.postAction('addLiveEvent', payload); });
+    pendingAdds.push(row);
+    savePending();
+    render();
+    scheduleSync(SYNC_DEBOUNCE_MS);
   }
 
   function closeOverlay() { pendingTipo = null; overlay = null; render(); }
 
   function undoLast() {
-    if (!events.length) return;
-    const last = events[events.length - 1];
+    const list = mergedEvents();
+    if (!list.length) return;
+    const last = list[list.length - 1];
     if (!window.confirm('¿Deshacer "' + eventFeedText(last) + '"?')) return;
-    runAction(function () { return SM.api.postAction('deleteLiveEvent', { id: last.id }); });
+    const pendingIdx = pendingAdds.findIndex(function (e) { return e.id === last.id; });
+    if (pendingIdx !== -1) {
+      // Todavía no había salido de este dispositivo — no hace falta avisar a la hoja.
+      pendingAdds.splice(pendingIdx, 1);
+    } else {
+      pendingDeleteIds.push(last.id);
+      confirmedEvents = confirmedEvents.filter(function (e) { return e.id !== last.id; });
+    }
+    savePending();
+    render();
+    scheduleSync(500);
   }
 
   // ---- reloj en vivo: solo actualiza el número, no repinta toda la pantalla ----
@@ -219,6 +317,23 @@
 
   // ---- render ----
 
+  // Estado de guardado, siempre visible — sin esto, no tener ni idea de si
+  // los taps están llegando de verdad a la hoja es exactamente lo que hizo
+  // parecer que "Iniciar partido" no funcionaba. "Reintentar ahora" fuerza
+  // un intento inmediato en vez de esperar al siguiente ciclo automático.
+  function syncStatusHtml() {
+    const pendingCount = pendingAdds.length + pendingDeleteIds.length;
+    if (syncing) return '<span class="live-sync-badge syncing">↻ Sincronizando…</span>';
+    if (!pendingCount) return '<span class="live-sync-badge ok">✓ Guardado</span>';
+    if (lastSyncError) {
+      return (
+        '<span class="live-sync-badge error">⚠ Sin conexión — ' + pendingCount + ' sin guardar</span>' +
+        '<button type="button" class="retry-sync-btn">Reintentar</button>'
+      );
+    }
+    return '<span class="live-sync-badge pending">⏳ ' + pendingCount + ' sin guardar</span>';
+  }
+
   function headerHtml() {
     const clubName = (DATA.settings && DATA.settings.club_nombre) || 'Mi club';
     return (
@@ -230,6 +345,7 @@
           '<div class="live-header-title">' + SM.ui.escapeHtml(clubName) + ' vs ' + SM.ui.escapeHtml(match.rival || 'Rival') + '</div>' +
           '<div class="live-header-sub">' + SM.ui.formatDateShort(match.fecha) + (match.hora ? ' · ' + match.hora : '') + '</div>' +
         '</div>' +
+        '<div class="live-sync-wrap">' + syncStatusHtml() + '</div>' +
       '</div>'
     );
   }
@@ -241,11 +357,10 @@
     const phase = phaseOf(m);
     const clock = clockLabel(elapsedMs(m, phase));
     const phaseBtn = (function () {
-      const dis = saving ? ' disabled' : '';
-      if (phase === 'no_iniciado') return '<button class="live-phase-btn primary" id="phase-btn"' + dis + '>' + (saving ? 'Guardando…' : 'Iniciar partido') + '</button>';
-      if (phase === 'primera') return '<button class="live-phase-btn" id="phase-btn"' + dis + '>' + (saving ? 'Guardando…' : 'Fin 1ª parte') + '</button>';
-      if (phase === 'descanso') return '<button class="live-phase-btn primary" id="phase-btn"' + dis + '>' + (saving ? 'Guardando…' : 'Iniciar 2ª parte') + '</button>';
-      if (phase === 'segunda') return '<button class="live-phase-btn danger" id="phase-btn"' + dis + '>' + (saving ? 'Guardando…' : 'Finalizar partido') + '</button>';
+      if (phase === 'no_iniciado') return '<button class="live-phase-btn primary" id="phase-btn">Iniciar partido</button>';
+      if (phase === 'primera') return '<button class="live-phase-btn" id="phase-btn">Fin 1ª parte</button>';
+      if (phase === 'descanso') return '<button class="live-phase-btn primary" id="phase-btn">Iniciar 2ª parte</button>';
+      if (phase === 'segunda') return '<button class="live-phase-btn danger" id="phase-btn">Finalizar partido</button>';
       return '';
     })();
     return (
@@ -264,7 +379,7 @@
 
   function teamTabsHtml() {
     const phase = phaseOf(markers());
-    const enabled = (phase === 'primera' || phase === 'segunda') && !saving;
+    const enabled = phase === 'primera' || phase === 'segunda';
     return (
       '<div class="live-teamtabs">' +
         '<button class="live-teamtab propio' + (activeTeam === 'propio' ? ' active' : '') + '" data-team="propio"' + (enabled ? '' : ' disabled') + '>NUESTRO EQUIPO</button>' +
@@ -273,21 +388,9 @@
     );
   }
 
-  // Aviso fijo (no un toast que se esfuma solo) cuando la última acción ha
-  // fallado — con el mensaje real del error y un botón para cerrarlo.
-  function errorBannerHtml() {
-    if (!lastError) return '';
-    return (
-      '<div class="live-error-banner" id="live-error-banner">' +
-        '<span>⚠ ' + SM.ui.escapeHtml(lastError) + '</span>' +
-        '<button type="button" id="dismiss-error-btn">Cerrar</button>' +
-      '</div>'
-    );
-  }
-
   function eventGridHtml() {
     const phase = phaseOf(markers());
-    const enabled = (phase === 'primera' || phase === 'segunda') && !saving;
+    const enabled = phase === 'primera' || phase === 'segunda';
     return (
       '<div class="live-eventgrid">' +
         EVENT_TYPES.map(function (ev) {
@@ -303,7 +406,7 @@
   }
 
   function feedHtml() {
-    const rows = events.slice().reverse().slice(0, 30);
+    const rows = mergedEvents().slice().reverse().slice(0, 30);
     return (
       '<div class="live-feed-wrap">' +
         '<div class="live-feed-title">Últimos eventos</div>' +
@@ -314,7 +417,7 @@
               '<span class="live-feed-minute">' + e.minuto + '\'</span>' +
               (isMarker ? '<span class="live-feed-dot" style="background:var(--text-ghost);"></span>' : '<span class="live-feed-dot ' + e.team + '"></span>') +
               '<span class="live-feed-text">' + SM.ui.escapeHtml(eventFeedText(e)) + '</span>' +
-              (i === 0 ? '<button class="live-feed-undo" id="undo-btn"' + (saving ? ' disabled' : '') + '>Deshacer</button>' : '') +
+              (i === 0 ? '<button class="live-feed-undo" id="undo-btn">Deshacer</button>' : '') +
             '</div>'
           );
         }).join('') : '<div class="live-feed-empty">Todavía no hay eventos.</div>') +
@@ -363,10 +466,16 @@
 
   function summaryHtml() {
     const s = score();
+    const pendingCount = pendingAdds.length + pendingDeleteIds.length;
     return (
       '<div class="live-summary">' +
         '<div class="live-summary-score">' + s.propio + ' – ' + s.rival + '</div>' +
-        '<div style="color:var(--text-dim);font-size:13px;">Partido finalizado. Revisa y confirma resultado, convocatoria y eventos en el acta — este registro no se guarda ahí automáticamente.</div>' +
+        (pendingCount
+          ? '<div style="color:var(--amber-bright);font-size:13px;font-weight:700;">⚠ Quedan ' + pendingCount + ' eventos por guardar en la hoja — no cierres esta pestaña hasta que se sincronicen.</div>' +
+            '<button type="button" class="btn btn-outline retry-sync-btn">Reintentar ahora</button>'
+          : '<div style="color:var(--green);font-size:13px;font-weight:700;">✓ Todo guardado correctamente.</div>'
+        ) +
+        '<div style="color:var(--text-dim);font-size:13px;">Revisa y confirma resultado, convocatoria y eventos en el acta — este registro no se guarda ahí automáticamente.</div>' +
         '<a class="btn btn-primary" href="partidos.html">Ir a Partidos</a>' +
       '</div>'
     );
@@ -380,18 +489,17 @@
     const phase = phaseOf(markers());
     root.innerHTML =
       headerHtml() +
-      errorBannerHtml() +
       scoreboardHtml() +
       (phase === 'finalizado' ? summaryHtml() : (teamTabsHtml() + eventGridHtml() + feedHtml())) +
       overlayHtml();
 
-    const dismissBtn = document.getElementById('dismiss-error-btn');
-    if (dismissBtn) dismissBtn.addEventListener('click', function () { lastError = null; render(); });
+    root.querySelectorAll('.retry-sync-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { scheduleSync(0); });
+    });
 
     const phaseBtn = document.getElementById('phase-btn');
     if (phaseBtn) {
       phaseBtn.addEventListener('click', function () {
-        if (saving) return;
         if (phase === 'no_iniciado') logMarker('inicio_1');
         else if (phase === 'primera') logMarker('fin_1');
         else if (phase === 'descanso') logMarker('inicio_2');
@@ -444,10 +552,31 @@
     return;
   }
 
+  loadPending();
+
   SM.api.fetchAll().then(function (data) {
-    setData(data);
+    const scoped = SM.team.filterData(data, SM.team.current());
+    DATA = scoped;
+    match = scoped.matches.find(function (m) { return m.id === matchId; }) || null;
+    confirmedEvents = (scoped.matchLiveEvents || []).filter(function (e) { return e.match_id === matchId; });
+    if (match) saveCache();
     render();
+    startSyncLoop();
   }).catch(function (err) {
-    root.innerHTML = '<div class="live-loading">' + err.message + '</div>';
+    // Sin red al abrir (frecuente en un campo de fútbol) — si ya se había
+    // abierto antes esta consola en este móvil, seguimos con esa última
+    // copia guardada en vez de bloquear la pantalla con un error.
+    const cached = loadCache();
+    if (cached && cached.match) {
+      match = cached.match;
+      DATA = { players: cached.players || [], settings: cached.settings || {}, matches: [cached.match] };
+      confirmedEvents = [];
+      needsReconcile = true;
+      render();
+      SM.ui.toast('Sin conexión — usando los datos guardados de este partido. Se sincronizará cuando vuelva la red.', 'error');
+      startSyncLoop();
+    } else {
+      root.innerHTML = '<div class="live-loading">' + err.message + '</div>';
+    }
   });
 })();

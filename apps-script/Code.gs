@@ -326,7 +326,9 @@ function doPost(e) {
       updateSession: updateSession,
       deleteSession: deleteSession,
       addLiveEvent: addLiveEvent,
+      addLiveEvents: addLiveEvents,
       deleteLiveEvent: deleteLiveEvent,
+      deleteLiveEvents: deleteLiveEvents,
       clearLiveEvents: clearLiveEvents,
       saveCheckin: saveCheckin,
       saveCallups: saveCallups,
@@ -480,15 +482,21 @@ function deleteSession(payload) {
   return true;
 }
 
-// Registro en vivo (taps durante el partido) — cada tap es una escritura
-// inmediata, independiente del acta. addLiveEvent cubre tanto los eventos
-// (gol, tiro, falta...) como los marcadores de fase del reloj (inicio_1,
-// fin_1, inicio_2, fin_2).
+// Registro en vivo (taps durante el partido) — independiente del acta.
+// addLiveEvent cubre tanto los eventos (gol, tiro, falta...) como los
+// marcadores de fase del reloj (inicio_1, fin_1, inicio_2, fin_2).
+//
+// El id lo genera el propio móvil al tocar (no aquí) y viaja en el
+// payload: la consola guarda cada tap al instante en localStorage con ese
+// id y lo sincroniza con la hoja en segundo plano (por lotes, ver
+// addLiveEvents) — así funciona sin esperar a la red en pleno partido, y
+// necesita saber de antemano qué id tendrá cada evento para poder
+// deshacerlo localmente antes incluso de que llegue a guardarse aquí.
 function addLiveEvent(payload) {
   if (!payload.matchId) throw new Error('Falta el id del partido.');
   if (!payload.tipo) throw new Error('Falta el tipo de evento.');
   const row = {
-    id: newId('le'),
+    id: payload.id || newId('le'),
     match_id: payload.matchId,
     team: payload.team || '',
     player_id: payload.player_id || '',
@@ -496,16 +504,47 @@ function addLiveEvent(payload) {
     tipo: payload.tipo,
     minuto: payload.minuto != null ? payload.minuto : 0,
     parte: payload.parte != null ? payload.parte : '',
-    ts: new Date().toISOString()
+    ts: payload.ts || new Date().toISOString()
   };
   appendRow(SHEETS.matchLiveEvents, LIVE_EVENT_COLUMNS, row);
   return row;
 }
 
-// Deshacer un tap concreto (normalmente el último).
+// Versión por lotes de addLiveEvent — la consola en vivo acumula los taps
+// localmente y los manda de golpe cada pocos segundos, en vez de una
+// llamada de red por cada tap.
+function addLiveEvents(payload) {
+  if (!payload.matchId) throw new Error('Falta el id del partido.');
+  const rows = (payload.events || []).map(function (ev) {
+    return {
+      id: ev.id || newId('le'),
+      match_id: payload.matchId,
+      team: ev.team || '',
+      player_id: ev.player_id || '',
+      dorsal_rival: ev.dorsal_rival != null ? ev.dorsal_rival : '',
+      tipo: ev.tipo,
+      minuto: ev.minuto != null ? ev.minuto : 0,
+      parte: ev.parte != null ? ev.parte : '',
+      ts: ev.ts || new Date().toISOString()
+    };
+  });
+  rows.forEach(function (row) { appendRow(SHEETS.matchLiveEvents, LIVE_EVENT_COLUMNS, row); });
+  return rows;
+}
+
+// Deshacer un tap concreto (normalmente el último). Si el tap deshecho
+// todavía no había llegado a sincronizarse, la consola ni siquiera llama a
+// esto — simplemente lo quita de su cola local.
 function deleteLiveEvent(payload) {
   if (!payload.id) throw new Error('Falta el id del evento.');
   deleteRowsWhere(SHEETS.matchLiveEvents, 'id', payload.id);
+  return true;
+}
+
+// Versión por lotes de deleteLiveEvent, para deshacer eventos que ya se
+// habían sincronizado antes de que se pidiera deshacerlos.
+function deleteLiveEvents(payload) {
+  (payload.ids || []).forEach(function (id) { deleteRowsWhere(SHEETS.matchLiveEvents, 'id', id); });
   return true;
 }
 

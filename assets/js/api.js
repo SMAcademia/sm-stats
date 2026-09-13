@@ -166,7 +166,7 @@ SM.api = (function () {
       }
       case 'addLiveEvent': {
         const row = {
-          id: nextMockId('le'),
+          id: payload.id || nextMockId('le'),
           match_id: payload.matchId,
           team: payload.team || '',
           player_id: payload.player_id || '',
@@ -174,14 +174,39 @@ SM.api = (function () {
           tipo: payload.tipo,
           minuto: payload.minuto != null ? payload.minuto : 0,
           parte: payload.parte != null ? payload.parte : null,
-          ts: new Date().toISOString()
+          ts: payload.ts || new Date().toISOString()
         };
         d.matchLiveEvents = d.matchLiveEvents || [];
         d.matchLiveEvents.push(row);
         return row;
       }
+      // Versión por lotes — la consola en vivo acumula los taps en
+      // localStorage y los manda de golpe cada pocos segundos.
+      case 'addLiveEvents': {
+        const rows = (payload.events || []).map(function (ev) {
+          return {
+            id: ev.id || nextMockId('le'),
+            match_id: payload.matchId,
+            team: ev.team || '',
+            player_id: ev.player_id || '',
+            dorsal_rival: ev.dorsal_rival != null ? ev.dorsal_rival : null,
+            tipo: ev.tipo,
+            minuto: ev.minuto != null ? ev.minuto : 0,
+            parte: ev.parte != null ? ev.parte : null,
+            ts: ev.ts || new Date().toISOString()
+          };
+        });
+        d.matchLiveEvents = d.matchLiveEvents || [];
+        rows.forEach(function (r) { d.matchLiveEvents.push(r); });
+        return rows;
+      }
       case 'deleteLiveEvent': {
         d.matchLiveEvents = (d.matchLiveEvents || []).filter(function (le) { return le.id !== payload.id; });
+        return true;
+      }
+      case 'deleteLiveEvents': {
+        const ids = payload.ids || [];
+        d.matchLiveEvents = (d.matchLiveEvents || []).filter(function (le) { return ids.indexOf(le.id) === -1; });
         return true;
       }
       case 'clearLiveEvents': {
