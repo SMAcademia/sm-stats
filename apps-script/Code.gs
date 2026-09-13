@@ -29,6 +29,7 @@ const SHEETS = {
   matchIntervals: 'MatchIntervals',
   matchLiveEvents: 'MatchLiveEvents',
   checkins: 'Checkins',
+  planEntries: 'PlanEntries',
   settings: 'Settings'
 };
 
@@ -57,6 +58,11 @@ const LIVE_EVENT_COLUMNS = ['id', 'match_id', 'team', 'player_id', 'dorsal_rival
 // 3=amarillo, 4=verde. Un jugador solo tiene una fila por sesión — reenviar
 // sobrescribe la anterior.
 const CHECKIN_COLUMNS = ['id', 'session_id', 'player_id', 'satisfaccion', 'comentario_satisfaccion', 'rendimiento', 'comentario_rendimiento', 'ts'];
+// Planificación del cuerpo técnico — objetivos por día y categoría (equipo).
+// Una fila por día+categoría (id = "<fecha>::<categoria>", no autogenerado),
+// así guardar el mismo día dos veces actualiza la fila en vez de duplicarla.
+// Los 5 campos son texto libre (el entrenador puede escribir varias líneas).
+const PLAN_COLUMNS = ['id', 'fecha', 'categoria', 'tecnico', 'tactico', 'fisico', 'valores', 'porteros'];
 // Settings is a singleton sheet: header row + exactly one data row (row 2).
 const SETTINGS_COLUMNS = ['club_nombre', 'entrenador_nombre', 'entrenador_rol', 'liga_nombre'];
 const DEFAULT_SETTINGS = { club_nombre: 'Mi Club', entrenador_nombre: 'Nombre del entrenador', entrenador_rol: 'Entrenador', liga_nombre: 'Liga Regional · Grupo B' };
@@ -77,6 +83,7 @@ function setupSheets() {
     [SHEETS.matchIntervals, INTERVAL_COLUMNS],
     [SHEETS.matchLiveEvents, LIVE_EVENT_COLUMNS],
     [SHEETS.checkins, CHECKIN_COLUMNS],
+    [SHEETS.planEntries, PLAN_COLUMNS],
     [SHEETS.settings, SETTINGS_COLUMNS]
   ];
   defs.forEach(function (def) {
@@ -300,6 +307,7 @@ function doGet(e) {
       matchIntervals: sheetToObjects(SHEETS.matchIntervals).map(coerceInterval),
       matchLiveEvents: sheetToObjectsOrEmpty(SHEETS.matchLiveEvents).map(coerceLiveEvent),
       checkins: sheetToObjectsOrEmpty(SHEETS.checkins).map(coerceCheckin),
+      planEntries: sheetToObjectsOrEmpty(SHEETS.planEntries),
       settings: readSingletonRow(SHEETS.settings, SETTINGS_COLUMNS, DEFAULT_SETTINGS)
     };
     return jsonResponse({ ok: true, result: data });
@@ -331,6 +339,8 @@ function doPost(e) {
       deleteLiveEvents: deleteLiveEvents,
       clearLiveEvents: clearLiveEvents,
       saveCheckin: saveCheckin,
+      savePlanEntry: savePlanEntry,
+      deletePlanEntry: deletePlanEntry,
       saveCallups: saveCallups,
       saveMatchReport: saveMatchReport,
       saveAttendance: saveAttendance,
@@ -583,6 +593,40 @@ function saveCheckin(payload) {
   };
   appendRow(SHEETS.checkins, CHECKIN_COLUMNS, row);
   return row;
+}
+
+// Planificación del cuerpo técnico: guarda (o actualiza, si ya existía) los
+// objetivos de un día para una categoría — id determinista "fecha::categoria"
+// en vez de generado al azar, así volver a guardar el mismo día actualiza
+// la fila existente en lugar de duplicarla.
+function savePlanEntry(payload) {
+  if (!payload.fecha) throw new Error('Falta la fecha.');
+  if (!payload.categoria) throw new Error('Falta la categoría.');
+  const id = payload.fecha + '::' + payload.categoria;
+  const sheet = getSheet(SHEETS.planEntries);
+  const rowIndex = findRowIndexById(sheet, id);
+  const row = {
+    id: id,
+    fecha: payload.fecha,
+    categoria: payload.categoria,
+    tecnico: payload.tecnico || '',
+    tactico: payload.tactico || '',
+    fisico: payload.fisico || '',
+    valores: payload.valores || '',
+    porteros: payload.porteros || ''
+  };
+  if (rowIndex === -1) {
+    appendRow(SHEETS.planEntries, PLAN_COLUMNS, row);
+  } else {
+    updateRowById(SHEETS.planEntries, PLAN_COLUMNS, id, row);
+  }
+  return row;
+}
+
+function deletePlanEntry(payload) {
+  if (!payload.id) throw new Error('Falta el id de la planificación.');
+  deleteRowsWhereIfExists(SHEETS.planEntries, 'id', payload.id);
+  return true;
 }
 
 // Guarda solo la convocatoria (quién va convocado y el capitán), sin exigir

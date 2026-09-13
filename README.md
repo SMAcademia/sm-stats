@@ -105,6 +105,7 @@ index.html              Dashboard
 plantilla.html          Plantilla (jugadores) + Cuerpo técnico
 jugador.html            Ficha de un jugador (?id=...)
 asistencia.html         Control de asistencia
+planificacion.html      Objetivos de entrenamiento por día (cuerpo técnico)
 partidos.html           Partidos (próximo, jugados, acta)
 estadisticas.html       Estadísticas comparativas del equipo
 acceso.html             Login privado para familias/jugadores y staff

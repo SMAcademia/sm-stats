@@ -62,7 +62,8 @@ SM.team = (function () {
       matchAppearances: (data.matchAppearances || []).filter(function (a) { return matchIds[a.match_id]; }),
       matchIntervals: (data.matchIntervals || []).filter(function (iv) { return matchIds[iv.match_id]; }),
       matchLiveEvents: (data.matchLiveEvents || []).filter(function (le) { return matchIds[le.match_id]; }),
-      checkins: (data.checkins || []).filter(function (c) { return sessionIds[c.session_id]; })
+      checkins: (data.checkins || []).filter(function (c) { return sessionIds[c.session_id]; }),
+      planEntries: (data.planEntries || []).filter(function (pe) { return belongsTo(pe.categoria, categoria); })
     });
   }
 

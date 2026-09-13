@@ -1524,5 +1524,27 @@
   ],
   "matchIntervals": [],
   "matchLiveEvents": [],
-  "checkins": []
+  "checkins": [],
+  "planEntries": [
+    {
+      "id": "2026-09-10::Alevín",
+      "fecha": "2026-09-10",
+      "categoria": "Alevín",
+      "tecnico": "Control orientado y primer toque bajo presión.",
+      "tactico": "Salida de balón en 3+2, apoyos en amplitud.",
+      "fisico": "Trabajo de velocidad de reacción, series cortas.",
+      "valores": "Comunicación positiva entre líneas — hablar antes de recibir.",
+      "porteros": "Salidas al 1x1 y colocación en centros laterales."
+    },
+    {
+      "id": "2026-09-15::Alevín",
+      "fecha": "2026-09-15",
+      "categoria": "Alevín",
+      "tecnico": "Golpeo de balón parado (córners y faltas).",
+      "tactico": "Presión tras pérdida — 5 segundos de reacción.",
+      "fisico": "Resistencia aeróbica con balón.",
+      "valores": "Respeto al rival y al árbitro en situaciones de tensión.",
+      "porteros": "Blocaje y despeje con puños en centros altos."
+    }
+  ]
 }

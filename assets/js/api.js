@@ -231,6 +231,29 @@ SM.api = (function () {
         d.checkins.push(row);
         return row;
       }
+      case 'savePlanEntry': {
+        if (!payload.fecha) throw new Error('Falta la fecha.');
+        if (!payload.categoria) throw new Error('Falta la categoría.');
+        const id = payload.fecha + '::' + payload.categoria;
+        d.planEntries = d.planEntries || [];
+        const idx = d.planEntries.findIndex(function (pe) { return pe.id === id; });
+        const row = {
+          id: id,
+          fecha: payload.fecha,
+          categoria: payload.categoria,
+          tecnico: payload.tecnico || '',
+          tactico: payload.tactico || '',
+          fisico: payload.fisico || '',
+          valores: payload.valores || '',
+          porteros: payload.porteros || ''
+        };
+        if (idx >= 0) d.planEntries[idx] = row; else d.planEntries.push(row);
+        return row;
+      }
+      case 'deletePlanEntry': {
+        d.planEntries = (d.planEntries || []).filter(function (pe) { return pe.id !== payload.id; });
+        return true;
+      }
       case 'saveCallups': {
         if ((payload.appearances || []).length < 7) {
           throw new Error('Se necesitan al menos 7 jugadores convocados para guardar la convocatoria.');
