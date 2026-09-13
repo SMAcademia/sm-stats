@@ -430,6 +430,7 @@
     const body = SM.ui.el('div', {
       html:
         '<form id="report-form">' +
+          '<div id="acta-error" style="display:none;margin-bottom:14px;padding:10px 14px;border-radius:9px;background:' + SM.ui.alpha('var(--red)', 0.12) + ';border:1px solid ' + SM.ui.alpha('var(--red)', 0.4) + ';color:var(--red-bright);font-size:12.5px;font-weight:600;"></div>' +
           '<div class="form-grid">' +
             SM.forms.field('Goles a favor', '<input name="golesFavor" type="number" min="0" value="' + (match.goles_favor != null ? match.goles_favor : '') + '">') +
             SM.forms.field('Goles en contra', '<input name="golesContra" type="number" min="0" value="' + (match.goles_contra != null ? match.goles_contra : '') + '">') +
@@ -456,6 +457,28 @@
     });
     const handle = SM.ui.openModal('Acta · vs ' + match.rival, body);
     body.querySelector('#cancel-btn').addEventListener('click', handle.close);
+
+    // Sin esto, un fallo de red al guardar (o simplemente el tiempo que
+    // tarda) no daba NINGUNA señal en el botón — parecía que "no hacía
+    // nada". Bloquea el doble tap, muestra "Guardando..." al instante y
+    // deja el error a la vista (no solo un toast que desaparece solo).
+    let actaSaving = false;
+    const submitBtn = body.querySelector('#report-form button[type="submit"]');
+    const callupsBtn = body.querySelector('#save-callups-btn');
+    const submitLabel = submitBtn.textContent;
+    const callupsLabel = callupsBtn.textContent;
+    function setActaSaving(saving) {
+      actaSaving = saving;
+      submitBtn.disabled = saving;
+      callupsBtn.disabled = saving;
+      submitBtn.textContent = saving ? 'Guardando…' : submitLabel;
+      callupsBtn.textContent = saving ? 'Guardando…' : callupsLabel;
+    }
+    function showActaError(msg) {
+      const el = body.querySelector('#acta-error');
+      if (msg) { el.textContent = '⚠ ' + msg; el.style.display = 'block'; }
+      else { el.style.display = 'none'; el.textContent = ''; }
+    }
 
     // Borra el partido y TODO lo que cuelga de él: sesión/asistencia,
     // convocatoria, minutos, goles/tarjetas, check-ins de bienestar de esa
@@ -570,6 +593,7 @@
     // Guarda solo quién va convocado (y el capitán, si ya está decidido) —
     // no exige minutos/goles/tarjetas, para poder prepararla antes de jugar.
     body.querySelector('#save-callups-btn').addEventListener('click', function () {
+      if (actaSaving) return;
       const capitanId = (body.querySelector('input[name="capitan"]:checked') || {}).value;
       const appearances = [];
       players.forEach(function (p) {
@@ -586,9 +610,11 @@
         });
       });
       if (appearances.length < 7) {
-        SM.ui.toast('Se necesitan al menos 7 jugadores convocados para guardar la convocatoria.', 'error');
+        showActaError('Se necesitan al menos 7 jugadores convocados para guardar la convocatoria.');
         return;
       }
+      showActaError(null);
+      setActaSaving(true);
       SM.api.postAction('saveCallups', { matchId: match.id, appearances: appearances }).then(function () {
         handle.close();
         return SM.api.fetchAll(true);
@@ -596,11 +622,16 @@
         setData(data);
         render();
         SM.ui.toast('Convocatoria guardada.', 'ok');
-      }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+      }).catch(function (err) {
+        setActaSaving(false);
+        showActaError(err.message);
+        SM.ui.toast(err.message, 'error');
+      });
     });
 
     body.querySelector('#report-form').addEventListener('submit', function (e) {
       e.preventDefault();
+      if (actaSaving) return;
       const fd = new FormData(e.target);
       const golesFavor = fd.get('golesFavor') === '' ? null : Number(fd.get('golesFavor'));
       const golesContra = fd.get('golesContra') === '' ? null : Number(fd.get('golesContra'));
@@ -627,15 +658,17 @@
         if (fd.get('ro_' + p.id)) events.push({ player_id: p.id, tipo: 'roja' });
       });
       if (appearances.length < 7) {
-        SM.ui.toast('Se necesitan al menos 7 jugadores convocados para guardar el acta.', 'error');
+        showActaError('Se necesitan al menos 7 jugadores convocados para guardar el acta.');
         return;
       }
       const starters = new Set();
       intervals.forEach(function (iv) { if (Number(iv.entrada) === 0) starters.add(iv.player_id); });
       if (starters.size !== 7) {
-        SM.ui.toast('El 7 inicial (minuto 0) debe ser exactamente 7 jugadores — ahora mismo hay ' + starters.size + '.', 'error');
+        showActaError('El 7 inicial (minuto 0) debe ser exactamente 7 jugadores — ahora mismo hay ' + starters.size + '.');
         return;
       }
+      showActaError(null);
+      setActaSaving(true);
       SM.api.postAction('saveMatchReport', { matchId: match.id, golesFavor: golesFavor, golesContra: golesContra, appearances: appearances, events: events, intervals: intervals })
         .then(function () {
           handle.close();
@@ -644,7 +677,11 @@
           setData(data);
           render();
           SM.ui.toast('Acta guardada.', 'ok');
-        }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+        }).catch(function (err) {
+          setActaSaving(false);
+          showActaError(err.message);
+          SM.ui.toast(err.message, 'error');
+        });
     });
   }
 
