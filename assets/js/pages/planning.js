@@ -79,6 +79,12 @@
     return String(text).split(/[,\n]+/).map(function (s) { return s.trim(); }).filter(function (s) { return s; });
   }
 
+  // Pone en mayúscula la primera letra, para que "pase" y "Pase" se vean
+  // igual de cuidados en el panel aunque el entrenador no lo escriba así.
+  function capitalize(text) {
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
   // Agrupa los objetivos idénticos (mismo texto, sin distinguir mayúsculas)
   // dentro de una categoría, para que uno repetido varias veces se muestre
   // una vez con un contador en vez de duplicado.
@@ -89,7 +95,7 @@
       if (!hasContent(e, key)) return;
       splitObjectives(e[key]).forEach(function (text) {
         const norm = text.toLowerCase();
-        if (!byNorm[norm]) { byNorm[norm] = { text: text, count: 0 }; order.push(norm); }
+        if (!byNorm[norm]) { byNorm[norm] = { text: capitalize(text), count: 0 }; order.push(norm); }
         byNorm[norm].count++;
       });
     });
