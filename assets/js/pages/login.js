@@ -11,6 +11,16 @@
   let error = '';
   let submitting = false;
 
+  // Adónde volver tras entrar (p. ej. encuesta.html?session=... si es de
+  // ahí de donde te mandaron por no tener sesión iniciada). Solo se acepta
+  // una ruta relativa de la propia app, nunca una URL absoluta a otro
+  // sitio — evita que un enlace manipulado use esto para redirigir fuera.
+  function safeNext() {
+    const next = SM.ui.qs('next');
+    if (!next || /^[a-z][a-z0-9+.-]*:/i.test(next) || next.indexOf('//') === 0) return null;
+    return next;
+  }
+
   function render() {
     const clubName = (DATA && DATA.settings && DATA.settings.club_nombre) || 'SM Stats';
     root.innerHTML =
@@ -58,8 +68,10 @@
       render();
       if (match.type === 'player') {
         SM.auth.saveFamilySession(match.player.id);
-        window.location.href = 'mi-jugador.html?id=' + match.player.id;
+        window.location.href = safeNext() || ('mi-jugador.html?id=' + match.player.id);
       } else {
+        // "next" es solo para destinos de jugador (p. ej. volver a la
+        // encuesta de bienestar) — el staff siempre entra a la app completa.
         window.location.href = 'index.html';
       }
     });

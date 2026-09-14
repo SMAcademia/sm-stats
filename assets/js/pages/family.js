@@ -140,7 +140,9 @@
     const already = (scoped.checkins || []).some(function (c) { return c.session_id === todaySession.id && c.player_id === p.id; });
     if (already) return '';
     const isMatch = todaySession.tipo === 'partido';
-    const link = 'encuesta.html?session=' + todaySession.id + '&player=' + p.id;
+    // Sin &player=: la encuesta identifica al jugador por su propia sesión
+    // de acceso (ya iniciada, si has llegado hasta aquí), no por la URL.
+    const link = 'encuesta.html?session=' + todaySession.id;
     return (
       '<div class="panel">' +
         '<span class="panel-title">Bienestar de hoy</span>' +

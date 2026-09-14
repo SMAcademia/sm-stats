@@ -1,50 +1,32 @@
 /* SM Stats — Encuesta de bienestar (la rellena el propio jugador).
-   Página standalone (encuesta.html?session=<sessionId>), sin sidebar ni
-   login: el jugador elige su nombre de la plantilla de ESA sesión (no de
-   la categoría activa en este dispositivo, que no tiene por qué tener
-   nada guardado) y marca dos caritas — satisfacción y rendimiento
-   percibido — con un comentario opcional en cada una. */
+   Página standalone (encuesta.html?session=<sessionId>), sin sidebar.
+   La identidad del jugador viene SIEMPRE de su sesión de acceso (ver
+   assets/js/auth.js) — nunca de una lista para elegir ni de un parámetro
+   de la URL — así nadie puede rellenar la encuesta en nombre de otro
+   compañero. Si el dispositivo no tiene sesión iniciada, se manda a
+   acceso.html y se vuelve aquí después de entrar. */
 
 (function () {
   const root = document.getElementById('live-root');
   const sessionId = SM.ui.qs('session');
-  // Si llega con ?player=<id> (enlace directo desde el portal de familia,
-  // que ya sabe quién ha iniciado sesión), se salta el paso "¿Quién eres?".
-  const preselectedPlayerId = SM.ui.qs('player');
 
   let DATA = null;
   let session = null;
   let match = null;
-  let players = [];
 
-  let step = 'player'; // player -> satisfaccion -> rendimiento -> done
+  let step = 'satisfaccion'; // satisfaccion -> rendimiento -> done
   let player = null;
   let satisfaccion = null;
   let comentarioSatisfaccion = '';
   let rendimiento = null;
   let comentarioRendimiento = '';
+  let loadError = '';
 
   function defaultCategoria() { return SM.team.CATEGORIES[0].key; }
-
-  function loadPlayers() {
-    const cat = session.categoria || defaultCategoria();
-    players = (DATA.players || [])
-      .filter(function (p) { return p.activo && (p.categoria || defaultCategoria()) === cat; })
-      .sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
-  }
 
   function sessionLabel() {
     if (session.tipo === 'partido' && match) return 'vs ' + match.rival;
     return 'Entrenamiento';
-  }
-
-  function reset() {
-    step = 'player';
-    player = null;
-    satisfaccion = null;
-    comentarioSatisfaccion = '';
-    rendimiento = null;
-    comentarioRendimiento = '';
   }
 
   function headerHtml() {
@@ -56,24 +38,6 @@
           '<div class="live-header-sub">' + SM.ui.formatDateShort(session.fecha) + (session.hora ? ' · ' + session.hora : '') + '</div>' +
         '</div>' +
       '</div>'
-    );
-  }
-
-  function playerStepHtml() {
-    return (
-      '<div class="live-checkin-question">¿Quién eres?</div>' +
-      (players.length ? (
-        '<div class="live-playergrid" style="padding:10px 14px 24px;">' +
-          players.map(function (p) {
-            return (
-              '<button class="live-player-btn" data-player="' + p.id + '">' +
-                '<span class="live-player-dorsal">' + (p.dorsal != null ? p.dorsal : '—') + '</span>' +
-                '<span class="live-player-name">' + SM.ui.escapeHtml((p.nombre || '').split(' ')[0]) + '</span>' +
-              '</button>'
-            );
-          }).join('') +
-        '</div>'
-      ) : '<div class="live-feed-empty" style="padding:10px 14px;">No hay jugadores en la plantilla de esta sesión.</div>')
     );
   }
 
@@ -121,18 +85,21 @@
       '<div class="live-summary">' +
         '<div style="font-size:17px;font-weight:700;color:var(--text-strong);">¡Gracias, ' + SM.ui.escapeHtml((player.nombre || '').split(' ')[0]) + '!</div>' +
         '<div style="color:var(--text-dim);font-size:13px;">Tu respuesta se ha guardado.</div>' +
-        '<button type="button" class="btn btn-outline" id="another-btn">Responder por otro jugador</button>' +
+        '<a href="mi-jugador.html?id=' + player.id + '" class="btn btn-outline">Volver a mi ficha</a>' +
       '</div>'
     );
   }
 
   function render() {
+    if (loadError) {
+      root.innerHTML = '<div class="live-loading">' + SM.ui.escapeHtml(loadError) + '</div>';
+      return;
+    }
     if (!session) {
       root.innerHTML = '<div class="live-loading">No se encontró esa sesión. Pide al entrenador que te pase el enlace correcto.</div>';
       return;
     }
     const body =
-      step === 'player' ? playerStepHtml() :
       step === 'satisfaccion' ? satisfaccionStepHtml() :
       step === 'rendimiento' ? rendimientoStepHtml() :
       doneHtml();
@@ -141,13 +108,6 @@
   }
 
   function wire() {
-    root.querySelectorAll('.live-player-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        player = players.find(function (p) { return p.id === btn.getAttribute('data-player'); });
-        step = 'satisfaccion';
-        render();
-      });
-    });
     root.querySelectorAll('.live-face-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const value = Number(btn.getAttribute('data-face'));
@@ -207,12 +167,19 @@
         });
       });
     }
-    const anotherBtn = document.getElementById('another-btn');
-    if (anotherBtn) anotherBtn.addEventListener('click', function () { reset(); render(); });
   }
 
   if (!sessionId) {
     root.innerHTML = '<div class="live-loading">Falta el enlace de la sesión. Pide al entrenador que te lo vuelva a pasar.</div>';
+    return;
+  }
+
+  // Sin sesión de acceso en este dispositivo -> a iniciar sesión, y de
+  // vuelta aquí mismo en cuanto entre (ver el "next" en login.js).
+  const famSession = SM.auth.readFamilySession();
+  if (!famSession || famSession.type !== 'player') {
+    const returnUrl = window.location.pathname + window.location.search;
+    window.location.href = 'acceso.html?next=' + encodeURIComponent(returnUrl);
     return;
   }
 
@@ -223,10 +190,13 @@
       match = (DATA.matches || []).find(function (m) { return m.id === session.match_id; }) || null;
     }
     if (session) {
-      loadPlayers();
-      if (preselectedPlayerId) {
-        const preselected = players.find(function (p) { return p.id === preselectedPlayerId; });
-        if (preselected) { player = preselected; step = 'satisfaccion'; }
+      player = (DATA.players || []).find(function (p) { return p.id === famSession.id && p.activo; }) || null;
+      if (!player) {
+        loadError = 'Tu acceso ya no es válido. Vuelve a entrar desde acceso.html.';
+      } else {
+        const cat = session.categoria || defaultCategoria();
+        const playerCat = player.categoria || defaultCategoria();
+        if (playerCat !== cat) loadError = 'Esta encuesta es de otro equipo — no es la tuya.';
       }
     }
     render();

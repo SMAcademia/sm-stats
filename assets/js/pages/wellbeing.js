@@ -136,7 +136,7 @@
             '<input id="survey-link-input" readonly value="' + surveyUrl(session.id) + '" style="flex:1 1 260px;padding:8px 10px;border-radius:8px;background:var(--panel-2);border:1px solid var(--border-soft);color:var(--text-dim);font-size:12px;">' +
             '<button class="btn btn-primary" id="copy-link-btn" style="flex:none;">Copiar enlace de encuesta</button>' +
           '</div>' +
-          '<div class="form-hint">Comparte este enlace con las familias tras el entreno o partido — cada jugador elige su nombre y responde desde su móvil, sin cuenta ni contraseña.</div>' +
+          '<div class="form-hint">Comparte este enlace con las familias tras el entreno o partido — cada jugador debe entrar primero con su acceso (usuario y contraseña de su ficha, ver Plantilla → Copiar acceso); si ya inició sesión antes en su móvil, entra directo a responder.</div>' +
         '</div>' +
         '<div class="panel">' +
           '<span class="panel-title">Respuestas</span>' +
