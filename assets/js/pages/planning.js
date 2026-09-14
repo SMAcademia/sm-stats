@@ -57,7 +57,7 @@
 
       '<div class="form-hint">Haz clic en cualquier día para añadir o editar sus objetivos.</div>' +
 
-      '<div style="display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start;">' +
+      '<div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start;">' +
         '<div class="panel" style="padding:18px;">' + gridHtml(byDate) + '</div>' +
         breakdownHtml() +
       '</div>';
@@ -79,12 +79,30 @@
     return (DATA.planEntries || []).filter(function (pe) { return pe.fecha && pe.fecha.indexOf(prefix) === 0; });
   }
 
+  // Agrupa los textos idénticos (mismo contenido, sin distinguir mayúsculas)
+  // dentro de una categoría, para que un objetivo repetido varios días se
+  // muestre una vez con un contador en vez de duplicado.
+  function groupTexts(entries, key) {
+    const order = [];
+    const byNorm = {};
+    entries.forEach(function (e) {
+      if (!hasContent(e, key)) return;
+      const text = String(e[key]).trim();
+      const norm = text.toLowerCase();
+      if (!byNorm[norm]) { byNorm[norm] = { text: text, count: 0 }; order.push(norm); }
+      byNorm[norm].count++;
+    });
+    return order.map(function (norm) { return byNorm[norm]; }).sort(function (a, b) { return b.count - a.count; });
+  }
+
   function breakdownHtml() {
     const entries = monthEntries();
-    const counts = PLAN_TYPES.map(function (t) {
-      return { type: t, count: entries.filter(function (e) { return hasContent(e, t.key); }).length };
+    const perType = PLAN_TYPES.map(function (t) {
+      const items = groupTexts(entries, t.key);
+      const count = items.reduce(function (sum, it) { return sum + it.count; }, 0);
+      return { type: t, count: count, items: items };
     });
-    const total = counts.reduce(function (sum, c) { return sum + c.count; }, 0);
+    const total = perType.reduce(function (sum, c) { return sum + c.count; }, 0);
 
     if (!total) {
       return (
@@ -95,13 +113,26 @@
       );
     }
 
-    const rows = counts.map(function (c) {
+    const rows = perType.map(function (c) {
       const pct = Math.round((c.count / total) * 100);
+      const itemsHtml = c.items.map(function (it) {
+        return (
+          '<div style="font-size:11.5px;line-height:1.45;color:var(--text-dim);padding-left:12px;position:relative;">' +
+            '<span style="position:absolute;left:0;top:1px;color:' + c.type.color + ';">·</span>' +
+            SM.ui.escapeHtml(it.text) +
+            (it.count > 1 ? ' <span style="color:' + c.type.color + ';font-weight:700;white-space:nowrap;">×' + it.count + '</span>' : '') +
+          '</div>'
+        );
+      }).join('');
+
       return (
-        '<div style="display:flex;align-items:center;gap:10px;">' +
-          '<span style="width:58px;font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + c.type.label + '</span>' +
-          '<div class="bar-track thick"><div class="bar-fill" style="width:' + pct + '%;background:' + c.type.color + ';box-shadow:0 0 8px ' + c.type.color + ';"></div></div>' +
-          '<span style="width:76px;text-align:right;font-family:var(--font-display);font-size:12.5px;font-weight:700;color:' + c.type.color + ';">' + pct + '% <span style="color:var(--text-mute);font-weight:600;">(' + c.count + ')</span></span>' +
+        '<div>' +
+          '<div style="display:flex;align-items:center;gap:10px;">' +
+            '<span style="width:58px;font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + c.type.label + '</span>' +
+            '<div class="bar-track thick"><div class="bar-fill" style="width:' + pct + '%;background:' + c.type.color + ';box-shadow:0 0 8px ' + c.type.color + ';"></div></div>' +
+            '<span style="width:76px;text-align:right;font-family:var(--font-display);font-size:12.5px;font-weight:700;color:' + c.type.color + ';">' + pct + '% <span style="color:var(--text-mute);font-weight:600;">(' + c.count + ')</span></span>' +
+          '</div>' +
+          (itemsHtml ? '<div style="display:flex;flex-direction:column;gap:5px;margin:8px 0 0;">' + itemsHtml + '</div>' : '') +
         '</div>'
       );
     }).join('');
@@ -109,8 +140,8 @@
     return (
       '<div class="panel" style="padding:18px;">' +
         '<span class="panel-title">Objetivos trabajados</span>' +
-        '<div class="form-hint" style="margin:2px 0 0;">' + MONTHS[viewMonth] + ' · ' + total + ' día' + (total === 1 ? '' : 's') + '-categoría con contenido</div>' +
-        '<div style="display:flex;flex-direction:column;gap:14px;margin-top:18px;">' + rows + '</div>' +
+        '<div class="form-hint" style="margin:2px 0 0;">' + MONTHS[viewMonth] + ' · ' + total + ' objetivo' + (total === 1 ? '' : 's') + ' registrado' + (total === 1 ? '' : 's') + '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:18px;margin-top:18px;">' + rows + '</div>' +
       '</div>'
     );
   }
