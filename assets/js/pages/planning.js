@@ -72,13 +72,6 @@
     });
   }
 
-  // Entradas de PlanEntries que caen dentro del mes actualmente visible —
-  // la base para el desglose, así se recalcula solo con navegar de mes.
-  function monthEntries() {
-    const prefix = viewYear + '-' + String(viewMonth + 1).padStart(2, '0') + '-';
-    return (DATA.planEntries || []).filter(function (pe) { return pe.fecha && pe.fecha.indexOf(prefix) === 0; });
-  }
-
   // Un campo puede contener varios objetivos sueltos (p. ej. "pase, control,
   // conducción" o uno por línea) — se separan por comas y saltos de línea
   // para contabilizar cada uno por separado, no el campo entero como un bloque.
@@ -104,7 +97,9 @@
   }
 
   function breakdownHtml() {
-    const entries = monthEntries();
+    // Recuento global (toda la temporada), no solo del mes visible en el
+    // calendario — así el desglose refleja en qué se incide más en total.
+    const entries = DATA.planEntries || [];
     const perType = PLAN_TYPES.map(function (t) {
       const items = groupTexts(entries, t.key);
       const count = items.reduce(function (sum, it) { return sum + it.count; }, 0);
@@ -116,7 +111,7 @@
       return (
         '<div class="panel" style="padding:18px;">' +
           '<span class="panel-title">Objetivos trabajados</span>' +
-          '<div class="empty-state" style="margin-top:14px;">Todavía no hay objetivos planificados este mes.</div>' +
+          '<div class="empty-state" style="margin-top:14px;">Todavía no hay objetivos planificados.</div>' +
         '</div>'
       );
     }
@@ -152,7 +147,7 @@
     return (
       '<div class="panel" style="padding:18px;">' +
         '<span class="panel-title">Objetivos trabajados</span>' +
-        '<div class="form-hint" style="margin:2px 0 0;">' + MONTHS[viewMonth] + ' · ' + total + ' objetivo' + (total === 1 ? '' : 's') + ' registrado' + (total === 1 ? '' : 's') + '</div>' +
+        '<div class="form-hint" style="margin:2px 0 0;">Toda la temporada · ' + total + ' objetivo' + (total === 1 ? '' : 's') + ' registrado' + (total === 1 ? '' : 's') + '</div>' +
         '<div style="display:flex;flex-direction:column;gap:18px;margin-top:18px;">' + rows + '</div>' +
       '</div>'
     );
