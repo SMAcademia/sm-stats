@@ -106,6 +106,7 @@ plantilla.html          Plantilla (jugadores) + Cuerpo técnico
 jugador.html            Ficha de un jugador (?id=...)
 asistencia.html         Control de asistencia
 planificacion.html      Objetivos de entrenamiento por día (cuerpo técnico)
+cuadrante.html          Cuadrante semanal (todas las categorías) + descarga PNG
 partidos.html           Partidos (próximo, jugados, acta)
 estadisticas.html       Estadísticas comparativas del equipo
 acceso.html             Login privado para familias/jugadores y staff
