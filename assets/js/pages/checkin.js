@@ -108,6 +108,7 @@
       '<div class="live-checkin-question">¿Cómo crees que has rendido?</div>' +
       faceGridHtml(rendimiento, 'rendimiento') +
       '<textarea class="live-checkin-textarea" id="comment-rendimiento" placeholder="Cuéntanos algo más (opcional)">' + SM.ui.escapeHtml(comentarioRendimiento) + '</textarea>' +
+      '<div id="checkin-error" style="display:none;margin:0 14px 14px;padding:10px 14px;border-radius:9px;background:' + SM.ui.alpha('var(--red)', 0.12) + ';border:1px solid ' + SM.ui.alpha('var(--red)', 0.4) + ';color:var(--red-bright);font-size:12.5px;font-weight:600;"></div>' +
       '<div class="live-checkin-actions">' +
         '<button type="button" class="btn btn-primary" id="submit-btn"' + (rendimiento ? '' : ' disabled') + '>Enviar</button>' +
         '<button type="button" class="btn btn-outline" id="back-btn">Atrás</button>' +
@@ -173,9 +174,21 @@
     }
     const submitBtn = document.getElementById('submit-btn');
     if (submitBtn) {
+      const submitLabel = submitBtn.textContent;
+      const errorEl = document.getElementById('checkin-error');
+      function showError(msg) {
+        if (!errorEl) return;
+        if (msg) { errorEl.textContent = '⚠ ' + msg; errorEl.style.display = 'block'; }
+        else { errorEl.style.display = 'none'; errorEl.textContent = ''; }
+      }
       submitBtn.addEventListener('click', function () {
         comentarioRendimiento = document.getElementById('comment-rendimiento').value.trim();
+        showError(null);
         submitBtn.disabled = true;
+        submitBtn.textContent = 'Enviando…';
+        // Igual que en el resto de la app: si falla, deja el error a la
+        // vista (no solo un toast que puede pasar desapercibido para un
+        // jugador que ya ha soltado el móvil pensando que había terminado).
         SM.api.postAction('saveCheckin', {
           sessionId: sessionId,
           playerId: player.id,
@@ -187,8 +200,10 @@
           step = 'done';
           render();
         }).catch(function (err) {
-          SM.ui.toast(err.message, 'error');
           submitBtn.disabled = false;
+          submitBtn.textContent = submitLabel;
+          showError(err.message);
+          SM.ui.toast(err.message, 'error');
         });
       });
     }

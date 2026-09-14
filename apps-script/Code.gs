@@ -324,7 +324,21 @@ function doGet(e) {
   }
 }
 
+// Sin esto, dos peticiones concurrentes (típico justo después de un
+// entrenamiento: varios jugadores enviando su encuesta de bienestar casi a
+// la vez desde sus móviles) pueden entrelazarse: cada una lee la hoja,
+// decide qué fila borrar/añadir según esa lectura, y la segunda escribe
+// sobre una foto ya desactualizada por la primera — el resultado observado
+// es que una de las dos respuestas simplemente desaparece. LockService
+// serializa las escrituras (se ponen en cola, no se pierden) para toda
+// acción de doPost, no solo saveCheckin.
 function doPost(e) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (err) {
+    return jsonResponse({ ok: false, error: 'El servidor está ocupado ahora mismo — inténtalo de nuevo en unos segundos.' });
+  }
   try {
     const body = JSON.parse(e.postData.contents);
     checkToken(body.token);
@@ -362,6 +376,8 @@ function doPost(e) {
     return jsonResponse({ ok: true, result: result });
   } catch (err) {
     return jsonResponse({ ok: false, error: err.message });
+  } finally {
+    lock.releaseLock();
   }
 }
 
