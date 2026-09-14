@@ -19,6 +19,13 @@
     return d.getDate() + '/' + (d.getMonth() + 1);
   }
 
+  const DEV_STATES = [
+    { key: 'pendiente', label: 'Pendiente', color: 'var(--text-mute)' },
+    { key: 'en_progreso', label: 'En progreso', color: 'var(--cyan)' },
+    { key: 'conseguido', label: 'Conseguido', color: 'var(--green)' }
+  ];
+  const DEV_STATE_ORDER = { en_progreso: 0, pendiente: 1, conseguido: 2 };
+
   const id = SM.ui.qs('id');
   let DATA = null;
 
@@ -71,6 +78,11 @@
     const hasValues = SM.stats.VALUE_KEYS.some(function (k) { return p[k] != null && p[k] !== ''; });
     const radarValues = SM.stats.VALUE_KEYS.map(function (k) {
       return { label: SM.stats.VALUE_LABELS[k].toUpperCase(), value: p[k] || 0 };
+    });
+
+    const devGoals = (DATA.devGoals || []).filter(function (g) { return g.player_id === p.id; }).sort(function (a, b) {
+      const so = (DEV_STATE_ORDER[a.estado] ?? 1) - (DEV_STATE_ORDER[b.estado] ?? 1);
+      return so !== 0 ? so : (b.fecha_actualizacion || '').localeCompare(a.fecha_actualizacion || '');
     });
 
     const evolution = SM.stats.evolutionForPlayer(DATA, p.id, 6).map(function (a) {
@@ -132,6 +144,13 @@
             '</div>' +
           '</div>' +
           '<div class="panel">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+              '<span class="panel-title">Plan de desarrollo individual</span>' +
+              '<button type="button" id="add-dev-goal-btn" class="btn btn-outline" style="padding:6px 12px;font-size:12px;">+ Objetivo</button>' +
+            '</div>' +
+            '<div style="margin-top:14px;">' + devGoalsHtml(devGoals) + '</div>' +
+          '</div>' +
+          '<div class="panel">' +
             '<div style="display:flex;align-items:center;justify-content:space-between;"><span class="panel-title">Evolución del rendimiento</span>' +
             '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Últimos partidos</span></div>' +
             SM.charts.evolutionChart(evolution, { color: meta.color }) +
@@ -164,6 +183,15 @@
         SM.ui.toast('Jugador eliminado.', 'ok');
         window.location.href = 'plantilla.html';
       }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+    });
+    main.querySelector('#add-dev-goal-btn').addEventListener('click', function () {
+      openDevGoalModal(p, null);
+    });
+    main.querySelectorAll('[data-goal]').forEach(function (row) {
+      row.addEventListener('click', function () {
+        const goal = devGoals.find(function (g) { return g.id === row.getAttribute('data-goal'); });
+        if (goal) openDevGoalModal(p, goal);
+      });
     });
     main.querySelector('#copy-family-access-btn').addEventListener('click', function () {
       const creds = SM.auth.playerCredentials(p);
@@ -308,6 +336,115 @@
         '<tbody>' + rows + '</tbody>' +
       '</table>'
     );
+  }
+
+  function devGoalsHtml(goals) {
+    if (!goals.length) return '<div class="empty-state">Todavía no hay objetivos para este jugador — añade el primero.</div>';
+    return (
+      '<div style="display:flex;flex-direction:column;gap:10px;">' +
+        goals.map(function (g) {
+          const type = SM.stats.PLAN_TYPES.find(function (t) { return t.key === g.categoria; }) || SM.stats.PLAN_TYPES[0];
+          const state = DEV_STATES.find(function (s) { return s.key === g.estado; }) || DEV_STATES[0];
+          const achieved = g.estado === 'conseguido';
+          return (
+            '<div data-goal="' + g.id + '" style="cursor:pointer;padding:12px 14px;border-radius:10px;background:var(--panel-2);border:1px solid var(--border-soft);display:flex;align-items:flex-start;gap:12px;' + (achieved ? 'opacity:.6;' : '') + '">' +
+              '<div class="dot" style="background:' + type.color + ';margin-top:6px;flex:none;"></div>' +
+              '<div style="flex:1;min-width:0;">' +
+                '<div style="font-size:13px;font-weight:600;color:var(--text);' + (achieved ? 'text-decoration:line-through;' : '') + '">' + SM.ui.escapeHtml(g.texto) + '</div>' +
+                '<div style="font-size:11px;color:var(--text-mute);font-weight:600;margin-top:4px;">' + type.label + '</div>' +
+              '</div>' +
+              '<span style="flex:none;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;background:' + SM.ui.alpha(state.color, 0.14) + ';border:1px solid ' + SM.ui.alpha(state.color, 0.4) + ';color:' + state.color + ';white-space:nowrap;">' + state.label.toUpperCase() + '</span>' +
+            '</div>'
+          );
+        }).join('') +
+      '</div>'
+    );
+  }
+
+  function openDevGoalModal(player, existing) {
+    const e = existing || {};
+    const categoryOptions = SM.stats.PLAN_TYPES.map(function (t) { return [t.key, t.label]; });
+    const stateOptions = DEV_STATES.map(function (s) { return [s.key, s.label]; });
+    const body = SM.ui.el('div', {
+      html:
+        '<div id="dev-goal-error" style="display:none;margin-bottom:14px;padding:10px 14px;border-radius:9px;background:' + SM.ui.alpha('var(--red)', 0.12) + ';border:1px solid ' + SM.ui.alpha('var(--red)', 0.4) + ';color:var(--red-bright);font-size:12.5px;font-weight:600;"></div>' +
+        '<form id="dev-goal-form">' +
+          '<div class="form-grid">' +
+            SM.forms.field('Área', SM.forms.selectHtml('categoria', categoryOptions, e.categoria || 'tecnico')) +
+            SM.forms.field('Estado', SM.forms.selectHtml('estado', stateOptions, e.estado || 'pendiente')) +
+          '</div>' +
+          SM.forms.field('Objetivo', '<textarea name="texto" rows="3" placeholder="Ej.: Mejorar el golpeo con el pie izquierdo">' + SM.ui.escapeHtml(e.texto) + '</textarea>', true) +
+          '<div class="form-actions">' +
+            (existing ? '<button type="button" id="delete-dev-goal-btn" class="btn btn-outline" style="margin-right:auto;color:var(--red-bright);border-color:' + SM.ui.alpha('var(--red)', 0.4) + ';">Borrar</button>' : '') +
+            '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
+            '<button type="submit" class="btn btn-primary">Guardar</button>' +
+          '</div>' +
+        '</form>'
+    });
+    const handle = SM.ui.openModal(existing ? 'Editar objetivo' : 'Nuevo objetivo · ' + player.nombre, body);
+    body.querySelector('#cancel-btn').addEventListener('click', handle.close);
+
+    // Mismo patrón que el resto de la app: bloquea el doble tap, muestra
+    // "Guardando..." al instante, y si falla deja el error a la vista.
+    let saving = false;
+    const submitBtn = body.querySelector('button[type="submit"]');
+    const submitLabel = submitBtn.textContent;
+    function showError(msg) {
+      const el = body.querySelector('#dev-goal-error');
+      if (msg) { el.textContent = '⚠ ' + msg; el.style.display = 'block'; }
+      else { el.style.display = 'none'; el.textContent = ''; }
+    }
+    function setSaving(v) {
+      saving = v;
+      submitBtn.disabled = v;
+      submitBtn.textContent = v ? 'Guardando…' : submitLabel;
+      const delBtn = body.querySelector('#delete-dev-goal-btn');
+      if (delBtn) delBtn.disabled = v;
+    }
+
+    body.querySelector('#dev-goal-form').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      if (saving) return;
+      const payload = { player_id: player.id };
+      if (existing) payload.id = existing.id;
+      new FormData(ev.target).forEach(function (v, k) { payload[k] = v; });
+      showError(null);
+      setSaving(true);
+      SM.api.postAction('saveDevGoal', payload).then(function () {
+        handle.close();
+        return SM.api.fetchAll(true);
+      }).then(function (data) {
+        DATA = SM.team.filterData(data, SM.team.current());
+        render();
+        SM.ui.toast('Objetivo guardado.', 'ok');
+      }).catch(function (err) {
+        setSaving(false);
+        showError(err.message);
+        SM.ui.toast(err.message, 'error');
+      });
+    });
+
+    const deleteBtn = body.querySelector('#delete-dev-goal-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', function () {
+        if (saving) return;
+        if (!window.confirm('¿Borrar este objetivo? No se puede deshacer.')) return;
+        showError(null);
+        setSaving(true);
+        SM.api.postAction('deleteDevGoal', { id: existing.id }).then(function () {
+          handle.close();
+          return SM.api.fetchAll(true);
+        }).then(function (data) {
+          DATA = SM.team.filterData(data, SM.team.current());
+          render();
+          SM.ui.toast('Objetivo borrado.', 'ok');
+        }).catch(function (err) {
+          setSaving(false);
+          showError(err.message);
+          SM.ui.toast(err.message, 'error');
+        });
+      });
+    }
   }
 
   if (!id) {

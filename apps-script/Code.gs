@@ -30,6 +30,7 @@ const SHEETS = {
   matchLiveEvents: 'MatchLiveEvents',
   checkins: 'Checkins',
   planEntries: 'PlanEntries',
+  devGoals: 'DevGoals',
   settings: 'Settings'
 };
 
@@ -63,6 +64,11 @@ const CHECKIN_COLUMNS = ['id', 'session_id', 'player_id', 'satisfaccion', 'comen
 // así guardar el mismo día dos veces actualiza la fila en vez de duplicarla.
 // Los 5 campos son texto libre (el entrenador puede escribir varias líneas).
 const PLAN_COLUMNS = ['id', 'fecha', 'categoria', 'tecnico', 'tactico', 'fisico', 'valores', 'porteros'];
+// Plan de desarrollo individual — objetivos que el entrenador fija a UN
+// jugador concreto (no al equipo, a diferencia de PlanEntries). categoria:
+// tecnico/tactico/fisico/valores/porteros (mismas 5 de Planificación).
+// estado: pendiente / en_progreso / conseguido.
+const DEV_GOAL_COLUMNS = ['id', 'player_id', 'categoria', 'texto', 'estado', 'fecha_creacion', 'fecha_actualizacion'];
 // Settings is a singleton sheet: header row + exactly one data row (row 2).
 const SETTINGS_COLUMNS = ['club_nombre', 'entrenador_nombre', 'entrenador_rol', 'liga_nombre'];
 const DEFAULT_SETTINGS = { club_nombre: 'Mi Club', entrenador_nombre: 'Nombre del entrenador', entrenador_rol: 'Entrenador', liga_nombre: 'Liga Regional · Grupo B' };
@@ -84,6 +90,7 @@ function setupSheets() {
     [SHEETS.matchLiveEvents, LIVE_EVENT_COLUMNS],
     [SHEETS.checkins, CHECKIN_COLUMNS],
     [SHEETS.planEntries, PLAN_COLUMNS],
+    [SHEETS.devGoals, DEV_GOAL_COLUMNS],
     [SHEETS.settings, SETTINGS_COLUMNS]
   ];
   defs.forEach(function (def) {
@@ -308,6 +315,7 @@ function doGet(e) {
       matchLiveEvents: sheetToObjectsOrEmpty(SHEETS.matchLiveEvents).map(coerceLiveEvent),
       checkins: sheetToObjectsOrEmpty(SHEETS.checkins).map(coerceCheckin),
       planEntries: sheetToObjectsOrEmpty(SHEETS.planEntries),
+      devGoals: sheetToObjectsOrEmpty(SHEETS.devGoals),
       settings: readSingletonRow(SHEETS.settings, SETTINGS_COLUMNS, DEFAULT_SETTINGS)
     };
     return jsonResponse({ ok: true, result: data });
@@ -341,6 +349,8 @@ function doPost(e) {
       saveCheckin: saveCheckin,
       savePlanEntry: savePlanEntry,
       deletePlanEntry: deletePlanEntry,
+      saveDevGoal: saveDevGoal,
+      deleteDevGoal: deleteDevGoal,
       saveCallups: saveCallups,
       saveMatchReport: saveMatchReport,
       saveAttendance: saveAttendance,
@@ -379,6 +389,7 @@ function deletePlayer(payload) {
   deleteRowsWhere(SHEETS.matchAppearances, 'player_id', payload.id);
   deleteRowsWhere(SHEETS.matchEvents, 'player_id', payload.id);
   deleteRowsWhere(SHEETS.matchIntervals, 'player_id', payload.id);
+  deleteRowsWhereIfExists(SHEETS.devGoals, 'player_id', payload.id);
   return true;
 }
 
@@ -626,6 +637,40 @@ function savePlanEntry(payload) {
 function deletePlanEntry(payload) {
   if (!payload.id) throw new Error('Falta el id de la planificación.');
   deleteRowsWhereIfExists(SHEETS.planEntries, 'id', payload.id);
+  return true;
+}
+
+// Plan de desarrollo individual: crea (o actualiza, si payload.id viene
+// relleno) un objetivo de UN jugador. fecha_creacion solo se fija al crear;
+// fecha_actualizacion se refresca en cada guardado (incluido el cambio de
+// estado a "conseguido"), así queda constancia de cuándo pasó.
+function saveDevGoal(payload) {
+  if (!payload.player_id) throw new Error('Falta el jugador.');
+  if (!payload.categoria) throw new Error('Falta la categoría del objetivo.');
+  if (!payload.texto || !String(payload.texto).trim()) throw new Error('Escribe el objetivo.');
+  const today = new Date().toISOString().slice(0, 10);
+  const estado = payload.estado || 'pendiente';
+  if (payload.id) {
+    const patch = { categoria: payload.categoria, texto: payload.texto, estado: estado, fecha_actualizacion: today };
+    updateRowById(SHEETS.devGoals, DEV_GOAL_COLUMNS, payload.id, patch);
+    return Object.assign({ id: payload.id }, patch);
+  }
+  const row = {
+    id: newId('dg'),
+    player_id: payload.player_id,
+    categoria: payload.categoria,
+    texto: payload.texto,
+    estado: estado,
+    fecha_creacion: today,
+    fecha_actualizacion: today
+  };
+  appendRow(SHEETS.devGoals, DEV_GOAL_COLUMNS, row);
+  return row;
+}
+
+function deleteDevGoal(payload) {
+  if (!payload.id) throw new Error('Falta el id del objetivo.');
+  deleteRowsWhereIfExists(SHEETS.devGoals, 'id', payload.id);
   return true;
 }
 

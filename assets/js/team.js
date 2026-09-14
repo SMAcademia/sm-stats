@@ -48,6 +48,8 @@ SM.team = (function () {
     const matches = (data.matches || []).filter(function (m) { return belongsTo(m.categoria, categoria); });
     const matchIds = {};
     matches.forEach(function (m) { matchIds[m.id] = true; });
+    const playerIds = {};
+    players.forEach(function (p) { playerIds[p.id] = true; });
     const sessions = (data.sessions || []).filter(function (s) {
       return s.tipo === 'partido' ? matchIds[s.match_id] : belongsTo(s.categoria, categoria);
     });
@@ -63,7 +65,8 @@ SM.team = (function () {
       matchIntervals: (data.matchIntervals || []).filter(function (iv) { return matchIds[iv.match_id]; }),
       matchLiveEvents: (data.matchLiveEvents || []).filter(function (le) { return matchIds[le.match_id]; }),
       checkins: (data.checkins || []).filter(function (c) { return sessionIds[c.session_id]; }),
-      planEntries: (data.planEntries || []).filter(function (pe) { return belongsTo(pe.categoria, categoria); })
+      planEntries: (data.planEntries || []).filter(function (pe) { return belongsTo(pe.categoria, categoria); }),
+      devGoals: (data.devGoals || []).filter(function (g) { return playerIds[g.player_id]; })
     });
   }
 

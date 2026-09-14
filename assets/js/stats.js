@@ -24,6 +24,16 @@ SM.stats = (function () {
     companerismo: 'Compañerismo', sacrificio: 'Sacrificio', respeto: 'Respeto',
     motivacion: 'Motivación', esfuerzo: 'Esfuerzo', constancia: 'Constancia'
   };
+  // Las 5 áreas de trabajo del cuerpo técnico — compartidas entre
+  // Planificación (objetivos del equipo) y el plan de desarrollo individual
+  // (objetivos de un jugador concreto), así ambas hablan el mismo idioma.
+  const PLAN_TYPES = [
+    { key: 'tecnico', label: 'Técnico', color: 'var(--cyan)' },
+    { key: 'tactico', label: 'Táctico', color: 'var(--magenta)' },
+    { key: 'fisico', label: 'Físico', color: 'var(--green)' },
+    { key: 'valores', label: 'Valores', color: 'var(--amber)' },
+    { key: 'porteros', label: 'Porteros', color: 'var(--orange)' }
+  ];
 
   function attrKeysFor(player) {
     return player.posicion === 'POR' ? GK_ATTR_KEYS : ATTR_KEYS;
@@ -297,6 +307,7 @@ SM.stats = (function () {
     topKeys: topKeys,
     VALUE_KEYS: VALUE_KEYS,
     VALUE_LABELS: VALUE_LABELS,
+    PLAN_TYPES: PLAN_TYPES,
     overallRating: overallRating,
     byId: byId,
     playedMatches: playedMatches,

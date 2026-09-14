@@ -14,13 +14,7 @@
   const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const WEEKDAY_LABELS = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
 
-  const PLAN_TYPES = [
-    { key: 'tecnico', label: 'Técnico', color: 'var(--cyan)' },
-    { key: 'tactico', label: 'Táctico', color: 'var(--magenta)' },
-    { key: 'fisico', label: 'Físico', color: 'var(--green)' },
-    { key: 'valores', label: 'Valores', color: 'var(--amber)' },
-    { key: 'porteros', label: 'Porteros', color: 'var(--orange)' }
-  ];
+  const PLAN_TYPES = SM.stats.PLAN_TYPES;
 
   let DATA = null;
   const now = new Date();

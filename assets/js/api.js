@@ -94,6 +94,7 @@ SM.api = (function () {
         d.matchAppearances = d.matchAppearances.filter(function (a) { return a.player_id !== payload.id; });
         d.matchEvents = d.matchEvents.filter(function (e) { return e.player_id !== payload.id; });
         d.matchIntervals = (d.matchIntervals || []).filter(function (iv) { return iv.player_id !== payload.id; });
+        d.devGoals = (d.devGoals || []).filter(function (g) { return g.player_id !== payload.id; });
         return true;
       }
       case 'addStaffMember': {
@@ -252,6 +253,34 @@ SM.api = (function () {
       }
       case 'deletePlanEntry': {
         d.planEntries = (d.planEntries || []).filter(function (pe) { return pe.id !== payload.id; });
+        return true;
+      }
+      case 'saveDevGoal': {
+        if (!payload.player_id) throw new Error('Falta el jugador.');
+        if (!payload.categoria) throw new Error('Falta la categoría del objetivo.');
+        if (!payload.texto || !String(payload.texto).trim()) throw new Error('Escribe el objetivo.');
+        const today = new Date().toISOString().slice(0, 10);
+        d.devGoals = d.devGoals || [];
+        const estado = payload.estado || 'pendiente';
+        if (payload.id) {
+          const i = d.devGoals.findIndex(function (g) { return g.id === payload.id; });
+          if (i >= 0) d.devGoals[i] = Object.assign({}, d.devGoals[i], { categoria: payload.categoria, texto: payload.texto, estado: estado, fecha_actualizacion: today });
+          return d.devGoals[i];
+        }
+        const row = {
+          id: nextMockId('dg'),
+          player_id: payload.player_id,
+          categoria: payload.categoria,
+          texto: payload.texto,
+          estado: estado,
+          fecha_creacion: today,
+          fecha_actualizacion: today
+        };
+        d.devGoals.push(row);
+        return row;
+      }
+      case 'deleteDevGoal': {
+        d.devGoals = (d.devGoals || []).filter(function (g) { return g.id !== payload.id; });
         return true;
       }
       case 'saveCallups': {
