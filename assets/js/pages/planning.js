@@ -79,18 +79,26 @@
     return (DATA.planEntries || []).filter(function (pe) { return pe.fecha && pe.fecha.indexOf(prefix) === 0; });
   }
 
-  // Agrupa los textos idénticos (mismo contenido, sin distinguir mayúsculas)
-  // dentro de una categoría, para que un objetivo repetido varios días se
-  // muestre una vez con un contador en vez de duplicado.
+  // Un campo puede contener varios objetivos sueltos (p. ej. "pase, control,
+  // conducción" o uno por línea) — se separan por comas y saltos de línea
+  // para contabilizar cada uno por separado, no el campo entero como un bloque.
+  function splitObjectives(text) {
+    return String(text).split(/[,\n]+/).map(function (s) { return s.trim(); }).filter(function (s) { return s; });
+  }
+
+  // Agrupa los objetivos idénticos (mismo texto, sin distinguir mayúsculas)
+  // dentro de una categoría, para que uno repetido varias veces se muestre
+  // una vez con un contador en vez de duplicado.
   function groupTexts(entries, key) {
     const order = [];
     const byNorm = {};
     entries.forEach(function (e) {
       if (!hasContent(e, key)) return;
-      const text = String(e[key]).trim();
-      const norm = text.toLowerCase();
-      if (!byNorm[norm]) { byNorm[norm] = { text: text, count: 0 }; order.push(norm); }
-      byNorm[norm].count++;
+      splitObjectives(e[key]).forEach(function (text) {
+        const norm = text.toLowerCase();
+        if (!byNorm[norm]) { byNorm[norm] = { text: text, count: 0 }; order.push(norm); }
+        byNorm[norm].count++;
+      });
     });
     return order.map(function (norm) { return byNorm[norm]; }).sort(function (a, b) { return b.count - a.count; });
   }
@@ -197,7 +205,7 @@
           PLAN_TYPES.map(function (t) {
             return SM.forms.field(
               t.label,
-              '<textarea name="' + t.key + '" rows="3" placeholder="Objetivos de ' + t.label.toLowerCase() + ' para este día...">' + SM.ui.escapeHtml(e[t.key]) + '</textarea>',
+              '<textarea name="' + t.key + '" rows="3" placeholder="Separa cada objetivo con una coma o un salto de línea, p. ej.: pase, control, conducción...">' + SM.ui.escapeHtml(e[t.key]) + '</textarea>',
               true
             );
           }).join('') +
