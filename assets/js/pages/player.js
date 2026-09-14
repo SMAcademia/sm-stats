@@ -119,59 +119,61 @@
 
       '<div style="display:grid;grid-template-columns:320px 1fr;gap:22px;">' +
         leftCardHtml(p, meta, rating, age) +
-        '<div style="display:flex;flex-direction:column;gap:20px;">' +
-          '<div style="display:grid;grid-template-columns:repeat(7, minmax(0,1fr));gap:12px;">' +
-            miniKpi(goles, 'GOLES', 'var(--green)') +
-            miniKpi(asistencias, 'ASISTENCIAS', 'var(--cyan)') +
-            miniKpi(pj, 'PARTIDOS', 'var(--text)') +
-            miniKpi(minutos, 'MINUTOS', 'var(--text)') +
-            miniKpi(amarillas, 'AMARILLAS', 'var(--amber)') +
-            miniKpi(asistenciaPct != null ? asistenciaPct + '%' : '—', 'ASISTENCIA', 'var(--magenta)') +
-            miniKpi(capitanias, 'CAPITÁN', 'var(--amber-bright)') +
-          '</div>' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">' +
-            '<div class="panel"><span class="panel-title">Atributos' + (isGk ? ' de portero' : '') + '</span>' +
-              (hasAttrs
-                ? '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarAttrs, { color: meta.color }) + '</div>'
-                : '<div class="empty-state">Sin valorar todavía — edita la ficha para puntuar' + (isGk ? ' blocaje, despeje, comunicación...' : ' ritmo, tiro, pase...') + '</div>'
-              ) +
+        (p.activo ? (
+          '<div style="display:flex;flex-direction:column;gap:20px;">' +
+            '<div style="display:grid;grid-template-columns:repeat(7, minmax(0,1fr));gap:12px;">' +
+              miniKpi(goles, 'GOLES', 'var(--green)') +
+              miniKpi(asistencias, 'ASISTENCIAS', 'var(--cyan)') +
+              miniKpi(pj, 'PARTIDOS', 'var(--text)') +
+              miniKpi(minutos, 'MINUTOS', 'var(--text)') +
+              miniKpi(amarillas, 'AMARILLAS', 'var(--amber)') +
+              miniKpi(asistenciaPct != null ? asistenciaPct + '%' : '—', 'ASISTENCIA', 'var(--magenta)') +
+              miniKpi(capitanias, 'CAPITÁN', 'var(--amber-bright)') +
             '</div>' +
-            '<div class="panel"><span class="panel-title">Valores</span>' +
-              (hasValues
-                ? '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarValues, { color: 'var(--amber)' }) + '</div>'
-                : '<div class="empty-state">Sin valorar todavía — edita la ficha para puntuar compañerismo, sacrificio, respeto...</div>'
-              ) +
-            '</div>' +
-          '</div>' +
-          '<div class="panel">' +
-            '<div style="display:flex;align-items:center;justify-content:space-between;">' +
-              '<span class="panel-title">Plan de desarrollo individual</span>' +
-              '<button type="button" id="add-dev-goal-btn" class="btn btn-outline" style="padding:6px 12px;font-size:12px;">+ Objetivo</button>' +
-            '</div>' +
-            '<div style="margin-top:14px;">' + devGoalsHtml(devGoals) + '</div>' +
-          '</div>' +
-          '<div class="panel">' +
-            '<div style="display:flex;align-items:center;justify-content:space-between;"><span class="panel-title">Evolución del rendimiento</span>' +
-            '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Últimos partidos</span></div>' +
-            SM.charts.evolutionChart(evolution, { color: meta.color }) +
-          '</div>' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">' +
-            '<div class="panel">' +
-              '<div style="display:flex;align-items:center;justify-content:space-between;"><span class="panel-title">Satisfacción</span>' +
-              '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Bienestar</span></div>' +
-              SM.charts.evolutionChart(satisfaccionEvo, { color: 'var(--cyan)', min: 1, max: 4 }) +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">' +
+              '<div class="panel"><span class="panel-title">Atributos' + (isGk ? ' de portero' : '') + '</span>' +
+                (hasAttrs
+                  ? '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarAttrs, { color: meta.color }) + '</div>'
+                  : '<div class="empty-state">Sin valorar todavía — edita la ficha para puntuar' + (isGk ? ' blocaje, despeje, comunicación...' : ' ritmo, tiro, pase...') + '</div>'
+                ) +
+              '</div>' +
+              '<div class="panel"><span class="panel-title">Valores</span>' +
+                (hasValues
+                  ? '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarValues, { color: 'var(--amber)' }) + '</div>'
+                  : '<div class="empty-state">Sin valorar todavía — edita la ficha para puntuar compañerismo, sacrificio, respeto...</div>'
+                ) +
+              '</div>' +
             '</div>' +
             '<div class="panel">' +
-              '<div style="display:flex;align-items:center;justify-content:space-between;"><span class="panel-title">Rendimiento percibido</span>' +
-              '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Bienestar</span></div>' +
-              SM.charts.evolutionChart(rendimientoEvo, { color: 'var(--magenta)', min: 1, max: 4 }) +
+              '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+                '<span class="panel-title">Plan de desarrollo individual</span>' +
+                '<button type="button" id="add-dev-goal-btn" class="btn btn-outline" style="padding:6px 12px;font-size:12px;">+ Objetivo</button>' +
+              '</div>' +
+              '<div style="margin-top:14px;">' + devGoalsHtml(devGoals) + '</div>' +
             '</div>' +
-          '</div>' +
-          '<div class="panel">' +
-            '<span class="panel-title">Últimos partidos</span>' +
-            recentMatchesTable(recentApps, p) +
-          '</div>' +
-        '</div>' +
+            '<div class="panel">' +
+              '<div style="display:flex;align-items:center;justify-content:space-between;"><span class="panel-title">Evolución del rendimiento</span>' +
+              '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Últimos partidos</span></div>' +
+              SM.charts.evolutionChart(evolution, { color: meta.color }) +
+            '</div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">' +
+              '<div class="panel">' +
+                '<div style="display:flex;align-items:center;justify-content:space-between;"><span class="panel-title">Satisfacción</span>' +
+                '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Bienestar</span></div>' +
+                SM.charts.evolutionChart(satisfaccionEvo, { color: 'var(--cyan)', min: 1, max: 4 }) +
+              '</div>' +
+              '<div class="panel">' +
+                '<div style="display:flex;align-items:center;justify-content:space-between;"><span class="panel-title">Rendimiento percibido</span>' +
+                '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Bienestar</span></div>' +
+                SM.charts.evolutionChart(rendimientoEvo, { color: 'var(--magenta)', min: 1, max: 4 }) +
+              '</div>' +
+            '</div>' +
+            '<div class="panel">' +
+              '<span class="panel-title">Últimos partidos</span>' +
+              recentMatchesTable(recentApps, p) +
+            '</div>' +
+          '</div>'
+        ) : bajaPanelHtml(p)) +
       '</div>';
 
     main.querySelector('#edit-player-btn').addEventListener('click', function () {
@@ -184,9 +186,22 @@
         window.location.href = 'plantilla.html';
       }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
     });
-    main.querySelector('#add-dev-goal-btn').addEventListener('click', function () {
-      openDevGoalModal(p, null);
-    });
+    const bajaBtn = main.querySelector('#baja-player-btn');
+    if (bajaBtn) {
+      bajaBtn.addEventListener('click', function () {
+        SM.forms.openBajaForm(p, function (data) { DATA = SM.team.filterData(data, SM.team.current()); render(); });
+      });
+    }
+    const reactivarBtn = main.querySelector('#reactivar-player-btn-panel');
+    if (reactivarBtn) {
+      reactivarBtn.addEventListener('click', function () {
+        SM.forms.reactivatePlayer(p, function (data) { DATA = SM.team.filterData(data, SM.team.current()); render(); });
+      });
+    }
+    const addGoalBtn = main.querySelector('#add-dev-goal-btn');
+    if (addGoalBtn) {
+      addGoalBtn.addEventListener('click', function () { openDevGoalModal(p, null); });
+    }
     main.querySelectorAll('[data-goal]').forEach(function (row) {
       row.addEventListener('click', function () {
         const goal = devGoals.find(function (g) { return g.id === row.getAttribute('data-goal'); });
@@ -279,6 +294,10 @@
           dataRow('Club anterior', SM.ui.escapeHtml(p.club_anterior) || '—') +
         '</div>' +
         '<button id="edit-player-btn" class="btn btn-outline" style="width:100%;margin-top:22px;">Editar ficha</button>' +
+        (p.activo
+          ? '<button id="baja-player-btn" class="btn btn-outline" style="width:100%;margin-top:10px;color:var(--amber-bright);border-color:' + SM.ui.alpha('var(--amber)', 0.4) + ';">Dar de baja</button>'
+          : ''
+        ) +
         '<button id="delete-player-btn" class="btn btn-outline" style="width:100%;margin-top:10px;color:var(--red-bright);border-color:' + SM.ui.alpha('var(--red)', 0.4) + ';">Eliminar jugador</button>' +
         '<div style="width:100%;height:1px;background:var(--border);margin:20px 0;"></div>' +
         familyAccessHtml(p) +
@@ -335,6 +354,26 @@
         '<thead><tr><th>FECHA</th><th>RIVAL</th><th>RESULT.</th><th>MINUTOS</th><th>GOLES</th><th>NOTA</th></tr></thead>' +
         '<tbody>' + rows + '</tbody>' +
       '</table>'
+    );
+  }
+
+  // Sustituye TODO el panel de estadísticas mientras el jugador está de
+  // baja — nada de goles, asistencia, radares, evolución ni bienestar. No
+  // se ha borrado nada: en cuanto se reactiva, render() vuelve a mostrar
+  // el panel de siempre con los mismos números de antes.
+  function bajaPanelHtml(p) {
+    const motivo = SM.forms.BAJA_MOTIVOS.find(function (m) { return m[0] === p.motivo_baja; });
+    return (
+      '<div class="panel" style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:48px 32px;align-self:start;">' +
+        '<div class="badge" style="background:' + SM.ui.alpha('var(--amber)', 0.14) + ';border:1px solid ' + SM.ui.alpha('var(--amber)', 0.5) + ';color:var(--amber-bright);">DE BAJA</div>' +
+        '<div style="font-size:18px;font-weight:700;color:var(--text-strong);">' + SM.ui.escapeHtml(p.nombre) + ' está de baja</div>' +
+        '<div style="font-size:13.5px;color:var(--text-dim);max-width:360px;">' +
+          (motivo ? 'Motivo: <strong style="color:var(--text);">' + motivo[1] + '</strong>. ' : '') +
+          (p.fecha_baja ? 'Desde el ' + SM.ui.formatDateLong(p.fecha_baja) + '. ' : '') +
+          'Sus estadísticas están ocultas y volverán a verse en cuanto se reactive.' +
+        '</div>' +
+        '<button type="button" id="reactivar-player-btn-panel" class="btn btn-primary" style="margin-top:6px;">Reactivar jugador</button>' +
+      '</div>'
     );
   }
 

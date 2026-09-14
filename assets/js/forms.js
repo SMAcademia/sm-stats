@@ -194,6 +194,79 @@ SM.forms = (function () {
     });
   }
 
+  const BAJA_MOTIVOS = [
+    ['lesion', 'Lesión'],
+    ['vacaciones', 'Vacaciones'],
+    ['abandono', 'Abandono'],
+    ['otro', 'Otro']
+  ];
+
+  // Dar de baja no borra nada — solo pone activo=false y guarda motivo/fecha.
+  // Todas las estadísticas del jugador (asistencia, partidos, goles...) son
+  // filas que siguen intactas en la hoja; al reactivarlo vuelven a contar
+  // exactamente igual, porque nunca se han tocado.
+  function openBajaForm(player, onSaved) {
+    const body = SM.ui.el('div', {
+      html:
+        '<div id="baja-error" style="display:none;margin-bottom:14px;padding:10px 14px;border-radius:9px;background:' + SM.ui.alpha('var(--red)', 0.12) + ';border:1px solid ' + SM.ui.alpha('var(--red)', 0.4) + ';color:var(--red-bright);font-size:12.5px;font-weight:600;"></div>' +
+        '<div class="form-hint" style="margin-bottom:14px;">Sus estadísticas no se pierden — se ocultan mientras esté de baja y vuelven a verse en cuanto lo reactives.</div>' +
+        '<form id="baja-form">' +
+          '<div class="form-grid">' +
+            field('Motivo', selectHtml('motivo_baja', BAJA_MOTIVOS, 'lesion')) +
+            field('Fecha', '<input name="fecha_baja" type="date" value="' + esc(SM.ui.formatDateIso(new Date())) + '">') +
+          '</div>' +
+          '<div class="form-actions">' +
+            '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
+            '<button type="submit" class="btn btn-primary">Dar de baja</button>' +
+          '</div>' +
+        '</form>'
+    });
+    const handle = SM.ui.openModal('Dar de baja a ' + player.nombre, body);
+    body.querySelector('#cancel-btn').addEventListener('click', handle.close);
+
+    let saving = false;
+    const submitBtn = body.querySelector('button[type="submit"]');
+    const submitLabel = submitBtn.textContent;
+    function showError(msg) {
+      const el = body.querySelector('#baja-error');
+      if (msg) { el.textContent = '⚠ ' + msg; el.style.display = 'block'; }
+      else { el.style.display = 'none'; el.textContent = ''; }
+    }
+    body.querySelector('#baja-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (saving) return;
+      const payload = { id: player.id, activo: false };
+      new FormData(e.target).forEach(function (v, k) { payload[k] = v; });
+      showError(null);
+      saving = true;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Guardando…';
+      SM.api.postAction('updatePlayer', payload).then(function () {
+        handle.close();
+        return SM.api.fetchAll(true);
+      }).then(function (data) {
+        SM.ui.toast(player.nombre + ' dado de baja.', 'ok');
+        if (onSaved) onSaved(data);
+      }).catch(function (err) {
+        saving = false;
+        submitBtn.disabled = false;
+        submitBtn.textContent = submitLabel;
+        showError(err.message);
+        SM.ui.toast(err.message, 'error');
+      });
+    });
+  }
+
+  function reactivatePlayer(player, onSaved) {
+    if (!window.confirm('¿Reactivar a ' + player.nombre + '? Volverá a la plantilla activa y sus estadísticas se verán de nuevo.')) return;
+    SM.api.postAction('updatePlayer', { id: player.id, activo: true, motivo_baja: '', fecha_baja: '' }).then(function () {
+      return SM.api.fetchAll(true);
+    }).then(function (data) {
+      SM.ui.toast(player.nombre + ' reactivado.', 'ok');
+      if (onSaved) onSaved(data);
+    }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+  }
+
   function openStaffForm(existing, onSaved) {
     const body = SM.ui.el('div', { html: staffFormHtml(existing) });
     const handle = SM.ui.openModal('Añadir miembro del cuerpo técnico', body);
@@ -534,6 +607,7 @@ SM.forms = (function () {
     esc: esc, field: field, selectHtml: selectHtml,
     playerFormHtml: playerFormHtml, staffFormHtml: staffFormHtml, formToPayload: formToPayload,
     openPlayerForm: openPlayerForm, openStaffForm: openStaffForm, openSettingsForm: openSettingsForm,
+    BAJA_MOTIVOS: BAJA_MOTIVOS, openBajaForm: openBajaForm, reactivatePlayer: reactivatePlayer,
     openRecurringSessionForm: openRecurringSessionForm, openAttendanceModal: openAttendanceModal,
     openEditMatchForm: openEditMatchForm
   };

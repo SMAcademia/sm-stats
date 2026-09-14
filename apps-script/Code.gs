@@ -34,7 +34,12 @@ const SHEETS = {
   settings: 'Settings'
 };
 
-const PLAYER_COLUMNS = ['id', 'nombre', 'dorsal', 'posicion', 'posicion_secundaria', 'pie', 'fecha_nacimiento', 'nacionalidad', 'altura_cm', 'peso_kg', 'contacto_emergencia', 'categoria', 'club_anterior', 'fecha_alta', 'foto_url', 'activo', 'ritmo', 'tiro', 'pase', 'regate', 'defensa', 'fisico', 'companerismo', 'sacrificio', 'respeto', 'motivacion', 'esfuerzo', 'constancia', 'blocaje', 'despeje', 'comunicacion', 'posicionamiento', 'unoxuno', 'abp'];
+// motivo_baja/fecha_baja: rellenos solo mientras activo=false (baja por
+// lesión/vacaciones/abandono/otro) — se limpian al reactivar. No borran ni
+// afectan a ninguna otra fila: todas las estadísticas del jugador siguen
+// intactas en sus propias hojas, solo dejan de contarse mientras esté de
+// baja porque el resto de la app ya filtra por activo.
+const PLAYER_COLUMNS = ['id', 'nombre', 'dorsal', 'posicion', 'posicion_secundaria', 'pie', 'fecha_nacimiento', 'nacionalidad', 'altura_cm', 'peso_kg', 'contacto_emergencia', 'categoria', 'club_anterior', 'fecha_alta', 'foto_url', 'activo', 'motivo_baja', 'fecha_baja', 'ritmo', 'tiro', 'pase', 'regate', 'defensa', 'fisico', 'companerismo', 'sacrificio', 'respeto', 'motivacion', 'esfuerzo', 'constancia', 'blocaje', 'despeje', 'comunicacion', 'posicionamiento', 'unoxuno', 'abp'];
 const STAFF_COLUMNS = ['id', 'nombre', 'rol', 'licencia', 'fecha_alta', 'foto_url'];
 const SESSION_COLUMNS = ['id', 'fecha', 'hora', 'tipo', 'lugar', 'match_id', 'categoria'];
 const ATTENDANCE_COLUMNS = ['id', 'session_id', 'player_id', 'estado'];

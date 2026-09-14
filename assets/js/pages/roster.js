@@ -24,16 +24,21 @@
   let posFilter = 'TODOS';
   let search = '';
 
+  const TAB_TITLES = { jugadores: 'Plantilla', staff: 'Cuerpo técnico', bajas: 'Bajas' };
+  const BAJA_LABELS = {};
+  SM.forms.BAJA_MOTIVOS.forEach(function (m) { BAJA_LABELS[m[0]] = m[1]; });
+
   function render() {
     main.innerHTML =
       '<div class="page-header">' +
-        '<div><div class="page-title">' + (tab === 'jugadores' ? 'Plantilla' : 'Cuerpo técnico') + '</div>' +
+        '<div><div class="page-title">' + TAB_TITLES[tab] + '</div>' +
         '<div class="page-subtitle" id="subtitle"></div></div>' +
-        '<button class="btn btn-primary" id="btn-add">+ ' + (tab === 'jugadores' ? 'Añadir jugador' : 'Añadir miembro') + '</button>' +
+        (tab !== 'bajas' ? '<button class="btn btn-primary" id="btn-add">+ ' + (tab === 'jugadores' ? 'Añadir jugador' : 'Añadir miembro') + '</button>' : '') +
       '</div>' +
       '<div class="tabbar" id="tabbar">' +
         '<button class="tab' + (tab === 'jugadores' ? ' active' : '') + '" data-tab="jugadores">Jugadores</button>' +
         '<button class="tab' + (tab === 'staff' ? ' active' : '') + '" data-tab="staff">Cuerpo técnico</button>' +
+        '<button class="tab' + (tab === 'bajas' ? ' active' : '') + '" data-tab="bajas">Bajas</button>' +
       '</div>' +
       (tab === 'jugadores' ? (
         '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">' +
@@ -44,7 +49,7 @@
           '</div>' +
         '</div>'
       ) : '') +
-      '<div id="grid" class="card-grid"></div>';
+      '<div id="grid" class="' + (tab === 'bajas' ? '' : 'card-grid') + '"></div>';
 
     document.getElementById('tabbar').addEventListener('click', function (e) {
       const btn = e.target.closest('[data-tab]');
@@ -52,13 +57,16 @@
       tab = btn.getAttribute('data-tab');
       render();
     });
-    document.getElementById('btn-add').addEventListener('click', function () {
-      if (tab === 'jugadores') {
-        SM.forms.openPlayerForm(null, function (data) { DATA = SM.team.filterData(data, SM.team.current()); updateGrid(); });
-      } else {
-        SM.forms.openStaffForm(null, function (data) { DATA = SM.team.filterData(data, SM.team.current()); updateGrid(); });
-      }
-    });
+    const addBtn = document.getElementById('btn-add');
+    if (addBtn) {
+      addBtn.addEventListener('click', function () {
+        if (tab === 'jugadores') {
+          SM.forms.openPlayerForm(null, function (data) { DATA = SM.team.filterData(data, SM.team.current()); updateGrid(); });
+        } else {
+          SM.forms.openStaffForm(null, function (data) { DATA = SM.team.filterData(data, SM.team.current()); updateGrid(); });
+        }
+      });
+    }
     if (tab === 'jugadores') {
       document.getElementById('search').addEventListener('input', function (e) {
         search = e.target.value.trim().toLowerCase();
@@ -91,7 +99,7 @@
       grid.querySelectorAll('.player-card').forEach(function (card) {
         card.addEventListener('click', function () { window.location.href = 'jugador.html?id=' + card.getAttribute('data-id'); });
       });
-    } else {
+    } else if (tab === 'staff') {
       subtitle.textContent = DATA.staff.length + ' miembros del staff · Temporada 2026/27';
       grid.innerHTML = DATA.staff.length ? DATA.staff.map(staffCardHtml).join('') : '<div class="empty-state">Todavía no hay miembros del cuerpo técnico.</div>';
       grid.querySelectorAll('.copy-staff-access-btn').forEach(function (btn) {
@@ -110,7 +118,46 @@
           }
         });
       });
+    } else {
+      const inactivos = DATA.players.filter(function (p) { return !p.activo; })
+        .sort(function (a, b) { return (b.fecha_baja || '').localeCompare(a.fecha_baja || ''); });
+      subtitle.textContent = inactivos.length + ' jugador' + (inactivos.length === 1 ? '' : 'es') + ' de baja — sus estadísticas quedan ocultas hasta reactivarlos';
+      grid.innerHTML = inactivos.length
+        ? '<div class="panel" style="padding:8px;display:flex;flex-direction:column;gap:6px;">' + inactivos.map(bajaRowHtml).join('') + '</div>'
+        : '<div class="empty-state">No hay ningún jugador de baja ahora mismo.</div>';
+      grid.querySelectorAll('[data-view]').forEach(function (el) {
+        el.addEventListener('click', function () { window.location.href = 'jugador.html?id=' + el.getAttribute('data-view'); });
+      });
+      grid.querySelectorAll('.reactivate-btn').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const p = DATA.players.find(function (pl) { return pl.id === btn.getAttribute('data-player'); });
+          if (!p) return;
+          SM.forms.reactivatePlayer(p, function (data) { DATA = SM.team.filterData(data, SM.team.current()); updateGrid(); });
+        });
+      });
     }
+  }
+
+  // Fila ligera para la pestaña Bajas — a propósito sin ninguna estadística
+  // (ni rating, ni goles, ni asistencia): eso es justo lo que se oculta
+  // mientras el jugador está de baja.
+  function bajaRowHtml(p) {
+    const meta = SM.ui.positionMeta(p.posicion);
+    return (
+      '<div data-view="' + p.id + '" style="cursor:pointer;padding:10px 12px;border-radius:10px;display:flex;align-items:center;gap:14px;">' +
+        SM.ui.avatarHtml(p.foto_url, 40) +
+        '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:13.5px;font-weight:700;color:var(--text);">' + SM.ui.escapeHtml(p.nombre) + '</div>' +
+          '<div style="font-size:11.5px;color:' + meta.color + ';font-weight:600;">' + meta.label + (p.dorsal ? ' · #' + p.dorsal : '') + '</div>' +
+        '</div>' +
+        '<div style="text-align:right;">' +
+          '<div style="font-size:12px;font-weight:700;color:var(--amber-bright);">' + (BAJA_LABELS[p.motivo_baja] || 'Sin motivo') + '</div>' +
+          '<div style="font-size:11px;color:var(--text-mute);font-weight:600;">' + (p.fecha_baja ? SM.ui.formatDateLong(p.fecha_baja) : '—') + '</div>' +
+        '</div>' +
+        '<button type="button" class="btn btn-outline reactivate-btn" data-player="' + p.id + '" style="flex:none;padding:8px 14px;font-size:12px;">Reactivar</button>' +
+      '</div>'
+    );
   }
 
   function playerCardHtml(p) {
