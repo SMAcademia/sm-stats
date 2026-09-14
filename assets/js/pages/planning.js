@@ -124,11 +124,15 @@
     const rows = perType.map(function (c) {
       const pct = Math.round((c.count / total) * 100);
       const itemsHtml = c.items.map(function (it) {
+        const itemPct = Math.round((it.count / c.count) * 100);
         return (
-          '<div style="font-size:11.5px;line-height:1.45;color:var(--text-dim);padding-left:12px;position:relative;">' +
+          '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding-left:12px;position:relative;">' +
             '<span style="position:absolute;left:0;top:1px;color:' + c.type.color + ';">·</span>' +
-            SM.ui.escapeHtml(it.text) +
-            (it.count > 1 ? ' <span style="color:' + c.type.color + ';font-weight:700;white-space:nowrap;">×' + it.count + '</span>' : '') +
+            '<span style="font-size:11.5px;line-height:1.45;color:var(--text-dim);">' +
+              SM.ui.escapeHtml(it.text) +
+              (it.count > 1 ? ' <span style="color:' + c.type.color + ';font-weight:700;white-space:nowrap;">×' + it.count + '</span>' : '') +
+            '</span>' +
+            '<span style="flex:none;font-size:11px;font-weight:700;color:var(--text-mute);white-space:nowrap;">' + itemPct + '%</span>' +
           '</div>'
         );
       }).join('');
