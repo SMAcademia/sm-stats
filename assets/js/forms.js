@@ -138,7 +138,7 @@ SM.forms = (function () {
     // esconde — si no, sus inputs (con su valor por defecto) viajarían en
     // el FormData y pisarían el otro conjunto de atributos al guardar.
     function syncAttrBlocks() {
-      const isGk = state.primary === 'POR';
+      const isGk = SM.stats.isGoalkeeper({ posicion: state.primary });
       const outfieldBlock = body.querySelector('#attrs-outfield-block');
       const gkBlock = body.querySelector('#attrs-gk-block');
       const outfieldHint = body.querySelector('#attrs-outfield-hint');

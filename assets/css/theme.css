@@ -663,6 +663,12 @@ button { font-family: inherit; }
 }
 
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* Sin esto, el atributo hidden no oculta un .form-grid: la regla de autor
+   display:grid de arriba gana siempre a la regla display:none del user
+   agent para [hidden], aunque el elemento tenga hidden=true en JS — es lo
+   que hacía que el bloque de atributos de jugador de campo (ritmo, tiro...)
+   se quedara visible en la ficha de un portero pese a estar "oculto". */
+.form-grid[hidden] { display: none; }
 .form-field { display: flex; flex-direction: column; gap: 6px; }
 .form-field.span-2 { grid-column: 1 / -1; }
 

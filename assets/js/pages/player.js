@@ -133,10 +133,7 @@
             '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">' +
               '<div class="panel"><span class="panel-title">Atributos' + (isGk ? ' de portero' : '') + '</span>' +
                 (hasAttrs
-                  ? (isGk
-                      ? '<div style="margin-top:14px;">' + attrBarsHtml(attrKeys, attrLabels, p, meta.color) + '</div>'
-                      : '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarAttrs, { color: meta.color }) + '</div>'
-                    )
+                  ? '<div style="display:flex;justify-content:center;margin-top:6px;">' + SM.charts.radarChart(radarAttrs, { color: meta.color }) + '</div>'
                   : '<div class="empty-state">Sin valorar todavía — edita la ficha para puntuar' + (isGk ? ' blocaje, despeje, comunicación...' : ' ritmo, tiro, pase...') + '</div>'
                 ) +
               '</div>' +
@@ -376,26 +373,6 @@
           'Sus estadísticas están ocultas y volverán a verse en cuanto se reactive.' +
         '</div>' +
         '<button type="button" id="reactivar-player-btn-panel" class="btn btn-primary" style="margin-top:6px;">Reactivar jugador</button>' +
-      '</div>'
-    );
-  }
-
-  // Barras horizontales para los atributos de portero — deliberadamente
-  // distinto del radar hexagonal de jugador de campo, para no comparar
-  // porteros con el resto de la plantilla con el mismo tipo de gráfico.
-  function attrBarsHtml(keys, labels, player, color) {
-    return (
-      '<div style="display:flex;flex-direction:column;gap:13px;">' +
-        keys.map(function (k) {
-          const value = player[k] != null && player[k] !== '' ? Number(player[k]) : 0;
-          return (
-            '<div style="display:flex;align-items:center;gap:12px;">' +
-              '<span style="width:140px;font-size:12.5px;font-weight:600;color:var(--text-dim);">' + labels[k] + '</span>' +
-              '<div class="bar-track thick"><div class="bar-fill" style="width:' + value + '%;background:' + color + ';box-shadow:0 0 8px ' + color + ';"></div></div>' +
-              '<span style="width:26px;text-align:right;font-family:var(--font-display);font-size:13px;font-weight:700;color:' + color + ';">' + value + '</span>' +
-            '</div>'
-          );
-        }).join('') +
       '</div>'
     );
   }
