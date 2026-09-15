@@ -35,8 +35,17 @@ SM.stats = (function () {
     { key: 'porteros', label: 'Porteros', color: 'var(--orange)' }
   ];
 
+  // Normaliza espacios/mayúsculas — una fila tocada a mano en la Sheet (o
+  // pegada desde fuera) puede traer "Portero" o "POR " en vez del código
+  // exacto "POR" que escribe el selector de posición de la propia app, y
+  // eso hacía que sus atributos de portero se leyeran como si no tuviera
+  // ninguno puntuado (comparaba contra los de jugador de campo, vacíos).
+  function isGoalkeeper(player) {
+    return String((player && player.posicion) || '').trim().toUpperCase() === 'POR';
+  }
+
   function attrKeysFor(player) {
-    return player.posicion === 'POR' ? GK_ATTR_KEYS : ATTR_KEYS;
+    return isGoalkeeper(player) ? GK_ATTR_KEYS : ATTR_KEYS;
   }
 
   // Claves con el valor más alto entre `keys` para ese jugador (empate ->
@@ -304,6 +313,7 @@ SM.stats = (function () {
     GK_ATTR_KEYS: GK_ATTR_KEYS,
     GK_ATTR_LABELS: GK_ATTR_LABELS,
     attrKeysFor: attrKeysFor,
+    isGoalkeeper: isGoalkeeper,
     topKeys: topKeys,
     VALUE_KEYS: VALUE_KEYS,
     VALUE_LABELS: VALUE_LABELS,

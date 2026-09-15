@@ -222,7 +222,7 @@
     // Nada de cifras ni radares aquí: comparar números entre compañeros
     // genera competitividad tóxica a estas edades. En su lugar, solo el
     // punto que más destaca de cada jugador, como etiqueta.
-    const isGk = p.posicion === 'POR';
+    const isGk = SM.stats.isGoalkeeper(p);
     const attrKeys = SM.stats.attrKeysFor(p);
     const attrLabels = isGk ? SM.stats.GK_ATTR_LABELS : SM.stats.ATTR_LABELS;
     const topAttrLabels = SM.stats.topKeys(p, attrKeys).map(function (k) { return attrLabels[k]; });
