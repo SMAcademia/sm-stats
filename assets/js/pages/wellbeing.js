@@ -61,7 +61,15 @@
   function render() {
     const matchesById = SM.stats.byId(DATA.matches);
     const sessions = DATA.sessions.slice().sort(function (a, b) { return b.fecha.localeCompare(a.fecha) || (b.hora || '').localeCompare(a.hora || ''); });
-    if (!selectedSessionId && sessions.length) selectedSessionId = sessions[0].id;
+    if (!selectedSessionId && sessions.length) {
+      // La lista tiene entrenamientos futuros (se crean varios meses de
+      // golpe desde Calendario) — por defecto hay que abrir el último que
+      // YA se ha jugado (hoy o antes), no el próximo programado, que
+      // todavía no puede tener respuestas de nadie.
+      const today = SM.ui.formatDateIso(new Date());
+      const played = sessions.filter(function (s) { return s.fecha <= today; });
+      selectedSessionId = (played[0] || sessions[0]).id;
+    }
     const session = sessions.find(function (s) { return s.id === selectedSessionId; }) || null;
 
     main.innerHTML =
