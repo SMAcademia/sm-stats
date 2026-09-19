@@ -51,7 +51,7 @@ SM.forms = (function () {
           field('Contacto de emergencia', '<input name="contacto_emergencia" value="' + esc(p.contacto_emergencia) + '">', true) +
           field('Club anterior', '<input name="club_anterior" value="' + esc(p.club_anterior) + '">') +
           field('En el club desde', '<input name="fecha_alta" type="date" value="' + esc(p.fecha_alta) + '">') +
-          field('Foto (URL, opcional)', '<input name="foto_url" type="url" placeholder="https://..." value="' + esc(p.foto_url) + '">', true) +
+          photoFieldHtml(p) +
         '</div>' +
         '<div class="form-hint" id="attrs-outfield-hint" style="margin-top:16px;">Atributos (0-100) — alimentan el radar del perfil del jugador.</div>' +
         '<div class="form-grid" id="attrs-outfield-block">' +
@@ -89,7 +89,7 @@ SM.forms = (function () {
           field('Rol', '<input name="rol" required placeholder="Ej. Preparador físico" value="' + esc(s.rol) + '">') +
           field('Licencia / formación', '<input name="licencia" value="' + esc(s.licencia) + '">') +
           field('En el club desde', '<input name="fecha_alta" placeholder="Ej. 2026" value="' + esc(s.fecha_alta) + '">') +
-          field('Foto (URL, opcional)', '<input name="foto_url" type="url" placeholder="https://..." value="' + esc(s.foto_url) + '">', true) +
+          photoFieldHtml(s) +
         '</div>' +
         '<div class="form-actions">' +
           '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
@@ -97,6 +97,101 @@ SM.forms = (function () {
         '</div>' +
       '</form>'
     );
+  }
+
+  // Campo de foto compartido por jugador y staff: un botón que abre el
+  // selector de archivos nativo del navegador — en el móvil, eso YA ofrece
+  // cámara, galería y archivos/Drive sin tener que montar nada especial —
+  // más una URL editable a mano por si se prefiere pegar un enlace directo.
+  function photoFieldHtml(current) {
+    return (
+      '<div class="form-field span-2"><label>Foto</label>' +
+        '<div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">' +
+          '<div id="photo-preview">' + SM.ui.avatarHtml(current.foto_url, 72) + '</div>' +
+          '<div style="display:flex;flex-direction:column;gap:8px;flex:1 1 220px;min-width:220px;">' +
+            '<input type="file" id="photo-file-input" accept="image/*" style="display:none;">' +
+            '<button type="button" class="btn btn-outline" id="photo-pick-btn" style="align-self:flex-start;padding:8px 14px;font-size:12.5px;">Subir foto (galería, archivos o cámara)</button>' +
+            '<span id="photo-upload-status" style="font-size:11.5px;color:var(--text-mute);min-height:14px;"></span>' +
+            '<input name="foto_url" id="foto-url-input" type="url" placeholder="...o pega aquí una URL de imagen" value="' + esc(current.foto_url) + '" style="font-size:12px;">' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  const MAX_PHOTO_DIM = 480;
+
+  // Redimensiona/comprime en el propio móvil antes de mandarla — una foto
+  // de cámara sin tocar pesa varios MB, muy lento de subir y de más para
+  // un avatar que como mucho se ve a un tamaño pequeño en la ficha.
+  function compressImageFile(file) {
+    return new Promise(function (resolve, reject) {
+      const reader = new FileReader();
+      reader.onerror = function () { reject(new Error('No se pudo leer el archivo.')); };
+      reader.onload = function () {
+        const img = new Image();
+        img.onerror = function () { reject(new Error('El archivo elegido no es una imagen válida.')); };
+        img.onload = function () {
+          let w = img.width, h = img.height;
+          if (w > MAX_PHOTO_DIM || h > MAX_PHOTO_DIM) {
+            const scale = MAX_PHOTO_DIM / Math.max(w, h);
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Wires the shared photo field inside a player/staff form. Returns
+  // {isUploading} so the submit handler can refuse to save mid-upload —
+  // guardar justo mientras sube dejaría foto_url a medias.
+  function wirePhotoField(body) {
+    const fileInput = body.querySelector('#photo-file-input');
+    const pickBtn = body.querySelector('#photo-pick-btn');
+    const preview = body.querySelector('#photo-preview');
+    const statusEl = body.querySelector('#photo-upload-status');
+    const urlInput = body.querySelector('#foto-url-input');
+    let uploading = false;
+
+    pickBtn.addEventListener('click', function () { fileInput.click(); });
+    urlInput.addEventListener('input', function () {
+      preview.innerHTML = SM.ui.avatarHtml(urlInput.value, 72);
+    });
+    fileInput.addEventListener('change', function () {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      uploading = true;
+      pickBtn.disabled = true;
+      statusEl.style.color = 'var(--text-mute)';
+      statusEl.textContent = 'Subiendo…';
+      compressImageFile(file).then(function (dataUrl) {
+        preview.innerHTML = SM.ui.avatarHtml(dataUrl, 72);
+        return SM.api.postAction('uploadPhoto', { dataUrl: dataUrl, filename: 'foto' });
+      }).then(function (result) {
+        urlInput.value = result.url;
+        preview.innerHTML = SM.ui.avatarHtml(result.url, 72);
+        statusEl.textContent = 'Foto subida.';
+        uploading = false;
+        pickBtn.disabled = false;
+        fileInput.value = '';
+      }).catch(function (err) {
+        statusEl.style.color = 'var(--red-bright)';
+        statusEl.textContent = '⚠ ' + err.message;
+        uploading = false;
+        pickBtn.disabled = false;
+        fileInput.value = '';
+      });
+    });
+
+    return { isUploading: function () { return uploading; } };
   }
 
   function formToPayload(form) {
@@ -177,10 +272,15 @@ SM.forms = (function () {
     const handle = SM.ui.openModal(isEdit ? 'Editar ficha' : 'Añadir jugador', body);
     body.querySelector('#cancel-btn').addEventListener('click', handle.close);
     wirePitchPicker(body, existing);
+    const photo = wirePhotoField(body);
     body.querySelector('#player-form').addEventListener('submit', function (e) {
       e.preventDefault();
       if (!body.querySelector('#posicion-input').value) {
         SM.ui.toast('Marca al menos la posición principal en el campo.', 'error');
+        return;
+      }
+      if (photo.isUploading()) {
+        SM.ui.toast('Espera a que termine de subirse la foto.', 'error');
         return;
       }
       const payload = formToPayload(e.target);
@@ -271,8 +371,13 @@ SM.forms = (function () {
     const body = SM.ui.el('div', { html: staffFormHtml(existing) });
     const handle = SM.ui.openModal('Añadir miembro del cuerpo técnico', body);
     body.querySelector('#cancel-btn').addEventListener('click', handle.close);
+    const photo = wirePhotoField(body);
     body.querySelector('#staff-form').addEventListener('submit', function (e) {
       e.preventDefault();
+      if (photo.isUploading()) {
+        SM.ui.toast('Espera a que termine de subirse la foto.', 'error');
+        return;
+      }
       const payload = formToPayload(e.target);
       SM.api.postAction('addStaffMember', payload).then(function () {
         handle.close();

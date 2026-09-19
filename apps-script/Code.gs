@@ -370,6 +370,7 @@ function doPost(e) {
       deletePlanEntry: deletePlanEntry,
       saveDevGoal: saveDevGoal,
       deleteDevGoal: deleteDevGoal,
+      uploadPhoto: uploadPhoto,
       saveCallups: saveCallups,
       saveMatchReport: saveMatchReport,
       saveAttendance: saveAttendance,
@@ -418,6 +419,33 @@ function addStaffMember(payload) {
   const row = Object.assign({ id: newId('s') }, payload);
   appendRow(SHEETS.staff, STAFF_COLUMNS, row);
   return row;
+}
+
+const PHOTOS_FOLDER_NAME = 'SM Stats — Fotos';
+
+function getOrCreatePhotosFolder() {
+  const it = DriveApp.getFoldersByName(PHOTOS_FOLDER_NAME);
+  if (it.hasNext()) return it.next();
+  return DriveApp.createFolder(PHOTOS_FOLDER_NAME);
+}
+
+// Sube una foto (jugador o staff) hecha desde el móvil (cámara, galería o
+// archivos/Drive — eso ya lo ofrece el propio selector de archivos del
+// navegador, no hay que montar nada aparte) a una carpeta de Drive del
+// entrenador y devuelve un enlace directo listo para foto_url. El frontend
+// ya redimensiona/comprime la imagen antes de mandarla (ver forms.js), así
+// que aquí no hace falta preocuparse por el tamaño.
+function uploadPhoto(payload) {
+  if (!payload.dataUrl) throw new Error('Falta la imagen.');
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(payload.dataUrl);
+  if (!match) throw new Error('Formato de imagen no válido.');
+  const mimeType = match[1];
+  const bytes = Utilities.base64Decode(match[2]);
+  const ext = mimeType.split('/')[1] || 'jpg';
+  const blob = Utilities.newBlob(bytes, mimeType, (payload.filename || 'foto') + '.' + ext);
+  const file = getOrCreatePhotosFolder().createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return { url: 'https://drive.google.com/uc?export=view&id=' + file.getId() };
 }
 
 function addMatch(payload) {

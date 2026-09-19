@@ -102,6 +102,12 @@ SM.api = (function () {
         d.staff.push(row);
         return row;
       }
+      case 'uploadPhoto': {
+        // Sin Drive real en modo demo — el propio data URL ya comprimido
+        // sirve tal cual como foto_url para esta sesión.
+        if (!payload.dataUrl) throw new Error('Falta la imagen.');
+        return { url: payload.dataUrl };
+      }
       case 'addMatch': {
         return createMockMatch(payload);
       }
