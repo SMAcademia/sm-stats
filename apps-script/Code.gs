@@ -445,7 +445,13 @@ function uploadPhoto(payload) {
   const blob = Utilities.newBlob(bytes, mimeType, (payload.filename || 'foto') + '.' + ext);
   const file = getOrCreatePhotosFolder().createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  return { url: 'https://drive.google.com/uc?export=view&id=' + file.getId() };
+  // OJO: "drive.google.com/uc?export=view" NO sirve como <img src> — Drive lo
+  // bloquea o pide confirmación salvo que quien la vea tenga sesión iniciada
+  // con la cuenta dueña del archivo (se ve al probarlo tú mismo y se rompe
+  // para cualquier otro, típico icono de imagen rota). El dominio de la CDN
+  // de imágenes de Google sí está pensado para insertarse como imagen
+  // pública sin login.
+  return { url: 'https://lh3.googleusercontent.com/d/' + file.getId() };
 }
 
 function addMatch(payload) {
