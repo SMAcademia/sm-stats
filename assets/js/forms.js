@@ -150,6 +150,19 @@ SM.forms = (function () {
     });
   }
 
+  // Quien no usa el botón "Subir foto" suele pegar el enlace que Drive da
+  // en su propio "Compartir > Copiar enlace" (.../file/d/ID/view,
+  // open?id=ID, uc?export=view&id=ID...) — ninguno de esos sirve como
+  // <img src> (Drive los bloquea o pide confirmación), solo se ve el icono
+  // de imagen rota. Los reescribe al formato de la CDN de imágenes de
+  // Google, que sí funciona embebido sin login.
+  function normalizeDriveUrl(url) {
+    if (url.indexOf('drive.google.com') === -1) return url;
+    let m = /\/file\/d\/([\w-]+)/.exec(url);
+    if (!m) m = /[?&]id=([\w-]+)/.exec(url);
+    return m ? 'https://lh3.googleusercontent.com/d/' + m[1] : url;
+  }
+
   // Wires the shared photo field inside a player/staff form. Returns
   // {isUploading} so the submit handler can refuse to save mid-upload —
   // guardar justo mientras sube dejaría foto_url a medias.
@@ -161,8 +174,19 @@ SM.forms = (function () {
     const urlInput = body.querySelector('#foto-url-input');
     let uploading = false;
 
+    // Autocorrige al abrir la ficha un enlace de Drive que quedó guardado
+    // roto (pegado a mano o de una subida previa al arreglo del formato) —
+    // así no hace falta volver a subir la foto, basta con reabrir y guardar.
+    const normalizedInitial = normalizeDriveUrl(urlInput.value.trim());
+    if (normalizedInitial && normalizedInitial !== urlInput.value) {
+      urlInput.value = normalizedInitial;
+      preview.innerHTML = SM.ui.avatarHtml(normalizedInitial, 72);
+    }
+
     pickBtn.addEventListener('click', function () { fileInput.click(); });
     urlInput.addEventListener('input', function () {
+      const normalized = normalizeDriveUrl(urlInput.value.trim());
+      if (normalized !== urlInput.value) urlInput.value = normalized;
       preview.innerHTML = SM.ui.avatarHtml(urlInput.value, 72);
     });
     fileInput.addEventListener('change', function () {
