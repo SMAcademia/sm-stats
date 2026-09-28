@@ -125,6 +125,45 @@
     );
   }
 
+  // Agenda completa de partidos (calendario) de la categoría del jugador:
+  // pasados y futuros, en orden cronológico — a diferencia de "Próximo
+  // partido" (solo el siguiente) y "Próximas sesiones" (mezcla partidos y
+  // entrenamientos, tope de 6), esta es la vista que pide la familia para
+  // planificarse con todo el calendario de partidos de la temporada.
+  function matchesCalendarHtml(scoped) {
+    const matches = (scoped.matches || []).slice().sort(function (a, b) { return (a.fecha || '').localeCompare(b.fecha || ''); });
+    if (!matches.length) return '<div class="empty-state">Todavía no hay partidos en el calendario.</div>';
+    return (
+      '<div style="display:flex;flex-direction:column;gap:2px;max-height:420px;overflow-y:auto;">' +
+        matches.map(function (m) {
+          const rival = (m.condicion === 'local' ? 'vs ' : '@ ') + SM.ui.escapeHtml(m.rival);
+          const sub = (m.jornada ? 'Jornada ' + SM.ui.escapeHtml(String(m.jornada)) + ' · ' : '') + SM.ui.escapeHtml(m.lugar || '—');
+          let rightColor, rightLabel;
+          if (m.jugado) {
+            const win = m.goles_favor > m.goles_contra, draw = m.goles_favor === m.goles_contra;
+            rightColor = win ? 'var(--green)' : draw ? 'var(--text-dim)' : 'var(--red-bright)';
+            rightLabel = m.goles_favor + ' – ' + m.goles_contra;
+          } else {
+            rightColor = 'var(--text-mute)';
+            rightLabel = m.hora || '—';
+          }
+          return (
+            '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--row-border);">' +
+              '<div>' +
+                '<div style="font-size:13.5px;font-weight:700;color:var(--text);">' + rival + '</div>' +
+                '<div style="font-size:11.5px;color:var(--text-mute);font-weight:600;">' + sub + '</div>' +
+              '</div>' +
+              '<div style="text-align:right;">' +
+                '<div style="font-size:12.5px;font-weight:700;color:var(--amber);">' + SM.ui.formatDateShort(m.fecha) + '</div>' +
+                '<div style="font-size:11.5px;color:' + rightColor + ';font-weight:700;">' + rightLabel + '</div>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('') +
+      '</div>'
+    );
+  }
+
   // Enlace directo a la encuesta de bienestar (encuesta.html) para la
   // sesión de hoy (entrenamiento o partido), sin esperar a que el
   // entrenador comparta el enlace por su cuenta. Solo aparece si se
@@ -336,6 +375,9 @@
           videoClipsHtml(scoped, p) +
           '<div class="panel"><span class="panel-title">Próximo partido</span>' +
             '<div style="margin-top:12px;">' + nextMatchHtml(scoped, p) + '</div>' +
+          '</div>' +
+          '<div class="panel"><span class="panel-title">Calendario de partidos</span>' +
+            '<div style="margin-top:8px;">' + matchesCalendarHtml(scoped) + '</div>' +
           '</div>' +
           '<div class="panel"><span class="panel-title">Próximas sesiones</span>' +
             '<div style="margin-top:8px;">' + agendaHtml(scoped) + '</div>' +
