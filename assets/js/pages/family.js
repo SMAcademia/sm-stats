@@ -151,38 +151,91 @@
     );
   }
 
+  // Se guardan aparte (no en un data-* del botón) porque un vídeo en modo
+  // demo es un data URL de varios MB — meterlo tal cual en un atributo HTML
+  // funciona, pero es innecesario cuando basta con recordar el índice.
+  let videoClipsForFullscreen = [];
+
   // Clips de corrección que el cuerpo técnico ha preparado para este
-  // jugador (ver video-analisis.html) — el más reciente primero.
+  // jugador (ver video-analisis.html) — el más reciente primero. Se
+  // muestran como miniaturas pequeñas (no el vídeo embebido directamente):
+  // en el móvil, con todo el resto de paneles alrededor, un reproductor
+  // incrustado apenas se aprecia — mejor un botón claro que abra el vídeo
+  // a pantalla completa.
   function videoClipsHtml(scoped, p) {
     const clips = (scoped.videoClips || [])
       .filter(function (c) { return c.player_id === p.id; })
       .slice()
       .sort(function (a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+    videoClipsForFullscreen = clips;
     if (!clips.length) return '';
     return (
       '<div class="panel">' +
         '<span class="panel-title">Vídeos de corrección</span>' +
-        '<div style="display:flex;flex-direction:column;gap:16px;margin-top:12px;">' +
-          clips.map(function (c) {
-            // En modo demo el vídeo se guarda como data URL y se reproduce
-            // con un <video> normal; contra Drive real, un vídeo no se puede
-            // embeber como <video src> fiable (falla el streaming en varios
-            // dispositivos), así que ahí se usa el visor propio de Drive.
-            const isDataUrl = c.video_url && c.video_url.indexOf('data:') === 0;
-            const player = isDataUrl
-              ? '<video src="' + SM.ui.escapeHtml(c.video_url) + '" controls playsinline style="width:100%;border-radius:10px;background:#000;display:block;"></video>'
-              : '<iframe src="' + SM.ui.escapeHtml(c.video_url) + '" allow="autoplay" style="width:100%;aspect-ratio:16/9;border:0;border-radius:10px;background:#000;display:block;"></iframe>';
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:12px;margin-top:12px;">' +
+          clips.map(function (c, i) {
             return (
-              '<div>' +
-                (c.titulo ? '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">' + SM.ui.escapeHtml(c.titulo) + '</div>' : '') +
-                player +
-                '<div style="font-size:11.5px;color:var(--text-mute);font-weight:600;margin-top:6px;">' + SM.ui.formatDateShort(c.fecha) + '</div>' +
-              '</div>'
+              '<button type="button" class="video-clip-thumb" data-clip-index="' + i + '" style="position:relative;aspect-ratio:16/9;border-radius:10px;border:1px solid var(--border-soft);background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:10px;text-align:center;">' +
+                '<div style="width:40px;height:40px;border-radius:50%;background:' + SM.ui.alpha('var(--cyan)', 0.18) + ';border:1px solid var(--cyan);display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+                  '<svg width="15" height="15" viewBox="0 0 24 24" fill="var(--cyan-bright)"><path d="M8 5v14l11-7z"/></svg>' +
+                '</div>' +
+                (c.titulo ? '<span style="font-size:11px;font-weight:700;color:var(--text);line-height:1.25;">' + SM.ui.escapeHtml(c.titulo) + '</span>' : '') +
+                '<span style="font-size:10px;color:var(--text-mute);font-weight:600;">' + SM.ui.formatDateShort(c.fecha) + '</span>' +
+              '</button>'
             );
           }).join('') +
         '</div>' +
       '</div>'
     );
+  }
+
+  // Abre el vídeo a pantalla completa directamente (sin dejarlo incrustado
+  // en la página) — un overlay propio que cubre toda la pantalla, más la
+  // API de pantalla completa nativa cuando el navegador la soporta (esconde
+  // la barra de direcciones, permite girar a horizontal). En modo demo el
+  // vídeo es un data URL y se reproduce con un <video> normal; contra Drive
+  // real, un vídeo no se puede embeber como <video src> fiable (falla el
+  // streaming sobre todo en iOS), así que ahí se usa el visor propio de
+  // Drive en un <iframe>.
+  function openClipFullscreen(videoUrl) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;background:#000;z-index:9999;display:flex;align-items:center;justify-content:center;';
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.setAttribute('aria-label', 'Cerrar');
+    closeBtn.style.cssText = 'position:absolute;top:14px;right:14px;width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;border:1px solid rgba(255,255,255,.3);font-size:16px;z-index:2;cursor:pointer;';
+    overlay.appendChild(closeBtn);
+
+    const isDataUrl = videoUrl && videoUrl.indexOf('data:') === 0;
+    let media;
+    if (isDataUrl) {
+      media = document.createElement('video');
+      media.src = videoUrl;
+      media.controls = true;
+      media.playsInline = true;
+      media.autoplay = true;
+      media.style.cssText = 'width:100%;height:100%;';
+    } else {
+      media = document.createElement('iframe');
+      media.src = videoUrl;
+      media.allow = 'autoplay; fullscreen';
+      media.style.cssText = 'width:100%;height:100%;border:0;';
+    }
+    overlay.appendChild(media);
+    document.body.appendChild(overlay);
+
+    function close() {
+      if (document.fullscreenElement) document.exitFullscreen().catch(function () {});
+      if (document.body.contains(overlay)) overlay.remove();
+    }
+    closeBtn.addEventListener('click', close);
+    document.addEventListener('fullscreenchange', function onFsChange() {
+      if (!document.fullscreenElement) { close(); document.removeEventListener('fullscreenchange', onFsChange); }
+    });
+
+    if (overlay.requestFullscreen) overlay.requestFullscreen().catch(function () {});
+    else if (media.webkitEnterFullscreen) media.webkitEnterFullscreen();
+    if (isDataUrl) media.play().catch(function () {});
   }
 
   function agendaHtml(scoped) {
@@ -321,6 +374,13 @@
     document.getElementById('logout-btn').addEventListener('click', function () {
       SM.auth.clearFamilySession();
       window.location.href = 'acceso.html';
+    });
+
+    main.querySelectorAll('.video-clip-thumb').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const clip = videoClipsForFullscreen[Number(btn.getAttribute('data-clip-index'))];
+        if (clip) openClipFullscreen(clip.video_url);
+      });
     });
   }
 

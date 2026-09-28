@@ -868,11 +868,10 @@
     boundedPlayback = false;
 
     try {
+      // Sin audio a propósito: no aporta nada al análisis y solo engorda el
+      // archivo — se graba únicamente el vídeo del canvas.
       const canvasStream = canvas.captureStream(EXPORT_FPS);
-      let audioTracks = [];
-      try { audioTracks = video.captureStream().getAudioTracks(); } catch (e) { /* sin audio en el clip, no pasa nada */ }
-      const stream = new MediaStream(canvasStream.getVideoTracks().concat(audioTracks));
-      const recorder = new MediaRecorder(stream, { mimeType: mimeType, videoBitsPerSecond: EXPORT_BITRATE });
+      const recorder = new MediaRecorder(canvasStream, { mimeType: mimeType, videoBitsPerSecond: EXPORT_BITRATE });
       const chunks = [];
       recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
       const stopped = new Promise(function (resolve) { recorder.onstop = resolve; });
@@ -887,9 +886,17 @@
 
       if (hadFrozenAnnotations) {
         exportPhase = 'holding';
-        drawFrame(); // el mismo fotograma congelado + anotaciones que ya se ve en el editor
         showExportStatus('Congelando el fotograma anotado (3s)…', null);
+        // Redibujar en bucle durante el hueco (en vez de pintar una vez y
+        // esperar) — algunos navegadores no generan fotogramas nuevos de
+        // forma fiable en captureStream() si el canvas está quieto varios
+        // segundos seguidos, aunque se le haya pedido una tasa fija; así se
+        // asegura que la grabación reciba el fotograma congelado+anotado
+        // de verdad durante todo el hueco, no solo un instante.
+        const holdInterval = setInterval(drawFrame, Math.round(1000 / EXPORT_FPS));
+        drawFrame();
         await sleep(EXPORT_HOLD_MS);
+        clearInterval(holdInterval);
         exportPhase = 'playing';
         if (freezeAtTime < outPoint) {
           showExportStatus('Grabando…', null);
