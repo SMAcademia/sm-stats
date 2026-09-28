@@ -53,6 +53,11 @@
     { key: 0.55, label: 'Media' },
     { key: 0.75, label: 'Poco transparente' }
   ];
+  const FONT_SIZE_OPTIONS = [
+    { px: 20, label: 'Pequeño' },
+    { px: 28, label: 'Mediano' },
+    { px: 40, label: 'Grande' }
+  ];
 
   let DATA = null;
 
@@ -115,10 +120,11 @@
   let selectedShapeId = null;
   let creatingShape = null; // línea/curva/caja en curso mientras se arrastra para crearla
   let networkDraft = null; // { nodes: [...] } mientras se van tocando puntos de una red
-  let currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none', fillMode: 'border', alpha: 0.55 };
+  let currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none', fillMode: 'border', alpha: 0.55, fontSize: FONT_SIZE_OPTIONS[1].px };
   let shapeDragState = null; // arrastre de un nodo de una forma ya creada: { shapeId, xField, yField }
   let handleEls = {}; // { [handleKey]: elemento DOM }, según HANDLE_DEFS[shape.type]
   let frozenAtVideoTime = 0; // segundo exacto del vídeo en el que se congeló, para saber dónde insertar el hueco de 3s al exportar
+  let selectedExportPlayerIds = []; // jugadores a los que se asigna el clip al exportar (varios a la vez)
 
   // ---- exportar y guardar en el área del jugador ----
   const EXPORT_FPS = 25;
@@ -208,19 +214,29 @@
             '<button type="button" class="pill va-tool-btn" data-tool="spotlight">Foco</button>' +
             '<button type="button" class="pill va-tool-btn" data-tool="clone">Clonar jugador</button>' +
             '<button type="button" class="pill va-tool-btn" data-tool="network">Red de nodos</button>' +
+            '<button type="button" class="pill va-tool-btn" data-tool="text">Texto</button>' +
             '<span id="va-network-status" style="font-size:12px;color:var(--text-mute);font-weight:700;display:none;"></span>' +
             '<button type="button" class="btn btn-primary" id="va-network-finish" style="padding:6px 14px;font-size:12px;display:none;">Terminar red</button>' +
             '<span style="flex:1 1 auto;"></span>' +
             '<button type="button" class="btn btn-outline" id="va-unfreeze-btn">Volver al vídeo</button>' +
           '</div>' +
           '<div id="va-shape-props" style="display:none;flex-direction:column;gap:10px;">' +
-            '<div class="va-group-row" id="va-base-row">' +
+            '<div class="va-group-row" id="va-color-row">' +
               '<span class="va-group-label">Color</span>' +
               LINE_COLORS.map(function (c) { return '<button type="button" class="va-color-swatch" data-color="' + c + '" style="background:' + c + ';"></button>'; }).join('') +
+            '</div>' +
+            '<div class="va-group-row" id="va-linestyle-row">' +
               '<span class="va-group-label">Grosor</span>' +
               LINE_WIDTH_OPTIONS.map(function (w) { return '<button type="button" class="pill va-width-btn" data-width="' + w.px + '">' + w.label + '</button>'; }).join('') +
               '<span class="va-group-label">Trazo</span>' +
               DASH_STYLES.map(function (d) { return '<button type="button" class="pill va-dash-btn" data-dash="' + d.key + '">' + d.label + '</button>'; }).join('') +
+            '</div>' +
+            '<div class="va-group-row" id="va-text-row">' +
+              '<span class="va-group-label">Tamaño</span>' +
+              FONT_SIZE_OPTIONS.map(function (f) { return '<button type="button" class="pill va-fontsize-btn" data-fontsize="' + f.px + '">' + f.label + '</button>'; }).join('') +
+            '</div>' +
+            '<div class="va-group-row" id="va-text-input-row">' +
+              '<textarea id="va-text-input" rows="2" placeholder="Escribe la nota…" style="flex:1 1 auto;min-width:180px;padding:8px 10px;border-radius:8px;resize:vertical;"></textarea>' +
             '</div>' +
             '<div class="va-group-row" id="va-arrow-row">' +
               '<span class="va-group-label">Flecha</span>' +
@@ -290,13 +306,13 @@
       '</div>' +
 
       '<div class="panel" id="va-export-panel">' +
-        '<span class="panel-title">Guardar para un jugador</span>' +
-        '<div style="font-size:11.5px;color:var(--text-mute);font-weight:600;margin-top:2px;">Exporta el recorte (con el fotograma congelado y las anotaciones incrustados, si los hay) y lo guarda en el área privada del jugador elegido.</div>' +
-        '<div class="va-group-row" style="margin-top:12px;">' +
-          '<select id="va-export-player" style="min-width:200px;padding:8px 10px;border-radius:8px;">' +
-            '<option value="">Elige un jugador…</option>' +
-            exportPlayers().map(function (p) { return '<option value="' + p.id + '">' + esc(p.nombre) + (p.dorsal ? ' (#' + p.dorsal + ')' : '') + '</option>'; }).join('') +
-          '</select>' +
+        '<span class="panel-title">Guardar para uno o varios jugadores</span>' +
+        '<div style="font-size:11.5px;color:var(--text-mute);font-weight:600;margin-top:2px;">Exporta el recorte (con el fotograma congelado y las anotaciones incrustados, si los hay) y lo guarda en el área privada de cada jugador que elijas.</div>' +
+        '<div class="va-group-row" style="margin-top:12px;flex-wrap:wrap;">' +
+          '<span class="va-group-label">Jugadores</span>' +
+          exportPlayers().map(function (p) { return '<button type="button" class="pill va-export-player-btn" data-player="' + p.id + '">' + esc(p.nombre) + (p.dorsal ? ' (#' + p.dorsal + ')' : '') + '</button>'; }).join('') +
+        '</div>' +
+        '<div class="va-group-row" style="margin-top:10px;">' +
           '<input type="text" id="va-export-title" placeholder="Título (opcional) — p. ej. Presión en salida de balón" style="flex:1 1 220px;min-width:200px;padding:8px 10px;">' +
           '<button type="button" class="btn btn-primary" id="va-export-btn" style="padding:8px 18px;font-size:13px;">Exportar y guardar</button>' +
         '</div>' +
@@ -319,9 +335,10 @@
     boundedPlayback = false;
     frozen = false; frozenSourceCanvas = null; shapes = []; nextShapeId = 1;
     activeTool = null; selectedShapeId = null; creatingShape = null; networkDraft = null;
-    currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none', fillMode: 'border', alpha: 0.55 };
+    currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none', fillMode: 'border', alpha: 0.55, fontSize: FONT_SIZE_OPTIONS[1].px };
     shapeDragState = null; handleEls = {};
     frozenAtVideoTime = 0; exportPhase = null; exporting = false;
+    selectedExportPlayerIds = [];
 
     renderEditor();
 
@@ -414,6 +431,15 @@
     main.querySelector('#va-unfreeze-btn').addEventListener('click', unfreeze);
     main.querySelector('#va-export-btn').addEventListener('click', exportAndSave);
 
+    main.querySelectorAll('.va-export-player-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const id = btn.getAttribute('data-player');
+        const idx = selectedExportPlayerIds.indexOf(id);
+        if (idx === -1) selectedExportPlayerIds.push(id); else selectedExportPlayerIds.splice(idx, 1);
+        btn.classList.toggle('active', idx === -1);
+      });
+    });
+
     main.querySelectorAll('.va-tool-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         activeTool = activeTool === btn.getAttribute('data-tool') ? null : btn.getAttribute('data-tool');
@@ -431,6 +457,14 @@
     });
     main.querySelectorAll('.va-dash-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { applyProp('dash', btn.getAttribute('data-dash')); });
+    });
+    main.querySelectorAll('.va-fontsize-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { applyProp('fontSize', Number(btn.getAttribute('data-fontsize'))); });
+    });
+    main.querySelector('#va-text-input').addEventListener('input', function (e) {
+      const shape = selectedShapeId != null ? shapes.find(function (s) { return s.id === selectedShapeId; }) : null;
+      if (shape) shape.text = e.target.value;
+      drawFrame();
     });
     main.querySelectorAll('.va-arrow-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { applyProp('arrow', btn.getAttribute('data-arrow')); });
@@ -463,6 +497,19 @@
         activeTool = null;
         updateToolButtonsUi();
         selectShape(shape.id);
+      } else if (activeTool === 'text') {
+        // Un solo tap coloca la nota (vacía) en ese punto — se escribe el
+        // texto a continuación en el panel de propiedades, que se enfoca
+        // automáticamente para no tener que buscarlo.
+        const shape = { id: nextShapeId++, type: 'text', x: p.x, y: p.y, text: '', color: currentDefaults.color, fontSize: currentDefaults.fontSize };
+        shapes.push(shape);
+        activeTool = null;
+        updateToolButtonsUi();
+        selectShape(shape.id);
+        requestAnimationFrame(function () {
+          const ta = main.querySelector('#va-text-input');
+          if (ta) ta.focus();
+        });
       } else if (activeTool === 'network') {
         // Cada tap añade un nodo enlazado al anterior — no hay arrastre que
         // capturar aquí, se sigue tocando hasta pulsar "Terminar red".
@@ -478,7 +525,7 @@
         // "cuerpo", solo sus nodos, así que no aplica.
         if (hitId != null) {
           const shape = shapes.find(function (s) { return s.id === hitId; });
-          if (shape.type === 'rect' || shape.type === 'ellipse' || shape.type === 'spotlight' || shape.type === 'clone') {
+          if (shape.type === 'rect' || shape.type === 'ellipse' || shape.type === 'spotlight' || shape.type === 'clone' || shape.type === 'text') {
             shapeDragState = { shapeId: hitId, mode: 'move', startX: p.x, startY: p.y, origX: shape.x, origY: shape.y };
           }
         }
@@ -560,10 +607,15 @@
         shapeDragState.def.set(shape, x, y);
       } else if (shapeDragState.mode === 'move') {
         // El foco es circular (su "tamaño" es un radio desde el centro),
-        // rectángulo/elipse son una caja con esquina superior izquierda —
-        // cada uno necesita su propio margen para no salirse del canvas.
-        const maxX = shape.type === 'spotlight' ? 1 - shape.r : 1 - shape.w;
-        const maxY = shape.type === 'spotlight' ? 1 - shape.r : 1 - shape.h;
+        // rectángulo/elipse/texto son una caja con esquina superior
+        // izquierda — cada uno necesita su propio margen para no salirse
+        // del canvas. El texto no tiene w/h propios (su tamaño depende del
+        // contenido) — se usa el ancho/alto ya calculado al dibujarlo
+        // (boxW/boxH, en fracciones 0..1, igual que w/h).
+        const boxW = shape.type === 'text' ? (shape.boxW || 0.05) : shape.w;
+        const boxH = shape.type === 'text' ? (shape.boxH || 0.05) : shape.h;
+        const maxX = shape.type === 'spotlight' ? 1 - shape.r : 1 - boxW;
+        const maxY = shape.type === 'spotlight' ? 1 - shape.r : 1 - boxH;
         const minX = shape.type === 'spotlight' ? shape.r : 0;
         const minY = shape.type === 'spotlight' ? shape.r : 0;
         shape.x = clamp(shapeDragState.origX + (x - shapeDragState.startX), minX, maxX);
@@ -840,8 +892,7 @@
       const el = main.querySelector(sel);
       if (el) { el.style.pointerEvents = isExporting ? 'none' : ''; el.style.opacity = isExporting ? '0.55' : ''; }
     });
-    const select = main.querySelector('#va-export-player');
-    if (select) select.disabled = isExporting;
+    main.querySelectorAll('.va-export-player-btn').forEach(function (btn) { btn.disabled = isExporting; });
     const titleInput = main.querySelector('#va-export-title');
     if (titleInput) titleInput.disabled = isExporting;
     const changeBtn = main.querySelector('#video-change-btn');
@@ -850,9 +901,8 @@
 
   async function exportAndSave() {
     if (exporting || !video || !duration) return;
-    const playerId = main.querySelector('#va-export-player').value;
-    if (!playerId) { showExportStatus('Elige a qué jugador se lo asignas.', 'error'); return; }
-    const player = (DATA.players || []).find(function (p) { return p.id === playerId; });
+    if (!selectedExportPlayerIds.length) { showExportStatus('Elige a qué jugador (o jugadores) se lo asignas.', 'error'); return; }
+    const players = (DATA.players || []).filter(function (p) { return selectedExportPlayerIds.indexOf(p.id) !== -1; });
     const mimeType = pickExportMimeType();
     if (!mimeType) { showExportStatus('Este navegador no permite exportar vídeo — pruébalo desde Chrome/Android.', 'error'); return; }
 
@@ -911,16 +961,20 @@
       showExportStatus('Subiendo…', null);
       const blob = new Blob(chunks, { type: mimeType });
       const dataUrl = await blobToDataUrl(blob);
+      // Un solo vídeo grabado, asignado a varios jugadores a la vez — el
+      // backend sube el archivo una única vez y crea una fila por jugador.
       await SM.api.postAction('uploadVideoClip', {
         dataUrl: dataUrl,
         filename: 'clip',
-        playerId: playerId,
+        playerIds: selectedExportPlayerIds,
         titulo: titulo,
-        fecha: SM.ui.formatDateIso(new Date()),
-        categoria: player ? player.categoria : ''
+        fecha: SM.ui.formatDateIso(new Date())
       });
-      showExportStatus('Guardado para ' + (player ? player.nombre : 'el jugador') + ' — ya lo puede ver desde su área privada.', 'ok');
+      const names = players.map(function (p) { return p.nombre; }).join(', ');
+      showExportStatus('Guardado para ' + (names || 'el jugador elegido') + ' — ya lo pueden ver desde su área privada.', 'ok');
       main.querySelector('#va-export-title').value = '';
+      selectedExportPlayerIds = [];
+      main.querySelectorAll('.va-export-player-btn').forEach(function (b) { b.classList.remove('active'); });
     } catch (err) {
       showExportStatus('⚠ ' + err.message, 'error');
     } finally {
@@ -970,6 +1024,14 @@
       // cómodo de pinchar, sobre todo en el estilo "con borde" donde el
       // interior está vacío.
       const x = s.x * canvas.width, y = s.y * canvas.height, w = s.w * canvas.width, h = s.h * canvas.height;
+      if (px >= x && px <= x + w && py >= y && py <= y + h) return 0;
+      const dx = Math.max(x - px, 0, px - (x + w));
+      const dy = Math.max(y - py, 0, py - (y + h));
+      return Math.hypot(dx, dy);
+    }
+    if (s.type === 'text') {
+      const x = s.x * canvas.width, y = s.y * canvas.height;
+      const w = (s.boxW || 0.05) * canvas.width, h = (s.boxH || 0.05) * canvas.height;
       if (px >= x && px <= x + w && py >= y && py <= y + h) return 0;
       const dx = Math.max(x - px, 0, px - (x + w));
       const dy = Math.max(y - py, 0, py - (y + h));
@@ -1062,8 +1124,13 @@
     const isLineLike = type === 'line' || type === 'curve';
     const isBoxLike = type === 'rect' || type === 'ellipse';
     const isClone = type === 'clone';
-    const hasStyle = isLineLike || isBoxLike || type === 'network'; // ni el foco ni el clon tienen color/grosor/trazo propios
-    main.querySelector('#va-base-row').style.display = hasStyle ? '' : 'none';
+    const isText = type === 'text';
+    const hasColor = isLineLike || isBoxLike || type === 'network' || isText; // el foco y el clon no tienen color propio
+    const hasLineStyle = isLineLike || isBoxLike || type === 'network'; // el texto no usa grosor/trazo de línea
+    main.querySelector('#va-color-row').style.display = hasColor ? '' : 'none';
+    main.querySelector('#va-linestyle-row').style.display = hasLineStyle ? '' : 'none';
+    main.querySelector('#va-text-row').style.display = isText ? '' : 'none';
+    main.querySelector('#va-text-input-row').style.display = isText ? '' : 'none';
     main.querySelector('#va-arrow-row').style.display = isLineLike ? '' : 'none';
     main.querySelector('#va-fill-row').style.display = isBoxLike ? '' : 'none';
     main.querySelector('#va-alpha-row').style.display = isClone ? '' : 'none';
@@ -1071,9 +1138,16 @@
     main.querySelectorAll('.va-color-swatch').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-color') === props.color); });
     main.querySelectorAll('.va-width-btn').forEach(function (b) { b.classList.toggle('active', Number(b.getAttribute('data-width')) === props.width); });
     main.querySelectorAll('.va-dash-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-dash') === props.dash); });
+    main.querySelectorAll('.va-fontsize-btn').forEach(function (b) { b.classList.toggle('active', Number(b.getAttribute('data-fontsize')) === props.fontSize); });
     main.querySelectorAll('.va-arrow-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-arrow') === props.arrow); });
     main.querySelectorAll('.va-fill-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-fill') === props.fillMode); });
     main.querySelectorAll('.va-alpha-btn').forEach(function (b) { b.classList.toggle('active', Number(b.getAttribute('data-alpha')) === props.alpha); });
+    // El textarea se actualiza aquí (p. ej. al seleccionar otra forma) salvo
+    // mientras el propio usuario está escribiendo en él — si no, cada tecla
+    // dispararía applyProp()→updateShapePropsUi() y sobrescribiría el valor
+    // que se acaba de pulsar, moviendo el cursor.
+    const textInput = main.querySelector('#va-text-input');
+    if (textInput && document.activeElement !== textInput) textInput.value = (shape && shape.text) || '';
     main.querySelector('#va-delete-shape').style.display = shape ? '' : 'none';
   }
 
@@ -1312,6 +1386,42 @@
     ctx.restore();
   }
 
+  // El tamaño de caja (boxW/boxH, en fracciones 0..1) se recalcula en cada
+  // dibujado a partir del propio texto y se guarda sobre la forma — así el
+  // hit-test y el arrastre por el cuerpo (que no tienen acceso al contexto
+  // 2D) pueden usarlo sin tener que remedir el texto ellos mismos.
+  function drawTextShape(s) {
+    const fontSize = s.fontSize || FONT_SIZE_OPTIONS[1].px;
+    ctx.save();
+    ctx.font = '700 ' + fontSize + 'px system-ui, -apple-system, sans-serif';
+    ctx.textBaseline = 'top';
+    const paddingX = fontSize * 0.4, paddingY = fontSize * 0.3, lineHeight = fontSize * 1.25;
+    const lines = s.text ? s.text.split('\n') : [''];
+    let maxLineWidth = 0;
+    lines.forEach(function (line) { maxLineWidth = Math.max(maxLineWidth, ctx.measureText(line || ' ').width); });
+    const boxWpx = maxLineWidth + paddingX * 2;
+    const boxHpx = lines.length * lineHeight + paddingY * 2;
+    s.boxW = boxWpx / canvas.width;
+    s.boxH = boxHpx / canvas.height;
+    // La caja crece hacia la derecha/abajo desde el punto donde se tocó,
+    // según lo que se va escribiendo — sin este ajuste, un texto largo
+    // tocado cerca del borde se saldría del encuadre (el canvas recorta lo
+    // que se dibuja fuera de sus límites) según se va escribiendo.
+    s.x = clamp(s.x, 0, Math.max(0, 1 - s.boxW));
+    s.y = clamp(s.y, 0, Math.max(0, 1 - s.boxH));
+    const x = s.x * canvas.width, y = s.y * canvas.height;
+    ctx.fillStyle = 'rgba(8,10,16,0.72)';
+    ctx.fillRect(x, y, boxWpx, boxHpx);
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x + 0.75, y + 0.75, boxWpx - 1.5, boxHpx - 1.5);
+    ctx.fillStyle = s.color;
+    lines.forEach(function (line, i) {
+      ctx.fillText(line, x + paddingX, y + paddingY + i * lineHeight);
+    });
+    ctx.restore();
+  }
+
   function drawShape(s) {
     if (s.type === 'line') drawLineShape(s);
     else if (s.type === 'curve') drawCurveShape(s);
@@ -1320,6 +1430,7 @@
     else if (s.type === 'spotlight') drawSpotlightShape(s);
     else if (s.type === 'clone') drawCloneShape(s);
     else if (s.type === 'network') drawNetworkShape(s);
+    else if (s.type === 'text') drawTextShape(s);
   }
 
   // Dibuja el vídeo en directo (con el efecto de zoom si estaba en vista

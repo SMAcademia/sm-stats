@@ -113,19 +113,27 @@ SM.api = (function () {
         // del vídeo ya grabado sirve tal cual — mi-jugador.html detecta que
         // empieza por "data:" y lo reproduce con un <video> normal en vez
         // del <iframe> de Drive que se usa contra el backend real.
+        // Un mismo clip puede asignarse a varios jugadores a la vez — se
+        // crea una fila por jugador, todas apuntando al mismo data URL (no
+        // hay "subida" real que duplicar en modo demo).
         if (!payload.dataUrl) throw new Error('Falta el vídeo.');
-        if (!payload.playerId) throw new Error('Falta el jugador.');
+        const playerIds = payload.playerIds || (payload.playerId ? [payload.playerId] : []);
+        if (!playerIds.length) throw new Error('Falta el jugador.');
         d.videoClips = d.videoClips || [];
-        const row = {
-          id: nextMockId('vc'),
-          player_id: payload.playerId,
-          titulo: payload.titulo || '',
-          fecha: payload.fecha || new Date().toISOString().slice(0, 10),
-          video_url: payload.dataUrl,
-          categoria: payload.categoria || ''
-        };
-        d.videoClips.push(row);
-        return row;
+        const players = d.players || [];
+        return playerIds.map(function (playerId) {
+          const player = players.find(function (p) { return p.id === playerId; });
+          const row = {
+            id: nextMockId('vc'),
+            player_id: playerId,
+            titulo: payload.titulo || '',
+            fecha: payload.fecha || new Date().toISOString().slice(0, 10),
+            video_url: payload.dataUrl,
+            categoria: player ? player.categoria : ''
+          };
+          d.videoClips.push(row);
+          return row;
+        });
       }
       case 'addMatch': {
         return createMockMatch(payload);

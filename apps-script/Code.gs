@@ -487,7 +487,10 @@ function getOrCreateVideosFolder() {
 // Drive en un <iframe> (…/preview) — así se usa en mi-jugador.html.
 function uploadVideoClip(payload) {
   if (!payload.dataUrl) throw new Error('Falta el vídeo.');
-  if (!payload.playerId) throw new Error('Falta el jugador.');
+  // Acepta tanto el nuevo `playerIds` (varios jugadores a la vez) como el
+  // antiguo `playerId` suelto, por compatibilidad.
+  const playerIds = payload.playerIds || (payload.playerId ? [payload.playerId] : []);
+  if (!playerIds.length) throw new Error('Falta el jugador.');
   // El tipo MIME real que da MediaRecorder incluye codecs, p.ej.
   // "video/webm;codecs=vp8,opus" — esa coma DENTRO del propio tipo (antes
   // de llegar a ";base64,") rompe un regex que espere la coma justo
@@ -501,19 +504,28 @@ function uploadVideoClip(payload) {
   const mimeType = payload.dataUrl.slice('data:'.length, markerIdx);
   const bytes = Utilities.base64Decode(payload.dataUrl.slice(markerIdx + marker.length));
   const ext = mimeType.indexOf('webm') !== -1 ? 'webm' : 'mp4';
+  // El archivo se sube UNA sola vez a Drive aunque se reparta entre varios
+  // jugadores — evita volver a subir el mismo vídeo N veces (importa con
+  // datos móviles), solo se añade una fila por jugador apuntando al mismo
+  // archivo ya subido.
   const blob = Utilities.newBlob(bytes, mimeType, (payload.filename || 'clip') + '.' + ext);
   const file = getOrCreateVideosFolder().createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  const row = {
-    id: newId('vc'),
-    player_id: payload.playerId,
-    titulo: payload.titulo || '',
-    fecha: payload.fecha || new Date().toISOString().slice(0, 10),
-    video_url: 'https://drive.google.com/file/d/' + file.getId() + '/preview',
-    categoria: payload.categoria || ''
-  };
-  appendRow(SHEETS.videoClips, VIDEO_CLIP_COLUMNS, row);
-  return row;
+  const videoUrl = 'https://drive.google.com/file/d/' + file.getId() + '/preview';
+  const categoriaById = {};
+  sheetToObjectsOrEmpty(SHEETS.players).forEach(function (p) { categoriaById[p.id] = p.categoria; });
+  return playerIds.map(function (playerId) {
+    const row = {
+      id: newId('vc'),
+      player_id: playerId,
+      titulo: payload.titulo || '',
+      fecha: payload.fecha || new Date().toISOString().slice(0, 10),
+      video_url: videoUrl,
+      categoria: categoriaById[playerId] || ''
+    };
+    appendRow(SHEETS.videoClips, VIDEO_CLIP_COLUMNS, row);
+    return row;
+  });
 }
 
 function addMatch(payload) {
