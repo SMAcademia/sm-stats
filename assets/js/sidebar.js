@@ -13,7 +13,8 @@ SM.sidebar = (function () {
     partidos: '<circle cx="12" cy="12" r="9"/><path d="M12 6.6 15.4 9l-1.3 3.9H9.9L8.6 9zM12 3v3.6M12 20.9V17.4M3.6 9.8l3.4 1.1M17 12.9l3.4 1.1M6.6 18.4l1.7-3M15.7 8.6l1.7-3"/>',
     convocatorias: '<path d="M8 3.5h8a1.5 1.5 0 0 1 1.5 1.5v15a1.5 1.5 0 0 1-1.5 1.5H8a1.5 1.5 0 0 1-1.5-1.5V5A1.5 1.5 0 0 1 8 3.5Z"/><path d="M9.5 3.5V3a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v.5"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4.5"/>',
     bienestar: '<circle cx="12" cy="12" r="9"/><circle cx="9" cy="10.3" r="1" fill="currentColor"/><circle cx="15" cy="10.3" r="1" fill="currentColor"/><path d="M8 14.2c1.1 1.5 2.5 2.3 4 2.3s2.9-.8 4-2.3"/>',
-    estadisticas: '<path d="M4 20V10M11 20V4M18 20v-7"/><path d="M2.5 20h19"/>'
+    estadisticas: '<path d="M4 20V10M11 20V4M18 20v-7"/><path d="M2.5 20h19"/>',
+    video: '<path d="M4 6.5h11a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 16V8A1.5 1.5 0 0 1 4 6.5Z"/><path d="m16.5 10.3 4-2.4v8.2l-4-2.4"/>'
   };
 
   const ITEMS = [
@@ -26,6 +27,7 @@ SM.sidebar = (function () {
     { key: 'partidos', label: 'Partidos', href: 'partidos.html' },
     { key: 'convocatorias', label: 'Convocatorias', href: 'convocatorias.html' },
     { key: 'bienestar', label: 'Bienestar', href: 'bienestar.html' },
+    { key: 'video', label: 'Vídeo análisis', href: 'video-analisis.html' },
     { key: 'estadisticas', label: 'Estadísticas', href: 'estadisticas.html' }
   ];
 
