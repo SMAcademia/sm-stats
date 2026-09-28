@@ -48,6 +48,11 @@
     { key: 'border', label: 'Con borde' },
     { key: 'fill', label: 'Relleno' }
   ];
+  const ALPHA_OPTIONS = [
+    { key: 0.35, label: 'Muy transparente' },
+    { key: 0.55, label: 'Media' },
+    { key: 0.75, label: 'Poco transparente' }
+  ];
 
   let DATA = null;
 
@@ -103,7 +108,7 @@
   let activeTool = null; // null (seleccionar/mover) | 'line' | 'curve'
   let selectedShapeId = null;
   let creatingShape = null; // línea/curva en curso mientras se arrastra para crearla
-  let currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none', fillMode: 'border' };
+  let currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none', fillMode: 'border', alpha: 0.55 };
   let shapeDragState = null; // arrastre de un nodo de una forma ya creada: { shapeId, xField, yField }
   let handleEls = {}; // { [handleKey]: elemento DOM }, según HANDLE_DEFS[shape.type]
 
@@ -177,6 +182,7 @@
             '<button type="button" class="pill va-tool-btn" data-tool="rect">Cuadrado</button>' +
             '<button type="button" class="pill va-tool-btn" data-tool="ellipse">Elipse</button>' +
             '<button type="button" class="pill va-tool-btn" data-tool="spotlight">Foco</button>' +
+            '<button type="button" class="pill va-tool-btn" data-tool="clone">Clonar jugador</button>' +
             '<span style="flex:1 1 auto;"></span>' +
             '<button type="button" class="btn btn-outline" id="va-unfreeze-btn">Volver al vídeo</button>' +
           '</div>' +
@@ -196,6 +202,10 @@
             '<div class="va-group-row" id="va-fill-row">' +
               '<span class="va-group-label">Estilo</span>' +
               FILL_MODES.map(function (f) { return '<button type="button" class="pill va-fill-btn" data-fill="' + f.key + '">' + f.label + '</button>'; }).join('') +
+            '</div>' +
+            '<div class="va-group-row" id="va-alpha-row">' +
+              '<span class="va-group-label">Transparencia</span>' +
+              ALPHA_OPTIONS.map(function (a) { return '<button type="button" class="pill va-alpha-btn" data-alpha="' + a.key + '">' + a.label + '</button>'; }).join('') +
             '</div>' +
             '<div class="va-group-row">' +
               '<button type="button" class="btn btn-outline" id="va-delete-shape" style="color:var(--red-bright);display:none;">Eliminar</button>' +
@@ -268,7 +278,7 @@
     boundedPlayback = false;
     frozen = false; frozenSourceCanvas = null; shapes = []; nextShapeId = 1;
     activeTool = null; selectedShapeId = null; creatingShape = null;
-    currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none', fillMode: 'border' };
+    currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none', fillMode: 'border', alpha: 0.55 };
     shapeDragState = null; handleEls = {};
 
     renderEditor();
@@ -382,6 +392,9 @@
     main.querySelectorAll('.va-fill-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { applyProp('fillMode', btn.getAttribute('data-fill')); });
     });
+    main.querySelectorAll('.va-alpha-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { applyProp('alpha', Number(btn.getAttribute('data-alpha'))); });
+    });
     main.querySelector('#va-delete-shape').addEventListener('click', function () {
       shapes = shapes.filter(function (s) { return s.id !== selectedShapeId; });
       selectShape(null);
@@ -393,7 +406,7 @@
       if (activeTool === 'line' || activeTool === 'curve') {
         creatingShape = { type: activeTool, x1: p.x, y1: p.y, x2: p.x, y2: p.y, cx: p.x, cy: p.y };
         canvas.setPointerCapture(e.pointerId);
-      } else if (activeTool === 'rect' || activeTool === 'ellipse') {
+      } else if (activeTool === 'rect' || activeTool === 'ellipse' || activeTool === 'clone') {
         creatingShape = { type: activeTool, anchorX: p.x, anchorY: p.y, x: p.x, y: p.y, w: 0, h: 0 };
         canvas.setPointerCapture(e.pointerId);
       } else if (activeTool === 'spotlight') {
@@ -412,7 +425,7 @@
         // "cuerpo", solo sus nodos, así que no aplica.
         if (hitId != null) {
           const shape = shapes.find(function (s) { return s.id === hitId; });
-          if (shape.type === 'rect' || shape.type === 'ellipse' || shape.type === 'spotlight') {
+          if (shape.type === 'rect' || shape.type === 'ellipse' || shape.type === 'spotlight' || shape.type === 'clone') {
             shapeDragState = { shapeId: hitId, mode: 'move', startX: p.x, startY: p.y, origX: shape.x, origY: shape.y };
           }
         }
@@ -421,7 +434,7 @@
     canvas.addEventListener('pointermove', function (e) {
       if (!creatingShape) return;
       const p = canvasPointFromEvent(e);
-      if (creatingShape.type === 'rect' || creatingShape.type === 'ellipse') {
+      if (creatingShape.type === 'rect' || creatingShape.type === 'ellipse' || creatingShape.type === 'clone') {
         creatingShape.x = Math.min(creatingShape.anchorX, p.x);
         creatingShape.y = Math.min(creatingShape.anchorY, p.y);
         creatingShape.w = Math.abs(p.x - creatingShape.anchorX);
@@ -440,11 +453,27 @@
       if (!creatingShape) return;
       const drawn = creatingShape;
       creatingShape = null;
-      const isBox = drawn.type === 'rect' || drawn.type === 'ellipse';
+      const isBox = drawn.type === 'rect' || drawn.type === 'ellipse' || drawn.type === 'clone';
       const dx = (drawn.x2 - drawn.x1) * canvas.width, dy = (drawn.y2 - drawn.y1) * canvas.height;
       const tooSmall = isBox ? (drawn.w * canvas.width < 6 || drawn.h * canvas.height < 6) : Math.hypot(dx, dy) < 6;
       if (tooSmall) { drawFrame(); return; } // tap accidental, sin arrastre real
       if (isBox) { delete drawn.anchorX; delete drawn.anchorY; }
+      if (drawn.type === 'clone') {
+        // Recorta del fotograma congelado ORIGINAL (sin las anotaciones ya
+        // dibujadas encima) — se quiere clonar al jugador tal cual salía en
+        // la imagen, no una copia con líneas/formas ya puestas.
+        const sx = drawn.x * canvas.width, sy = drawn.y * canvas.height;
+        const sw = drawn.w * canvas.width, sh = drawn.h * canvas.height;
+        const img = document.createElement('canvas');
+        img.width = Math.max(1, Math.round(sw));
+        img.height = Math.max(1, Math.round(sh));
+        img.getContext('2d').drawImage(frozenSourceCanvas, sx, sy, sw, sh, 0, 0, img.width, img.height);
+        drawn.img = img;
+        // Se desplaza un poco al crearlo, para que se note enseguida que es
+        // un duplicado y no el propio jugador original tapado encima.
+        drawn.x = clamp(drawn.x + 0.06, 0, 1 - drawn.w);
+        drawn.y = clamp(drawn.y + 0.06, 0, 1 - drawn.h);
+      }
       if (drawn.type === 'curve') {
         // Un punto de control justo en el medio da una "curva" recta, poco
         // útil de entrada — se desplaza en perpendicular al segmento (en
@@ -706,7 +735,7 @@
       const d = Math.hypot(px - cx, py - cy);
       return d <= r ? 0 : d - r;
     }
-    if (s.type === 'rect' || s.type === 'ellipse') {
+    if (s.type === 'rect' || s.type === 'ellipse' || s.type === 'clone') {
       // Toda la caja cuenta como zona de selección (no solo el borde) — más
       // cómodo de pinchar, sobre todo en el estilo "con borde" donde el
       // interior está vacío.
@@ -773,16 +802,19 @@
     if (!showProps) return;
     const isLineLike = type === 'line' || type === 'curve';
     const isBoxLike = type === 'rect' || type === 'ellipse';
-    const hasStyle = isLineLike || isBoxLike; // el foco no tiene color/grosor/trazo propios
+    const isClone = type === 'clone';
+    const hasStyle = isLineLike || isBoxLike; // ni el foco ni el clon tienen color/grosor/trazo propios
     main.querySelector('#va-base-row').style.display = hasStyle ? '' : 'none';
     main.querySelector('#va-arrow-row').style.display = isLineLike ? '' : 'none';
     main.querySelector('#va-fill-row').style.display = isBoxLike ? '' : 'none';
+    main.querySelector('#va-alpha-row').style.display = isClone ? '' : 'none';
     const props = shape || currentDefaults;
     main.querySelectorAll('.va-color-swatch').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-color') === props.color); });
     main.querySelectorAll('.va-width-btn').forEach(function (b) { b.classList.toggle('active', Number(b.getAttribute('data-width')) === props.width); });
     main.querySelectorAll('.va-dash-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-dash') === props.dash); });
     main.querySelectorAll('.va-arrow-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-arrow') === props.arrow); });
     main.querySelectorAll('.va-fill-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-fill') === props.fillMode); });
+    main.querySelectorAll('.va-alpha-btn').forEach(function (b) { b.classList.toggle('active', Number(b.getAttribute('data-alpha')) === props.alpha); });
     main.querySelector('#va-delete-shape').style.display = shape ? '' : 'none';
   }
 
@@ -963,12 +995,33 @@
     ctx.drawImage(spotlightOverlayCanvas, 0, 0);
   }
 
+  function drawCloneShape(s) {
+    if (!s.img) {
+      // Mientras se arrastra para elegir la zona a clonar, todavía no hay
+      // imagen capturada (eso pasa al soltar) — se muestra un simple
+      // contorno de selección en su lugar.
+      const x = s.x * canvas.width, y = s.y * canvas.height, w = s.w * canvas.width, h = s.h * canvas.height;
+      ctx.save();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 6]);
+      ctx.strokeRect(x, y, w, h);
+      ctx.restore();
+      return;
+    }
+    ctx.save();
+    ctx.globalAlpha = s.alpha != null ? s.alpha : 0.55;
+    ctx.drawImage(s.img, s.x * canvas.width, s.y * canvas.height, s.w * canvas.width, s.h * canvas.height);
+    ctx.restore();
+  }
+
   function drawShape(s) {
     if (s.type === 'line') drawLineShape(s);
     else if (s.type === 'curve') drawCurveShape(s);
     else if (s.type === 'rect') drawRectShape(s);
     else if (s.type === 'ellipse') drawEllipseShape(s);
     else if (s.type === 'spotlight') drawSpotlightShape(s);
+    else if (s.type === 'clone') drawCloneShape(s);
   }
 
   function drawFrame() {
