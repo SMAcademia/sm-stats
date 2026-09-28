@@ -39,6 +39,11 @@
     { key: 'dashed', label: 'Discontinuo' },
     { key: 'longdash', label: 'Guiones largos' }
   ];
+  const ARROW_STYLES = [
+    { key: 'none', label: 'Sin flecha' },
+    { key: 'end', label: 'Flecha' },
+    { key: 'both', label: 'Doble flecha' }
+  ];
 
   let DATA = null;
 
@@ -94,7 +99,7 @@
   let activeTool = null; // null (seleccionar/mover) | 'line'
   let selectedShapeId = null;
   let creatingLine = null; // línea en curso mientras se arrastra para crearla
-  let currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: false };
+  let currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none' };
   let shapeDragState = null; // arrastre de un nodo de una línea ya creada
   let handleEls = { start: null, end: null };
 
@@ -140,7 +145,8 @@
             LINE_WIDTH_OPTIONS.map(function (w) { return '<button type="button" class="pill va-width-btn" data-width="' + w.px + '">' + w.label + '</button>'; }).join('') +
             '<span class="va-group-label">Trazo</span>' +
             DASH_STYLES.map(function (d) { return '<button type="button" class="pill va-dash-btn" data-dash="' + d.key + '">' + d.label + '</button>'; }).join('') +
-            '<button type="button" class="pill va-arrow-toggle">Flecha</button>' +
+            '<span class="va-group-label">Flecha</span>' +
+            ARROW_STYLES.map(function (a) { return '<button type="button" class="pill va-arrow-btn" data-arrow="' + a.key + '">' + a.label + '</button>'; }).join('') +
             '<button type="button" class="btn btn-outline" id="va-delete-shape" style="color:var(--red-bright);display:none;">Eliminar</button>' +
           '</div>' +
         '</div>' +
@@ -210,7 +216,7 @@
     boundedPlayback = false;
     frozen = false; frozenSourceCanvas = null; shapes = []; nextShapeId = 1;
     activeTool = null; selectedShapeId = null; creatingLine = null;
-    currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: false };
+    currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none' };
     shapeDragState = null; handleEls = { start: null, end: null };
 
     renderEditor();
@@ -318,9 +324,8 @@
     main.querySelectorAll('.va-dash-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { applyProp('dash', btn.getAttribute('data-dash')); });
     });
-    main.querySelector('.va-arrow-toggle').addEventListener('click', function () {
-      const shape = selectedShapeId != null ? shapes.find(function (s) { return s.id === selectedShapeId; }) : null;
-      applyProp('arrow', !(shape || currentDefaults).arrow);
+    main.querySelectorAll('.va-arrow-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { applyProp('arrow', btn.getAttribute('data-arrow')); });
     });
     main.querySelector('#va-delete-shape').addEventListener('click', function () {
       shapes = shapes.filter(function (s) { return s.id !== selectedShapeId; });
@@ -611,8 +616,7 @@
     main.querySelectorAll('.va-color-swatch').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-color') === props.color); });
     main.querySelectorAll('.va-width-btn').forEach(function (b) { b.classList.toggle('active', Number(b.getAttribute('data-width')) === props.width); });
     main.querySelectorAll('.va-dash-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-dash') === props.dash); });
-    const arrowBtn = main.querySelector('.va-arrow-toggle');
-    if (arrowBtn) arrowBtn.classList.toggle('active', !!props.arrow);
+    main.querySelectorAll('.va-arrow-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-arrow') === props.arrow); });
     main.querySelector('#va-delete-shape').style.display = shape ? '' : 'none';
   }
 
@@ -667,19 +671,26 @@
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.stroke();
-    if (s.arrow) {
+    if (s.arrow === 'end' || s.arrow === 'both') {
       ctx.setLineDash([]);
-      const angle = Math.atan2(y2 - y1, x2 - x1);
-      const headLen = Math.max(10, w * 3.2);
-      const headAngle = Math.PI / 7.5;
-      ctx.beginPath();
-      ctx.moveTo(x2, y2);
-      ctx.lineTo(x2 - headLen * Math.cos(angle - headAngle), y2 - headLen * Math.sin(angle - headAngle));
-      ctx.lineTo(x2 - headLen * Math.cos(angle + headAngle), y2 - headLen * Math.sin(angle + headAngle));
-      ctx.closePath();
-      ctx.fill();
+      drawArrowHead(x2, y2, Math.atan2(y2 - y1, x2 - x1), w);
+    }
+    if (s.arrow === 'both') {
+      ctx.setLineDash([]);
+      drawArrowHead(x1, y1, Math.atan2(y1 - y2, x1 - x2), w);
     }
     ctx.restore();
+  }
+
+  function drawArrowHead(x, y, angle, w) {
+    const headLen = Math.max(10, w * 3.2);
+    const headAngle = Math.PI / 7.5;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - headLen * Math.cos(angle - headAngle), y - headLen * Math.sin(angle - headAngle));
+    ctx.lineTo(x - headLen * Math.cos(angle + headAngle), y - headLen * Math.sin(angle + headAngle));
+    ctx.closePath();
+    ctx.fill();
   }
 
   function drawFrame() {
