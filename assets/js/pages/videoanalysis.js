@@ -132,6 +132,14 @@
     ]
   };
   HANDLE_DEFS.ellipse = HANDLE_DEFS.rect;
+  HANDLE_DEFS.spotlight = [{
+    key: 'resize',
+    get: function (s) { return { x: s.x + s.r, y: s.y }; },
+    set: function (s, x, y) {
+      const dxPx = (x - s.x) * canvas.width, dyPx = (y - s.y) * canvas.height;
+      s.r = clamp(Math.hypot(dxPx, dyPx) / canvas.width, 0.03, 1);
+    }
+  }];
 
   function renderEmpty() {
     main.innerHTML =
@@ -168,11 +176,12 @@
             '<button type="button" class="pill va-tool-btn" data-tool="curve">Curva</button>' +
             '<button type="button" class="pill va-tool-btn" data-tool="rect">Cuadrado</button>' +
             '<button type="button" class="pill va-tool-btn" data-tool="ellipse">Elipse</button>' +
+            '<button type="button" class="pill va-tool-btn" data-tool="spotlight">Foco</button>' +
             '<span style="flex:1 1 auto;"></span>' +
             '<button type="button" class="btn btn-outline" id="va-unfreeze-btn">Volver al vídeo</button>' +
           '</div>' +
           '<div id="va-shape-props" style="display:none;flex-direction:column;gap:10px;">' +
-            '<div class="va-group-row">' +
+            '<div class="va-group-row" id="va-base-row">' +
               '<span class="va-group-label">Color</span>' +
               LINE_COLORS.map(function (c) { return '<button type="button" class="va-color-swatch" data-color="' + c + '" style="background:' + c + ';"></button>'; }).join('') +
               '<span class="va-group-label">Grosor</span>' +
@@ -387,15 +396,23 @@
       } else if (activeTool === 'rect' || activeTool === 'ellipse') {
         creatingShape = { type: activeTool, anchorX: p.x, anchorY: p.y, x: p.x, y: p.y, w: 0, h: 0 };
         canvas.setPointerCapture(e.pointerId);
+      } else if (activeTool === 'spotlight') {
+        // Un solo tap basta: coloca el foco ya con un tamaño por defecto,
+        // listo para arrastrar/redimensionar después si hace falta.
+        const shape = { id: nextShapeId++, type: 'spotlight', x: p.x, y: p.y, r: 0.15 };
+        shapes.push(shape);
+        activeTool = null;
+        updateToolButtonsUi();
+        selectShape(shape.id);
       } else {
         const hitId = hitTestShapes(p);
         selectShape(hitId);
-        // Un rectángulo/elipse se mueve arrastrando su propio cuerpo (el
-        // tirador de la esquina es solo para el tamaño) — línea/curva no
-        // tienen "cuerpo", solo sus nodos, así que no aplica.
+        // Un rectángulo/elipse/foco se mueve arrastrando su propio cuerpo
+        // (el tirador es solo para el tamaño) — línea/curva no tienen
+        // "cuerpo", solo sus nodos, así que no aplica.
         if (hitId != null) {
           const shape = shapes.find(function (s) { return s.id === hitId; });
-          if (shape.type === 'rect' || shape.type === 'ellipse') {
+          if (shape.type === 'rect' || shape.type === 'ellipse' || shape.type === 'spotlight') {
             shapeDragState = { shapeId: hitId, mode: 'move', startX: p.x, startY: p.y, origX: shape.x, origY: shape.y };
           }
         }
@@ -460,8 +477,15 @@
       if (shapeDragState.mode === 'node') {
         shapeDragState.def.set(shape, x, y);
       } else if (shapeDragState.mode === 'move') {
-        shape.x = clamp(shapeDragState.origX + (x - shapeDragState.startX), 0, 1 - shape.w);
-        shape.y = clamp(shapeDragState.origY + (y - shapeDragState.startY), 0, 1 - shape.h);
+        // El foco es circular (su "tamaño" es un radio desde el centro),
+        // rectángulo/elipse son una caja con esquina superior izquierda —
+        // cada uno necesita su propio margen para no salirse del canvas.
+        const maxX = shape.type === 'spotlight' ? 1 - shape.r : 1 - shape.w;
+        const maxY = shape.type === 'spotlight' ? 1 - shape.r : 1 - shape.h;
+        const minX = shape.type === 'spotlight' ? shape.r : 0;
+        const minY = shape.type === 'spotlight' ? shape.r : 0;
+        shape.x = clamp(shapeDragState.origX + (x - shapeDragState.startX), minX, maxX);
+        shape.y = clamp(shapeDragState.origY + (y - shapeDragState.startY), minY, maxY);
       }
       positionHandles(shape);
       drawFrame();
@@ -677,6 +701,11 @@
   }
 
   function distToShape(px, py, s) {
+    if (s.type === 'spotlight') {
+      const cx = s.x * canvas.width, cy = s.y * canvas.height, r = s.r * canvas.width;
+      const d = Math.hypot(px - cx, py - cy);
+      return d <= r ? 0 : d - r;
+    }
     if (s.type === 'rect' || s.type === 'ellipse') {
       // Toda la caja cuenta como zona de selección (no solo el borde) — más
       // cómodo de pinchar, sobre todo en el estilo "con borde" donde el
@@ -704,10 +733,15 @@
   function hitTestShapes(p) {
     const px = p.x * canvas.width, py = p.y * canvas.height;
     let best = null, bestDist = 14; // tolerancia en píxeles de canvas
-    shapes.forEach(function (s) {
-      const d = distToShape(px, py, s);
-      if (d < bestDist) { bestDist = d; best = s.id; }
-    });
+    // De atrás hacia adelante: si dos formas se solapan y el punto cae
+    // dentro de ambas (distancia 0 en las dos), "<" no sustituye un empate,
+    // así que la que se comprueba primero se queda con la selección. Empezar
+    // por la última creada (la que se ve encima) hace que gane esa, que es
+    // la que el usuario espera pinchar.
+    for (let i = shapes.length - 1; i >= 0; i--) {
+      const d = distToShape(px, py, shapes[i]);
+      if (d < bestDist) { bestDist = d; best = shapes[i].id; }
+    }
     return best;
   }
 
@@ -739,6 +773,8 @@
     if (!showProps) return;
     const isLineLike = type === 'line' || type === 'curve';
     const isBoxLike = type === 'rect' || type === 'ellipse';
+    const hasStyle = isLineLike || isBoxLike; // el foco no tiene color/grosor/trazo propios
+    main.querySelector('#va-base-row').style.display = hasStyle ? '' : 'none';
     main.querySelector('#va-arrow-row').style.display = isLineLike ? '' : 'none';
     main.querySelector('#va-fill-row').style.display = isBoxLike ? '' : 'none';
     const props = shape || currentDefaults;
@@ -896,11 +932,43 @@
     ctx.restore();
   }
 
+  // Oscurece todo el fotograma salvo un círculo — para "recortar" ese
+  // agujero sin tener que volver a pintar la imagen de base, se oscurece
+  // con un rectángulo semitransparente y luego se borra (destination-out)
+  // justo la zona del círculo, dejando ver lo que ya había debajo tal cual
+  // (incluidas otras anotaciones dibujadas antes que el foco).
+  // El canvas es una sola imagen aplanada: si oscurecemos y luego "borramos"
+  // el círculo directamente sobre él, se borra TODO lo que hay debajo (deja
+  // transparencia, no el color original). Por eso el oscurecido con su
+  // agujero se prepara aparte, en un canvas auxiliar, y solo el resultado
+  // final (negro con un hueco realmente transparente) se superpone al
+  // canvas principal — así el interior del foco queda intacto.
+  let spotlightOverlayCanvas = null;
+  function drawSpotlightShape(s) {
+    const cx = s.x * canvas.width, cy = s.y * canvas.height, r = s.r * canvas.width;
+    if (!spotlightOverlayCanvas) spotlightOverlayCanvas = document.createElement('canvas');
+    if (spotlightOverlayCanvas.width !== canvas.width || spotlightOverlayCanvas.height !== canvas.height) {
+      spotlightOverlayCanvas.width = canvas.width;
+      spotlightOverlayCanvas.height = canvas.height;
+    }
+    const octx = spotlightOverlayCanvas.getContext('2d');
+    octx.globalCompositeOperation = 'source-over';
+    octx.clearRect(0, 0, canvas.width, canvas.height);
+    octx.fillStyle = 'rgba(0,0,0,0.72)';
+    octx.fillRect(0, 0, canvas.width, canvas.height);
+    octx.globalCompositeOperation = 'destination-out';
+    octx.beginPath();
+    octx.arc(cx, cy, r, 0, Math.PI * 2);
+    octx.fill();
+    ctx.drawImage(spotlightOverlayCanvas, 0, 0);
+  }
+
   function drawShape(s) {
     if (s.type === 'line') drawLineShape(s);
     else if (s.type === 'curve') drawCurveShape(s);
     else if (s.type === 'rect') drawRectShape(s);
     else if (s.type === 'ellipse') drawEllipseShape(s);
+    else if (s.type === 'spotlight') drawSpotlightShape(s);
   }
 
   function drawFrame() {
