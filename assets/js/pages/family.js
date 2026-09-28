@@ -128,15 +128,14 @@
   // Enlace directo a la encuesta de bienestar (encuesta.html) para la
   // sesión de hoy (entrenamiento o partido), sin esperar a que el
   // entrenador comparta el enlace por su cuenta. Solo aparece si se
-  // cumplen las tres condiciones: hoy hay sesión, el jugador asistió (la
-  // asistencia se toma igual para entrenos y partidos, ver asistencia.html),
-  // y todavía no ha respondido la encuesta de hoy.
+  // cumplen las dos condiciones: hoy hay sesión y todavía no ha respondido
+  // la encuesta de hoy. NO se exige haber marcado ya la asistencia — el
+  // entrenador puede tardar en pasarla (o pasarla más tarde), y eso no debe
+  // bloquear que el jugador rellene la encuesta justo después de la sesión.
   function todaySessionHtml(scoped, p) {
     const today = SM.ui.formatDateIso(new Date());
     const todaySession = (scoped.sessions || []).find(function (s) { return s.fecha === today; });
     if (!todaySession) return '';
-    const asistio = (scoped.attendance || []).some(function (a) { return a.session_id === todaySession.id && a.player_id === p.id && a.estado === 'presente'; });
-    if (!asistio) return '';
     const already = (scoped.checkins || []).some(function (c) { return c.session_id === todaySession.id && c.player_id === p.id; });
     if (already) return '';
     const isMatch = todaySession.tipo === 'partido';
