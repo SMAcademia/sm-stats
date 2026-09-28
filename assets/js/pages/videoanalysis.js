@@ -44,6 +44,10 @@
     { key: 'end', label: 'Flecha' },
     { key: 'both', label: 'Doble flecha' }
   ];
+  const FILL_MODES = [
+    { key: 'border', label: 'Con borde' },
+    { key: 'fill', label: 'Relleno' }
+  ];
 
   let DATA = null;
 
@@ -99,7 +103,7 @@
   let activeTool = null; // null (seleccionar/mover) | 'line' | 'curve'
   let selectedShapeId = null;
   let creatingShape = null; // línea/curva en curso mientras se arrastra para crearla
-  let currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none' };
+  let currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none', fillMode: 'border' };
   let shapeDragState = null; // arrastre de un nodo de una forma ya creada: { shapeId, xField, yField }
   let handleEls = {}; // { [handleKey]: elemento DOM }, según HANDLE_DEFS[shape.type]
 
@@ -107,10 +111,27 @@
   // coordenadas (fracciones 0..1) corresponde cada uno. Común a todos los
   // tipos con nodos (línea, curva, y lo que venga después), así el resto de
   // funciones de selección/arrastre no necesitan saber de tipos concretos.
+  // get/set en vez de simples nombres de campo: un nodo de línea/curva es un
+  // punto suelto (x,y) pero el tirador de tamaño de un rectángulo/elipse es
+  // la esquina calculada (x+w, y+h) y al arrastrarlo hay que recalcular
+  // w/h, no escribir directamente sobre "el campo". Con funciones, el resto
+  // del código (crear/posicionar/arrastrar un tirador) no necesita saber
+  // qué tipo de forma es.
   const HANDLE_DEFS = {
-    line: [{ key: 'start', xField: 'x1', yField: 'y1' }, { key: 'end', xField: 'x2', yField: 'y2' }],
-    curve: [{ key: 'start', xField: 'x1', yField: 'y1' }, { key: 'control', xField: 'cx', yField: 'cy' }, { key: 'end', xField: 'x2', yField: 'y2' }]
+    line: [
+      { key: 'start', get: function (s) { return { x: s.x1, y: s.y1 }; }, set: function (s, x, y) { s.x1 = x; s.y1 = y; } },
+      { key: 'end', get: function (s) { return { x: s.x2, y: s.y2 }; }, set: function (s, x, y) { s.x2 = x; s.y2 = y; } }
+    ],
+    curve: [
+      { key: 'start', get: function (s) { return { x: s.x1, y: s.y1 }; }, set: function (s, x, y) { s.x1 = x; s.y1 = y; } },
+      { key: 'control', get: function (s) { return { x: s.cx, y: s.cy }; }, set: function (s, x, y) { s.cx = x; s.cy = y; } },
+      { key: 'end', get: function (s) { return { x: s.x2, y: s.y2 }; }, set: function (s, x, y) { s.x2 = x; s.y2 = y; } }
+    ],
+    rect: [
+      { key: 'resize', get: function (s) { return { x: s.x + s.w, y: s.y + s.h }; }, set: function (s, x, y) { s.w = clamp(x - s.x, 0.02, 1 - s.x); s.h = clamp(y - s.y, 0.02, 1 - s.y); } }
+    ]
   };
+  HANDLE_DEFS.ellipse = HANDLE_DEFS.rect;
 
   function renderEmpty() {
     main.innerHTML =
@@ -145,19 +166,31 @@
             '<span class="va-group-label">Herramienta</span>' +
             '<button type="button" class="pill va-tool-btn" data-tool="line">Línea</button>' +
             '<button type="button" class="pill va-tool-btn" data-tool="curve">Curva</button>' +
+            '<button type="button" class="pill va-tool-btn" data-tool="rect">Cuadrado</button>' +
+            '<button type="button" class="pill va-tool-btn" data-tool="ellipse">Elipse</button>' +
             '<span style="flex:1 1 auto;"></span>' +
             '<button type="button" class="btn btn-outline" id="va-unfreeze-btn">Volver al vídeo</button>' +
           '</div>' +
-          '<div class="va-group-row" id="va-shape-props" style="display:none;">' +
-            '<span class="va-group-label">Color</span>' +
-            LINE_COLORS.map(function (c) { return '<button type="button" class="va-color-swatch" data-color="' + c + '" style="background:' + c + ';"></button>'; }).join('') +
-            '<span class="va-group-label">Grosor</span>' +
-            LINE_WIDTH_OPTIONS.map(function (w) { return '<button type="button" class="pill va-width-btn" data-width="' + w.px + '">' + w.label + '</button>'; }).join('') +
-            '<span class="va-group-label">Trazo</span>' +
-            DASH_STYLES.map(function (d) { return '<button type="button" class="pill va-dash-btn" data-dash="' + d.key + '">' + d.label + '</button>'; }).join('') +
-            '<span class="va-group-label">Flecha</span>' +
-            ARROW_STYLES.map(function (a) { return '<button type="button" class="pill va-arrow-btn" data-arrow="' + a.key + '">' + a.label + '</button>'; }).join('') +
-            '<button type="button" class="btn btn-outline" id="va-delete-shape" style="color:var(--red-bright);display:none;">Eliminar</button>' +
+          '<div id="va-shape-props" style="display:none;flex-direction:column;gap:10px;">' +
+            '<div class="va-group-row">' +
+              '<span class="va-group-label">Color</span>' +
+              LINE_COLORS.map(function (c) { return '<button type="button" class="va-color-swatch" data-color="' + c + '" style="background:' + c + ';"></button>'; }).join('') +
+              '<span class="va-group-label">Grosor</span>' +
+              LINE_WIDTH_OPTIONS.map(function (w) { return '<button type="button" class="pill va-width-btn" data-width="' + w.px + '">' + w.label + '</button>'; }).join('') +
+              '<span class="va-group-label">Trazo</span>' +
+              DASH_STYLES.map(function (d) { return '<button type="button" class="pill va-dash-btn" data-dash="' + d.key + '">' + d.label + '</button>'; }).join('') +
+            '</div>' +
+            '<div class="va-group-row" id="va-arrow-row">' +
+              '<span class="va-group-label">Flecha</span>' +
+              ARROW_STYLES.map(function (a) { return '<button type="button" class="pill va-arrow-btn" data-arrow="' + a.key + '">' + a.label + '</button>'; }).join('') +
+            '</div>' +
+            '<div class="va-group-row" id="va-fill-row">' +
+              '<span class="va-group-label">Estilo</span>' +
+              FILL_MODES.map(function (f) { return '<button type="button" class="pill va-fill-btn" data-fill="' + f.key + '">' + f.label + '</button>'; }).join('') +
+            '</div>' +
+            '<div class="va-group-row">' +
+              '<button type="button" class="btn btn-outline" id="va-delete-shape" style="color:var(--red-bright);display:none;">Eliminar</button>' +
+            '</div>' +
           '</div>' +
         '</div>' +
 
@@ -226,7 +259,7 @@
     boundedPlayback = false;
     frozen = false; frozenSourceCanvas = null; shapes = []; nextShapeId = 1;
     activeTool = null; selectedShapeId = null; creatingShape = null;
-    currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none' };
+    currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none', fillMode: 'border' };
     shapeDragState = null; handleEls = {};
 
     renderEditor();
@@ -337,6 +370,9 @@
     main.querySelectorAll('.va-arrow-btn').forEach(function (btn) {
       btn.addEventListener('click', function () { applyProp('arrow', btn.getAttribute('data-arrow')); });
     });
+    main.querySelectorAll('.va-fill-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { applyProp('fillMode', btn.getAttribute('data-fill')); });
+    });
     main.querySelector('#va-delete-shape').addEventListener('click', function () {
       shapes = shapes.filter(function (s) { return s.id !== selectedShapeId; });
       selectShape(null);
@@ -348,27 +384,50 @@
       if (activeTool === 'line' || activeTool === 'curve') {
         creatingShape = { type: activeTool, x1: p.x, y1: p.y, x2: p.x, y2: p.y, cx: p.x, cy: p.y };
         canvas.setPointerCapture(e.pointerId);
+      } else if (activeTool === 'rect' || activeTool === 'ellipse') {
+        creatingShape = { type: activeTool, anchorX: p.x, anchorY: p.y, x: p.x, y: p.y, w: 0, h: 0 };
+        canvas.setPointerCapture(e.pointerId);
       } else {
-        selectShape(hitTestShapes(p));
+        const hitId = hitTestShapes(p);
+        selectShape(hitId);
+        // Un rectángulo/elipse se mueve arrastrando su propio cuerpo (el
+        // tirador de la esquina es solo para el tamaño) — línea/curva no
+        // tienen "cuerpo", solo sus nodos, así que no aplica.
+        if (hitId != null) {
+          const shape = shapes.find(function (s) { return s.id === hitId; });
+          if (shape.type === 'rect' || shape.type === 'ellipse') {
+            shapeDragState = { shapeId: hitId, mode: 'move', startX: p.x, startY: p.y, origX: shape.x, origY: shape.y };
+          }
+        }
       }
     });
     canvas.addEventListener('pointermove', function (e) {
       if (!creatingShape) return;
       const p = canvasPointFromEvent(e);
-      creatingShape.x2 = p.x; creatingShape.y2 = p.y;
-      // Mientras se arrastra, el punto de control sigue el punto medio (la
-      // vista previa sale recta) — la curva visible de verdad se le da al
-      // soltar, ver más abajo.
-      creatingShape.cx = (creatingShape.x1 + p.x) / 2;
-      creatingShape.cy = (creatingShape.y1 + p.y) / 2;
+      if (creatingShape.type === 'rect' || creatingShape.type === 'ellipse') {
+        creatingShape.x = Math.min(creatingShape.anchorX, p.x);
+        creatingShape.y = Math.min(creatingShape.anchorY, p.y);
+        creatingShape.w = Math.abs(p.x - creatingShape.anchorX);
+        creatingShape.h = Math.abs(p.y - creatingShape.anchorY);
+      } else {
+        creatingShape.x2 = p.x; creatingShape.y2 = p.y;
+        // Mientras se arrastra, el punto de control sigue el punto medio (la
+        // vista previa sale recta) — la curva visible de verdad se le da al
+        // soltar, ver más abajo.
+        creatingShape.cx = (creatingShape.x1 + p.x) / 2;
+        creatingShape.cy = (creatingShape.y1 + p.y) / 2;
+      }
       drawFrame();
     });
     canvas.addEventListener('pointerup', function () {
       if (!creatingShape) return;
       const drawn = creatingShape;
       creatingShape = null;
+      const isBox = drawn.type === 'rect' || drawn.type === 'ellipse';
       const dx = (drawn.x2 - drawn.x1) * canvas.width, dy = (drawn.y2 - drawn.y1) * canvas.height;
-      if (Math.hypot(dx, dy) < 6) { drawFrame(); return; } // tap accidental, sin arrastre real
+      const tooSmall = isBox ? (drawn.w * canvas.width < 6 || drawn.h * canvas.height < 6) : Math.hypot(dx, dy) < 6;
+      if (tooSmall) { drawFrame(); return; } // tap accidental, sin arrastre real
+      if (isBox) { delete drawn.anchorX; delete drawn.anchorY; }
       if (drawn.type === 'curve') {
         // Un punto de control justo en el medio da una "curva" recta, poco
         // útil de entrada — se desplaza en perpendicular al segmento (en
@@ -396,8 +455,14 @@
       const shape = shapes.find(function (s) { return s.id === shapeDragState.shapeId; });
       if (!shape) return;
       const wrapRect = canvasWrap.getBoundingClientRect();
-      shape[shapeDragState.xField] = clamp((e.clientX - wrapRect.left) / wrapRect.width, 0, 1);
-      shape[shapeDragState.yField] = clamp((e.clientY - wrapRect.top) / wrapRect.height, 0, 1);
+      const x = clamp((e.clientX - wrapRect.left) / wrapRect.width, 0, 1);
+      const y = clamp((e.clientY - wrapRect.top) / wrapRect.height, 0, 1);
+      if (shapeDragState.mode === 'node') {
+        shapeDragState.def.set(shape, x, y);
+      } else if (shapeDragState.mode === 'move') {
+        shape.x = clamp(shapeDragState.origX + (x - shapeDragState.startX), 0, 1 - shape.w);
+        shape.y = clamp(shapeDragState.origY + (y - shapeDragState.startY), 0, 1 - shape.h);
+      }
       positionHandles(shape);
       drawFrame();
     });
@@ -612,6 +677,16 @@
   }
 
   function distToShape(px, py, s) {
+    if (s.type === 'rect' || s.type === 'ellipse') {
+      // Toda la caja cuenta como zona de selección (no solo el borde) — más
+      // cómodo de pinchar, sobre todo en el estilo "con borde" donde el
+      // interior está vacío.
+      const x = s.x * canvas.width, y = s.y * canvas.height, w = s.w * canvas.width, h = s.h * canvas.height;
+      if (px >= x && px <= x + w && py >= y && py <= y + h) return 0;
+      const dx = Math.max(x - px, 0, px - (x + w));
+      const dy = Math.max(y - py, 0, py - (y + h));
+      return Math.hypot(dx, dy);
+    }
     const x1 = s.x1 * canvas.width, y1 = s.y1 * canvas.height, x2 = s.x2 * canvas.width, y2 = s.y2 * canvas.height;
     if (s.type === 'curve') {
       const cx = s.cx * canvas.width, cy = s.cy * canvas.height;
@@ -658,14 +733,20 @@
   function updateShapePropsUi() {
     const propsRow = main.querySelector('#va-shape-props');
     const shape = selectedShapeId != null ? shapes.find(function (s) { return s.id === selectedShapeId; }) : null;
-    const showProps = activeTool != null || !!shape;
-    propsRow.style.display = showProps ? '' : 'none';
+    const type = shape ? shape.type : activeTool;
+    const showProps = type != null;
+    propsRow.style.display = showProps ? 'flex' : 'none';
     if (!showProps) return;
+    const isLineLike = type === 'line' || type === 'curve';
+    const isBoxLike = type === 'rect' || type === 'ellipse';
+    main.querySelector('#va-arrow-row').style.display = isLineLike ? '' : 'none';
+    main.querySelector('#va-fill-row').style.display = isBoxLike ? '' : 'none';
     const props = shape || currentDefaults;
     main.querySelectorAll('.va-color-swatch').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-color') === props.color); });
     main.querySelectorAll('.va-width-btn').forEach(function (b) { b.classList.toggle('active', Number(b.getAttribute('data-width')) === props.width); });
     main.querySelectorAll('.va-dash-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-dash') === props.dash); });
     main.querySelectorAll('.va-arrow-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-arrow') === props.arrow); });
+    main.querySelectorAll('.va-fill-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-fill') === props.fillMode); });
     main.querySelector('#va-delete-shape').style.display = shape ? '' : 'none';
   }
 
@@ -681,7 +762,7 @@
     el.addEventListener('pointerdown', function (e) {
       e.preventDefault();
       e.stopPropagation();
-      shapeDragState = { shapeId: shapeId, xField: def.xField, yField: def.yField };
+      shapeDragState = { shapeId: shapeId, mode: 'node', def: def };
     });
     return el;
   }
@@ -691,8 +772,9 @@
     (HANDLE_DEFS[shape.type] || []).forEach(function (def) {
       const el = handleEls[def.key];
       if (!el) return;
-      el.style.left = (shape[def.xField] * wrapRect.width) + 'px';
-      el.style.top = (shape[def.yField] * wrapRect.height) + 'px';
+      const p = def.get(shape);
+      el.style.left = (p.x * wrapRect.width) + 'px';
+      el.style.top = (p.y * wrapRect.height) + 'px';
     });
   }
 
@@ -709,6 +791,12 @@
 
   // ---- dibujo del fotograma ----
 
+  function applyDashPattern(w, dashKey) {
+    if (dashKey === 'dashed') ctx.setLineDash([w * 2.4, w * 2]);
+    else if (dashKey === 'longdash') ctx.setLineDash([w * 5.5, w * 2.4]);
+    else ctx.setLineDash([]);
+  }
+
   function drawLineShape(s) {
     const x1 = s.x1 * canvas.width, y1 = s.y1 * canvas.height, x2 = s.x2 * canvas.width, y2 = s.y2 * canvas.height;
     const w = s.width;
@@ -718,9 +806,7 @@
     ctx.lineWidth = w;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    if (s.dash === 'dashed') ctx.setLineDash([w * 2.4, w * 2]);
-    else if (s.dash === 'longdash') ctx.setLineDash([w * 5.5, w * 2.4]);
-    else ctx.setLineDash([]);
+    applyDashPattern(w, s.dash);
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
@@ -758,9 +844,7 @@
     ctx.lineWidth = w;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    if (s.dash === 'dashed') ctx.setLineDash([w * 2.4, w * 2]);
-    else if (s.dash === 'longdash') ctx.setLineDash([w * 5.5, w * 2.4]);
-    else ctx.setLineDash([]);
+    applyDashPattern(w, s.dash);
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.quadraticCurveTo(cx, cy, x2, y2);
@@ -780,9 +864,43 @@
     ctx.restore();
   }
 
+  function drawRectShape(s) {
+    const x = s.x * canvas.width, y = s.y * canvas.height, w = s.w * canvas.width, h = s.h * canvas.height;
+    ctx.save();
+    if (s.fillMode === 'fill') {
+      ctx.fillStyle = s.color;
+      ctx.fillRect(x, y, w, h);
+    } else {
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = s.width;
+      applyDashPattern(s.width, s.dash);
+      ctx.strokeRect(x, y, w, h);
+    }
+    ctx.restore();
+  }
+
+  function drawEllipseShape(s) {
+    const x = s.x * canvas.width, y = s.y * canvas.height, w = s.w * canvas.width, h = s.h * canvas.height;
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(x + w / 2, y + h / 2, Math.max(w / 2, 0.5), Math.max(h / 2, 0.5), 0, 0, Math.PI * 2);
+    if (s.fillMode === 'fill') {
+      ctx.fillStyle = s.color;
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = s.width;
+      applyDashPattern(s.width, s.dash);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function drawShape(s) {
     if (s.type === 'line') drawLineShape(s);
     else if (s.type === 'curve') drawCurveShape(s);
+    else if (s.type === 'rect') drawRectShape(s);
+    else if (s.type === 'ellipse') drawEllipseShape(s);
   }
 
   function drawFrame() {
