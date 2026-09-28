@@ -61,6 +61,12 @@
   });
 
   function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
+  function esc(v) { return SM.ui.escapeHtml(v); }
+
+  function exportPlayers() {
+    return (DATA && DATA.players || []).filter(function (p) { return p.activo; })
+      .sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
+  }
 
   function fmtTime(t) {
     t = Math.max(0, t || 0);
@@ -112,6 +118,14 @@
   let currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none', fillMode: 'border', alpha: 0.55 };
   let shapeDragState = null; // arrastre de un nodo de una forma ya creada: { shapeId, xField, yField }
   let handleEls = {}; // { [handleKey]: elemento DOM }, según HANDLE_DEFS[shape.type]
+  let frozenAtVideoTime = 0; // segundo exacto del vídeo en el que se congeló, para saber dónde insertar el hueco de 3s al exportar
+
+  // ---- exportar y guardar en el área del jugador ----
+  const EXPORT_FPS = 25;
+  const EXPORT_HOLD_MS = 3000; // "congelar fotograma+dibujos hechos (3'')"
+  const EXPORT_BITRATE = 1500000; // ~1.5 Mbps — de sobra de calidad para un clip corto, sin pesar demasiado
+  let exportPhase = null; // null | 'playing' | 'holding' — fuerza qué dibuja drawFrame() durante la exportación
+  let exporting = false;
 
   // Qué nodos arrastrables tiene cada tipo de forma, y a qué campo de
   // coordenadas (fracciones 0..1) corresponde cada uno. Común a todos los
@@ -273,6 +287,20 @@
             '<button type="button" class="btn btn-outline" id="va-zoom-toggle" style="padding:6px 12px;font-size:12px;display:none;">Vista previa del zoom</button>' +
           '</div>' +
         '</div>' +
+      '</div>' +
+
+      '<div class="panel" id="va-export-panel">' +
+        '<span class="panel-title">Guardar para un jugador</span>' +
+        '<div style="font-size:11.5px;color:var(--text-mute);font-weight:600;margin-top:2px;">Exporta el recorte (con el fotograma congelado y las anotaciones incrustados, si los hay) y lo guarda en el área privada del jugador elegido.</div>' +
+        '<div class="va-group-row" style="margin-top:12px;">' +
+          '<select id="va-export-player" style="min-width:200px;padding:8px 10px;border-radius:8px;">' +
+            '<option value="">Elige un jugador…</option>' +
+            exportPlayers().map(function (p) { return '<option value="' + p.id + '">' + esc(p.nombre) + (p.dorsal ? ' (#' + p.dorsal + ')' : '') + '</option>'; }).join('') +
+          '</select>' +
+          '<input type="text" id="va-export-title" placeholder="Título (opcional) — p. ej. Presión en salida de balón" style="flex:1 1 220px;min-width:200px;padding:8px 10px;">' +
+          '<button type="button" class="btn btn-primary" id="va-export-btn" style="padding:8px 18px;font-size:13px;">Exportar y guardar</button>' +
+        '</div>' +
+        '<div id="va-export-status" style="font-size:12.5px;font-weight:600;margin-top:10px;display:none;"></div>' +
       '</div>';
 
     canvasWrap = main.querySelector('#canvas-wrap');
@@ -293,6 +321,7 @@
     activeTool = null; selectedShapeId = null; creatingShape = null; networkDraft = null;
     currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none', fillMode: 'border', alpha: 0.55 };
     shapeDragState = null; handleEls = {};
+    frozenAtVideoTime = 0; exportPhase = null; exporting = false;
 
     renderEditor();
 
@@ -335,6 +364,7 @@
 
   function wireEditor() {
     main.querySelector('#video-change-btn').addEventListener('click', function () {
+      if (exporting) return;
       stopDrawLoop();
       if (video) { video.pause(); video.remove(); video = null; }
       if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
@@ -382,6 +412,7 @@
 
     main.querySelector('#va-freeze-btn').addEventListener('click', freezeFrame);
     main.querySelector('#va-unfreeze-btn').addEventListener('click', unfreeze);
+    main.querySelector('#va-export-btn').addEventListener('click', exportAndSave);
 
     main.querySelectorAll('.va-tool-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -698,8 +729,9 @@
   // ---- congelar / anotar ----
 
   function freezeFrame() {
-    if (!video || frozen) return;
+    if (!video || frozen || exporting) return;
     if (!video.paused) video.pause();
+    frozenAtVideoTime = video.currentTime;
     frozenSourceCanvas = document.createElement('canvas');
     frozenSourceCanvas.width = canvas.width;
     frozenSourceCanvas.height = canvas.height;
@@ -718,6 +750,7 @@
   }
 
   function unfreeze() {
+    if (exporting) return;
     frozen = false;
     frozenSourceCanvas = null;
     shapes = [];
@@ -733,6 +766,161 @@
   function updateFreezeUiState() {
     main.querySelector('.va-controls').style.display = frozen ? 'none' : '';
     main.querySelector('#va-annotate-panel').style.display = frozen ? '' : 'none';
+  }
+
+  // ---- exportar y guardar en el área del jugador ----
+
+  function pickExportMimeType() {
+    if (!window.MediaRecorder) return '';
+    const candidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+    for (let i = 0; i < candidates.length; i++) {
+      if (MediaRecorder.isTypeSupported(candidates[i])) return candidates[i];
+    }
+    return '';
+  }
+
+  function seekTo(t) {
+    return new Promise(function (resolve) {
+      if (Math.abs(video.currentTime - t) < 0.01) { resolve(); return; }
+      function onSeeked() { video.removeEventListener('seeked', onSeeked); resolve(); }
+      video.addEventListener('seeked', onSeeked);
+      video.currentTime = t;
+    });
+  }
+
+  // Reproduce desde donde esté el vídeo hasta `toTime` y resuelve al llegar
+  // (dejándolo en pausa). No hace falta redibujar a mano aquí: el propio
+  // evento 'play' del vídeo ya arranca el bucle de dibujo normal.
+  function playSegment(toTime) {
+    return new Promise(function (resolve) {
+      if (video.currentTime >= toTime - 0.02) { resolve(); return; }
+      function onTimeUpdate() {
+        if (video.currentTime >= toTime - 0.02) {
+          video.removeEventListener('timeupdate', onTimeUpdate);
+          video.pause();
+          resolve();
+        }
+      }
+      video.addEventListener('timeupdate', onTimeUpdate);
+      video.play();
+    });
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise(function (resolve, reject) {
+      const reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function showExportStatus(msg, kind) {
+    const el = main.querySelector('#va-export-status');
+    if (!el) return;
+    if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+    el.style.display = 'block';
+    el.style.color = kind === 'error' ? 'var(--red-bright)' : (kind === 'ok' ? 'var(--green)' : 'var(--text-mute)');
+    el.textContent = msg;
+  }
+
+  // Bloquea el resto del editor mientras se exporta: tocar el vídeo, las
+  // herramientas de dibujo o cambiar de vídeo a mitad de la grabación
+  // dejaría el resultado a medias o corrompería el estado que la propia
+  // exportación está usando en ese momento.
+  function setExportingUiState(isExporting) {
+    exporting = isExporting;
+    const btn = main.querySelector('#va-export-btn');
+    if (btn) { btn.disabled = isExporting; btn.textContent = isExporting ? 'Exportando…' : 'Exportar y guardar'; }
+    ['#va-annotate-panel', '.va-controls', '#canvas-wrap'].forEach(function (sel) {
+      const el = main.querySelector(sel);
+      if (el) { el.style.pointerEvents = isExporting ? 'none' : ''; el.style.opacity = isExporting ? '0.55' : ''; }
+    });
+    const select = main.querySelector('#va-export-player');
+    if (select) select.disabled = isExporting;
+    const titleInput = main.querySelector('#va-export-title');
+    if (titleInput) titleInput.disabled = isExporting;
+    const changeBtn = main.querySelector('#video-change-btn');
+    if (changeBtn) changeBtn.disabled = isExporting;
+  }
+
+  async function exportAndSave() {
+    if (exporting || !video || !duration) return;
+    const playerId = main.querySelector('#va-export-player').value;
+    if (!playerId) { showExportStatus('Elige a qué jugador se lo asignas.', 'error'); return; }
+    const player = (DATA.players || []).find(function (p) { return p.id === playerId; });
+    const mimeType = pickExportMimeType();
+    if (!mimeType) { showExportStatus('Este navegador no permite exportar vídeo — pruébalo desde Chrome/Android.', 'error'); return; }
+
+    const titulo = main.querySelector('#va-export-title').value.trim();
+    // El hueco congelado solo tiene sentido si hay algo dibujado — si el
+    // entrenador congeló para mirar pero no anotó nada, se exporta el
+    // recorte tal cual, sin insertar ninguna pausa.
+    const hadFrozenAnnotations = frozen && shapes.length > 0;
+    const freezeAtTime = hadFrozenAnnotations ? clamp(frozenAtVideoTime, inPoint, outPoint) : null;
+
+    setExportingUiState(true);
+    showExportStatus('Preparando…', null);
+    boundedPlayback = false;
+
+    try {
+      const canvasStream = canvas.captureStream(EXPORT_FPS);
+      let audioTracks = [];
+      try { audioTracks = video.captureStream().getAudioTracks(); } catch (e) { /* sin audio en el clip, no pasa nada */ }
+      const stream = new MediaStream(canvasStream.getVideoTracks().concat(audioTracks));
+      const recorder = new MediaRecorder(stream, { mimeType: mimeType, videoBitsPerSecond: EXPORT_BITRATE });
+      const chunks = [];
+      recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+      const stopped = new Promise(function (resolve) { recorder.onstop = resolve; });
+
+      video.playbackRate = speed;
+      exportPhase = 'playing';
+      await seekTo(inPoint);
+      recorder.start();
+
+      showExportStatus('Grabando…', null);
+      await playSegment(freezeAtTime != null ? freezeAtTime : outPoint);
+
+      if (hadFrozenAnnotations) {
+        exportPhase = 'holding';
+        drawFrame(); // el mismo fotograma congelado + anotaciones que ya se ve en el editor
+        showExportStatus('Congelando el fotograma anotado (3s)…', null);
+        await sleep(EXPORT_HOLD_MS);
+        exportPhase = 'playing';
+        if (freezeAtTime < outPoint) {
+          showExportStatus('Grabando…', null);
+          await playSegment(outPoint);
+        }
+      }
+
+      exportPhase = null;
+      recorder.stop();
+      await stopped;
+
+      showExportStatus('Subiendo…', null);
+      const blob = new Blob(chunks, { type: mimeType });
+      const dataUrl = await blobToDataUrl(blob);
+      await SM.api.postAction('uploadVideoClip', {
+        dataUrl: dataUrl,
+        filename: 'clip',
+        playerId: playerId,
+        titulo: titulo,
+        fecha: SM.ui.formatDateIso(new Date()),
+        categoria: player ? player.categoria : ''
+      });
+      showExportStatus('Guardado para ' + (player ? player.nombre : 'el jugador') + ' — ya lo puede ver desde su área privada.', 'ok');
+      main.querySelector('#va-export-title').value = '';
+    } catch (err) {
+      showExportStatus('⚠ ' + err.message, 'error');
+    } finally {
+      exportPhase = null;
+      setExportingUiState(false);
+      drawFrame(); // recupera lo que tocara mostrar (congelado+anotado, o el vídeo)
+    }
   }
 
   function canvasPointFromEvent(e) {
@@ -1127,15 +1315,12 @@
     else if (s.type === 'network') drawNetworkShape(s);
   }
 
-  function drawFrame() {
-    if (!ctx) return;
-    if (frozen) {
-      if (frozenSourceCanvas) ctx.drawImage(frozenSourceCanvas, 0, 0);
-      shapes.forEach(drawShape);
-      if (creatingShape) drawShape(Object.assign({ id: 0 }, creatingShape, currentDefaults));
-      if (networkDraft) drawShape(Object.assign({ id: 0, type: 'network' }, networkDraft, currentDefaults));
-      return;
-    }
+  // Dibuja el vídeo en directo (con el efecto de zoom si estaba en vista
+  // previa) — separado de drawFrame() para poder forzarlo también durante
+  // la exportación mientras se reproducen los tramos sin congelar, aunque
+  // en ese momento `frozen` siga en true (el editor sigue "congelado" por
+  // fuera; solo se toma prestado el canvas un momento para grabar).
+  function drawLiveVideoFrame() {
     if (!video || !video.videoWidth) return;
     if (zoomLevel > 1 && zoomPreviewMode && zoomRect) {
       ctx.fillStyle = '#000';
@@ -1150,6 +1335,19 @@
     } else {
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     }
+  }
+
+  function drawFrame() {
+    if (!ctx) return;
+    if (exportPhase === 'playing') { drawLiveVideoFrame(); return; }
+    if (frozen) {
+      if (frozenSourceCanvas) ctx.drawImage(frozenSourceCanvas, 0, 0);
+      shapes.forEach(drawShape);
+      if (creatingShape) drawShape(Object.assign({ id: 0 }, creatingShape, currentDefaults));
+      if (networkDraft) drawShape(Object.assign({ id: 0, type: 'network' }, networkDraft, currentDefaults));
+      return;
+    }
+    drawLiveVideoFrame();
   }
 
   window.addEventListener('resize', function () {

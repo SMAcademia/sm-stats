@@ -31,6 +31,7 @@ const SHEETS = {
   checkins: 'Checkins',
   planEntries: 'PlanEntries',
   devGoals: 'DevGoals',
+  videoClips: 'VideoClips',
   settings: 'Settings'
 };
 
@@ -77,6 +78,11 @@ const PLAN_COLUMNS = ['id', 'fecha', 'categoria', 'tecnico', 'tactico', 'fisico'
 // tecnico/tactico/fisico/valores/porteros (mismas 5 de Planificación).
 // estado: pendiente / en_progreso / conseguido.
 const DEV_GOAL_COLUMNS = ['id', 'player_id', 'categoria', 'texto', 'estado', 'fecha_creacion', 'fecha_actualizacion'];
+// Clips de corrección en vídeo (ver video-analisis.html): grabados y
+// recortados en el propio navegador del entrenador, se suben ya montados
+// (con las anotaciones incrustadas si las había) — aquí solo se guarda el
+// enlace de Drive resultante y a quién pertenece.
+const VIDEO_CLIP_COLUMNS = ['id', 'player_id', 'titulo', 'fecha', 'video_url', 'categoria'];
 // Settings is a singleton sheet: header row + exactly one data row (row 2).
 const SETTINGS_COLUMNS = ['club_nombre', 'entrenador_nombre', 'entrenador_rol', 'liga_nombre'];
 const DEFAULT_SETTINGS = { club_nombre: 'Mi Club', entrenador_nombre: 'Nombre del entrenador', entrenador_rol: 'Entrenador', liga_nombre: 'Liga Regional · Grupo B' };
@@ -99,6 +105,7 @@ function setupSheets() {
     [SHEETS.checkins, CHECKIN_COLUMNS],
     [SHEETS.planEntries, PLAN_COLUMNS],
     [SHEETS.devGoals, DEV_GOAL_COLUMNS],
+    [SHEETS.videoClips, VIDEO_CLIP_COLUMNS],
     [SHEETS.settings, SETTINGS_COLUMNS]
   ];
   defs.forEach(function (def) {
@@ -324,6 +331,7 @@ function doGet(e) {
       checkins: sheetToObjectsOrEmpty(SHEETS.checkins).map(coerceCheckin),
       planEntries: sheetToObjectsOrEmpty(SHEETS.planEntries),
       devGoals: sheetToObjectsOrEmpty(SHEETS.devGoals),
+      videoClips: sheetToObjectsOrEmpty(SHEETS.videoClips),
       settings: readSingletonRow(SHEETS.settings, SETTINGS_COLUMNS, DEFAULT_SETTINGS)
     };
     return jsonResponse({ ok: true, result: data });
@@ -374,6 +382,7 @@ function doPost(e) {
       saveDevGoal: saveDevGoal,
       deleteDevGoal: deleteDevGoal,
       uploadPhoto: uploadPhoto,
+      uploadVideoClip: uploadVideoClip,
       saveCallups: saveCallups,
       saveMatchReport: saveMatchReport,
       saveAttendance: saveAttendance,
@@ -455,6 +464,56 @@ function uploadPhoto(payload) {
   // de imágenes de Google sí está pensado para insertarse como imagen
   // pública sin login.
   return { url: 'https://lh3.googleusercontent.com/d/' + file.getId() };
+}
+
+const VIDEOS_FOLDER_NAME = 'SM Stats — Vídeos';
+
+function getOrCreateVideosFolder() {
+  const it = DriveApp.getFoldersByName(VIDEOS_FOLDER_NAME);
+  if (it.hasNext()) return it.next();
+  return DriveApp.createFolder(VIDEOS_FOLDER_NAME);
+}
+
+// Sube un clip de corrección ya montado en el navegador (recortado a ≤30s,
+// con las anotaciones y el fotograma congelado incrustados si los había —
+// ver video-analisis.html) y lo asocia a un jugador para que lo vea desde
+// su área privada.
+//
+// OJO con el enlace: a diferencia de una imagen, un vídeo de Drive NO se
+// puede insertar como <video src="..."> normal — Drive no sirve bien las
+// peticiones "range" que necesita el streaming, así que en muchos
+// dispositivos (sobre todo iOS) o no carga o obliga a descargar en vez de
+// reproducir. El enlace que sí funciona embebido es el visor propio de
+// Drive en un <iframe> (…/preview) — así se usa en mi-jugador.html.
+function uploadVideoClip(payload) {
+  if (!payload.dataUrl) throw new Error('Falta el vídeo.');
+  if (!payload.playerId) throw new Error('Falta el jugador.');
+  // El tipo MIME real que da MediaRecorder incluye codecs, p.ej.
+  // "video/webm;codecs=vp8,opus" — esa coma DENTRO del propio tipo (antes
+  // de llegar a ";base64,") rompe un regex que espere la coma justo
+  // después del tipo, así que se busca el separador real por texto en vez
+  // de intentar capturarlo con una expresión regular.
+  const marker = ';base64,';
+  const markerIdx = payload.dataUrl.indexOf(marker);
+  if (payload.dataUrl.indexOf('data:video/') !== 0 || markerIdx === -1) {
+    throw new Error('Formato de vídeo no válido.');
+  }
+  const mimeType = payload.dataUrl.slice('data:'.length, markerIdx);
+  const bytes = Utilities.base64Decode(payload.dataUrl.slice(markerIdx + marker.length));
+  const ext = mimeType.indexOf('webm') !== -1 ? 'webm' : 'mp4';
+  const blob = Utilities.newBlob(bytes, mimeType, (payload.filename || 'clip') + '.' + ext);
+  const file = getOrCreateVideosFolder().createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  const row = {
+    id: newId('vc'),
+    player_id: payload.playerId,
+    titulo: payload.titulo || '',
+    fecha: payload.fecha || new Date().toISOString().slice(0, 10),
+    video_url: 'https://drive.google.com/file/d/' + file.getId() + '/preview',
+    categoria: payload.categoria || ''
+  };
+  appendRow(SHEETS.videoClips, VIDEO_CLIP_COLUMNS, row);
+  return row;
 }
 
 function addMatch(payload) {

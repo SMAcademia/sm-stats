@@ -151,6 +151,40 @@
     );
   }
 
+  // Clips de corrección que el cuerpo técnico ha preparado para este
+  // jugador (ver video-analisis.html) — el más reciente primero.
+  function videoClipsHtml(scoped, p) {
+    const clips = (scoped.videoClips || [])
+      .filter(function (c) { return c.player_id === p.id; })
+      .slice()
+      .sort(function (a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+    if (!clips.length) return '';
+    return (
+      '<div class="panel">' +
+        '<span class="panel-title">Vídeos de corrección</span>' +
+        '<div style="display:flex;flex-direction:column;gap:16px;margin-top:12px;">' +
+          clips.map(function (c) {
+            // En modo demo el vídeo se guarda como data URL y se reproduce
+            // con un <video> normal; contra Drive real, un vídeo no se puede
+            // embeber como <video src> fiable (falla el streaming en varios
+            // dispositivos), así que ahí se usa el visor propio de Drive.
+            const isDataUrl = c.video_url && c.video_url.indexOf('data:') === 0;
+            const player = isDataUrl
+              ? '<video src="' + SM.ui.escapeHtml(c.video_url) + '" controls playsinline style="width:100%;border-radius:10px;background:#000;display:block;"></video>'
+              : '<iframe src="' + SM.ui.escapeHtml(c.video_url) + '" allow="autoplay" style="width:100%;aspect-ratio:16/9;border:0;border-radius:10px;background:#000;display:block;"></iframe>';
+            return (
+              '<div>' +
+                (c.titulo ? '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">' + SM.ui.escapeHtml(c.titulo) + '</div>' : '') +
+                player +
+                '<div style="font-size:11.5px;color:var(--text-mute);font-weight:600;margin-top:6px;">' + SM.ui.formatDateShort(c.fecha) + '</div>' +
+              '</div>'
+            );
+          }).join('') +
+        '</div>' +
+      '</div>'
+    );
+  }
+
   function agendaHtml(scoped) {
     const upcoming = SM.stats.upcomingSessions(scoped, { n: 6 });
     if (!upcoming.length) return '<div class="empty-state">No hay próximas sesiones programadas.</div>';
@@ -246,6 +280,7 @@
             miniKpi(asistenciaPct != null ? asistenciaPct + '%' : '—', 'ASISTENCIA', 'var(--magenta)') +
           '</div>' +
           todaySessionHtml(scoped, p) +
+          videoClipsHtml(scoped, p) +
           '<div class="panel"><span class="panel-title">Próximo partido</span>' +
             '<div style="margin-top:12px;">' + nextMatchHtml(scoped, p) + '</div>' +
           '</div>' +

@@ -108,6 +108,25 @@ SM.api = (function () {
         if (!payload.dataUrl) throw new Error('Falta la imagen.');
         return { url: payload.dataUrl };
       }
+      case 'uploadVideoClip': {
+        // Igual que uploadPhoto: sin Drive real en demo, el propio data URL
+        // del vídeo ya grabado sirve tal cual — mi-jugador.html detecta que
+        // empieza por "data:" y lo reproduce con un <video> normal en vez
+        // del <iframe> de Drive que se usa contra el backend real.
+        if (!payload.dataUrl) throw new Error('Falta el vídeo.');
+        if (!payload.playerId) throw new Error('Falta el jugador.');
+        d.videoClips = d.videoClips || [];
+        const row = {
+          id: nextMockId('vc'),
+          player_id: payload.playerId,
+          titulo: payload.titulo || '',
+          fecha: payload.fecha || new Date().toISOString().slice(0, 10),
+          video_url: payload.dataUrl,
+          categoria: payload.categoria || ''
+        };
+        d.videoClips.push(row);
+        return row;
+      }
       case 'addMatch': {
         return createMockMatch(payload);
       }
