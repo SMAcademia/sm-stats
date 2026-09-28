@@ -135,6 +135,39 @@ SM.api = (function () {
           return row;
         });
       }
+      case 'setVideoClipPlayers': {
+        // Igual que en Code.gs: todas las filas de VideoClips que comparten
+        // video_url son el mismo clip visto por distintos jugadores — se
+        // borran las de los jugadores quitados, se actualiza el título de
+        // las que quedan, y se añade una fila por cada jugador nuevo.
+        if (!payload.videoUrl) throw new Error('Falta el vídeo.');
+        const playerIds = payload.playerIds || [];
+        d.videoClips = d.videoClips || [];
+        d.videoClips = d.videoClips.filter(function (c) {
+          return c.video_url !== payload.videoUrl || playerIds.indexOf(c.player_id) !== -1;
+        });
+        if (!playerIds.length) return [];
+        const titulo = payload.titulo || '';
+        const existingPlayerIds = {};
+        d.videoClips.forEach(function (c) {
+          if (c.video_url === payload.videoUrl) { existingPlayerIds[c.player_id] = true; c.titulo = titulo; }
+        });
+        const players = d.players || [];
+        const newRows = playerIds.filter(function (pid) { return !existingPlayerIds[pid]; }).map(function (playerId) {
+          const player = players.find(function (p) { return p.id === playerId; });
+          const row = {
+            id: nextMockId('vc'),
+            player_id: playerId,
+            titulo: titulo,
+            fecha: payload.fecha || new Date().toISOString().slice(0, 10),
+            video_url: payload.videoUrl,
+            categoria: player ? player.categoria : ''
+          };
+          d.videoClips.push(row);
+          return row;
+        });
+        return newRows;
+      }
       case 'addMatch': {
         return createMockMatch(payload);
       }

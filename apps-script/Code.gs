@@ -383,6 +383,7 @@ function doPost(e) {
       deleteDevGoal: deleteDevGoal,
       uploadPhoto: uploadPhoto,
       uploadVideoClip: uploadVideoClip,
+      setVideoClipPlayers: setVideoClipPlayers,
       saveCallups: saveCallups,
       saveMatchReport: saveMatchReport,
       saveAttendance: saveAttendance,
@@ -521,6 +522,76 @@ function uploadVideoClip(payload) {
       titulo: payload.titulo || '',
       fecha: payload.fecha || new Date().toISOString().slice(0, 10),
       video_url: videoUrl,
+      categoria: categoriaById[playerId] || ''
+    };
+    appendRow(SHEETS.videoClips, VIDEO_CLIP_COLUMNS, row);
+    return row;
+  });
+}
+
+// Extrae el id de archivo de una URL "…/file/d/<id>/preview" (la que genera
+// uploadVideoClip) y lo manda a la papelera de Drive — no hace nada si la
+// URL no tiene ese formato (p. ej. en modo demo, donde video_url es un data
+// URL en vez de un enlace de Drive real).
+function trashDriveFileByUrl(url) {
+  const m = /\/file\/d\/([^/]+)/.exec(url || '');
+  if (!m) return;
+  try { DriveApp.getFileById(m[1]).setTrashed(true); } catch (err) { /* ya no existe o sin acceso — no bloquea el borrado en la hoja */ }
+}
+
+// Gestiona la "Biblioteca" de clips ya exportados (ver video-analisis.html):
+// edita el título y cambia a qué jugadores está asignado un clip — todas las
+// filas de VideoClips que comparten el mismo video_url son el MISMO clip
+// visto por distintos jugadores, así que video_url es lo que identifica al
+// clip aquí (no hace falta volver a subir ni tocar el archivo de Drive para
+// añadir/quitar jugadores, solo añadir/borrar filas).
+function setVideoClipPlayers(payload) {
+  if (!payload.videoUrl) throw new Error('Falta el vídeo.');
+  const playerIds = payload.playerIds || [];
+  const titulo = payload.titulo || '';
+
+  const sheet = getSheet(SHEETS.videoClips);
+  const header = ensureHeader(sheet, VIDEO_CLIP_COLUMNS);
+  const urlCol = header.indexOf('video_url');
+  const playerCol = header.indexOf('player_id');
+  const tituloCol = header.indexOf('titulo');
+
+  // 1) Quita las filas de los jugadores que ya no deben tener este clip.
+  let values = sheet.getDataRange().getValues();
+  for (let i = values.length - 1; i >= 1; i--) {
+    if (String(values[i][urlCol]) === String(payload.videoUrl) && playerIds.indexOf(values[i][playerCol]) === -1) {
+      sheet.deleteRow(i + 1);
+    }
+  }
+
+  // Sin nadie asignado, el clip desaparece del todo — se manda también el
+  // archivo de Drive a la papelera, o se quedaría huérfano ocupando espacio.
+  if (!playerIds.length) {
+    trashDriveFileByUrl(payload.videoUrl);
+    return [];
+  }
+
+  // 2) Actualiza el título de las filas que se mantienen y añade una fila
+  // nueva por cada jugador que no la tuviera todavía, reutilizando el mismo
+  // archivo (sin volver a subirlo).
+  values = sheet.getDataRange().getValues();
+  const existingPlayerIds = {};
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][urlCol]) === String(payload.videoUrl)) {
+      existingPlayerIds[values[i][playerCol]] = true;
+      sheet.getRange(i + 1, tituloCol + 1).setValue(titulo);
+    }
+  }
+  const categoriaById = {};
+  sheetToObjectsOrEmpty(SHEETS.players).forEach(function (p) { categoriaById[p.id] = p.categoria; });
+  const fecha = payload.fecha || new Date().toISOString().slice(0, 10);
+  return playerIds.filter(function (pid) { return !existingPlayerIds[pid]; }).map(function (playerId) {
+    const row = {
+      id: newId('vc'),
+      player_id: playerId,
+      titulo: titulo,
+      fecha: fecha,
+      video_url: payload.videoUrl,
       categoria: categoriaById[playerId] || ''
     };
     appendRow(SHEETS.videoClips, VIDEO_CLIP_COLUMNS, row);

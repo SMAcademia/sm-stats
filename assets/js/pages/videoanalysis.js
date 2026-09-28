@@ -73,6 +73,171 @@
       .sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
   }
 
+  // ---- biblioteca: todos los clips ya exportados (de cualquier jugador) ----
+  // Se agrupan por video_url: todas las filas de VideoClips que comparten esa
+  // URL son EL MISMO clip visto por varios jugadores (ver setVideoClipPlayers
+  // en Code.gs) — aquí se listan como una sola tarjeta con el conjunto de
+  // jugadores asignados, en vez de una fila repetida por cada uno.
+  let libraryGroupsCache = [];
+
+  function libraryGroups() {
+    const map = {};
+    const order = [];
+    (DATA && DATA.videoClips || []).forEach(function (c) {
+      if (!map[c.video_url]) { map[c.video_url] = { videoUrl: c.video_url, titulo: c.titulo || '', fecha: c.fecha || '', playerIds: [] }; order.push(c.video_url); }
+      map[c.video_url].playerIds.push(c.player_id);
+      if (c.titulo) map[c.video_url].titulo = c.titulo;
+      if (c.fecha) map[c.video_url].fecha = c.fecha;
+    });
+    return order.map(function (u) { return map[u]; })
+      .sort(function (a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
+  }
+
+  function libraryPanelHtml() {
+    return (
+      '<div class="panel" id="va-library-panel">' +
+        '<span class="panel-title">Biblioteca de clips</span>' +
+        '<div style="font-size:11.5px;color:var(--text-mute);font-weight:600;margin-top:2px;">Todos los clips ya exportados. Desde aquí puedes cambiar el título, añadir o quitar jugadores, o eliminar el clip.</div>' +
+        '<div id="va-library-list" style="margin-top:12px;">' + renderLibraryHtml() + '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderLibraryHtml() {
+    const groups = libraryGroupsCache = libraryGroups();
+    if (!groups.length) return '<div class="empty-state">Todavía no se ha exportado ningún clip.</div>';
+    const eligiblePlayers = exportPlayers();
+    return (
+      '<div style="display:flex;flex-direction:column;gap:12px;">' +
+        groups.map(function (g, idx) {
+          // Los jugadores ya asignados aparecen aunque estén dados de baja
+          // (o el clip no se podría "ver" de un vistazo quién lo tiene).
+          const shown = eligiblePlayers.slice();
+          g.playerIds.forEach(function (pid) {
+            if (!shown.some(function (p) { return p.id === pid; })) {
+              const p = (DATA.players || []).find(function (pp) { return pp.id === pid; });
+              shown.push(p || { id: pid, nombre: 'Jugador eliminado', dorsal: null });
+            }
+          });
+          return (
+            '<div class="panel" style="padding:14px;">' +
+              '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+                '<button type="button" class="va-icon-btn primary va-library-play" data-group-index="' + idx + '" title="Reproducir" style="flex-shrink:0;">' + ICON_PLAY + '</button>' +
+                '<input type="text" class="va-library-title" data-group-index="' + idx + '" value="' + esc(g.titulo) + '" placeholder="Sin título" style="flex:1 1 200px;min-width:160px;padding:7px 10px;">' +
+                '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;white-space:nowrap;">' + SM.ui.formatDateShort(g.fecha) + '</span>' +
+                '<button type="button" class="btn btn-outline va-library-delete" data-group-index="' + idx + '" style="padding:6px 12px;font-size:12px;color:var(--red-bright);">Eliminar clip</button>' +
+              '</div>' +
+              '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">' +
+                shown.map(function (p) {
+                  const active = g.playerIds.indexOf(p.id) !== -1;
+                  return '<button type="button" class="pill va-library-player-btn' + (active ? ' active' : '') + '" data-group-index="' + idx + '" data-player="' + p.id + '">' + esc(p.nombre) + (p.dorsal ? ' (#' + p.dorsal + ')' : '') + '</button>';
+                }).join('') +
+              '</div>' +
+            '</div>'
+          );
+        }).join('') +
+      '</div>'
+    );
+  }
+
+  // Abre un clip a pantalla completa — mismo patrón que mi-jugador.html: un
+  // <video> normal para un data URL (modo demo) o el <iframe> del visor de
+  // Drive (…/preview) para un clip real, que no se puede embeber como
+  // <video src> fiable (falla el streaming, sobre todo en iOS).
+  function openLibraryClipFullscreen(videoUrl) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;background:#000;z-index:9999;display:flex;align-items:center;justify-content:center;';
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.setAttribute('aria-label', 'Cerrar');
+    closeBtn.style.cssText = 'position:absolute;top:14px;right:14px;width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;border:1px solid rgba(255,255,255,.3);font-size:16px;z-index:2;cursor:pointer;';
+    overlay.appendChild(closeBtn);
+
+    const isDataUrl = videoUrl && videoUrl.indexOf('data:') === 0;
+    let media;
+    if (isDataUrl) {
+      media = document.createElement('video');
+      media.src = videoUrl;
+      media.controls = true;
+      media.playsInline = true;
+      media.autoplay = true;
+      media.style.cssText = 'width:100%;height:100%;';
+    } else {
+      media = document.createElement('iframe');
+      media.src = videoUrl;
+      media.allow = 'autoplay; fullscreen';
+      media.style.cssText = 'width:100%;height:100%;border:0;';
+    }
+    overlay.appendChild(media);
+    document.body.appendChild(overlay);
+
+    function close() {
+      if (document.fullscreenElement) document.exitFullscreen().catch(function () {});
+      if (document.body.contains(overlay)) overlay.remove();
+    }
+    closeBtn.addEventListener('click', close);
+    document.addEventListener('fullscreenchange', function onFsChange() {
+      if (!document.fullscreenElement) { close(); document.removeEventListener('fullscreenchange', onFsChange); }
+    });
+
+    if (overlay.requestFullscreen) overlay.requestFullscreen().catch(function () {});
+    else if (media.webkitEnterFullscreen) media.webkitEnterFullscreen();
+    if (isDataUrl) media.play().catch(function () {});
+  }
+
+  async function saveLibraryClip(videoUrl, titulo, playerIds, fecha) {
+    try {
+      await SM.api.postAction('setVideoClipPlayers', { videoUrl: videoUrl, titulo: titulo, playerIds: playerIds, fecha: fecha });
+      DATA = await SM.api.fetchAll();
+      refreshLibrary();
+    } catch (err) {
+      window.alert('⚠ ' + err.message);
+    }
+  }
+
+  function refreshLibrary() {
+    const el = main.querySelector('#va-library-list');
+    if (!el) return;
+    el.innerHTML = renderLibraryHtml();
+    wireLibrary();
+  }
+
+  function wireLibrary() {
+    main.querySelectorAll('.va-library-play').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const g = libraryGroupsCache[Number(btn.getAttribute('data-group-index'))];
+        if (g) openLibraryClipFullscreen(g.videoUrl);
+      });
+    });
+    main.querySelectorAll('.va-library-title').forEach(function (input) {
+      input.addEventListener('change', function () {
+        const g = libraryGroupsCache[Number(input.getAttribute('data-group-index'))];
+        if (!g) return;
+        saveLibraryClip(g.videoUrl, input.value.trim(), g.playerIds, g.fecha);
+      });
+    });
+    main.querySelectorAll('.va-library-player-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const idx = Number(btn.getAttribute('data-group-index'));
+        const g = libraryGroupsCache[idx];
+        if (!g) return;
+        const pid = btn.getAttribute('data-player');
+        const newIds = g.playerIds.indexOf(pid) === -1 ? g.playerIds.concat([pid]) : g.playerIds.filter(function (x) { return x !== pid; });
+        const titleInput = main.querySelector('.va-library-title[data-group-index="' + idx + '"]');
+        const titulo = titleInput ? titleInput.value.trim() : g.titulo;
+        saveLibraryClip(g.videoUrl, titulo, newIds, g.fecha);
+      });
+    });
+    main.querySelectorAll('.va-library-delete').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const g = libraryGroupsCache[Number(btn.getAttribute('data-group-index'))];
+        if (!g) return;
+        if (!window.confirm('¿Eliminar este clip para todos los jugadores a los que está asignado? Esta acción no se puede deshacer.')) return;
+        saveLibraryClip(g.videoUrl, '', [], g.fecha);
+      });
+    });
+  }
+
   function fmtTime(t) {
     t = Math.max(0, t || 0);
     const m = Math.floor(t / 60), s = Math.floor(t % 60);
@@ -185,7 +350,8 @@
         '<input type="file" id="video-file-input" accept="video/*" style="display:none;">' +
         '<div style="font-size:14px;color:var(--text-dim);font-weight:600;margin-bottom:16px;">Elige un vídeo de la galería, archivos o grábalo con la cámara</div>' +
         '<button type="button" class="btn btn-primary" id="video-pick-btn">Cargar vídeo</button>' +
-      '</div>';
+      '</div>' +
+      libraryPanelHtml();
     main.querySelector('#video-pick-btn').addEventListener('click', function () {
       main.querySelector('#video-file-input').click();
     });
@@ -193,6 +359,7 @@
       const file = e.target.files && e.target.files[0];
       if (file) loadVideo(file);
     });
+    wireLibrary();
   }
 
   function renderEditor() {
@@ -317,13 +484,16 @@
           '<button type="button" class="btn btn-primary" id="va-export-btn" style="padding:8px 18px;font-size:13px;">Exportar y guardar</button>' +
         '</div>' +
         '<div id="va-export-status" style="font-size:12.5px;font-weight:600;margin-top:10px;display:none;"></div>' +
-      '</div>';
+      '</div>' +
+
+      libraryPanelHtml();
 
     canvasWrap = main.querySelector('#canvas-wrap');
     canvas = main.querySelector('#va-canvas');
     ctx = canvas.getContext('2d');
 
     wireEditor();
+    wireLibrary();
   }
 
   function loadVideo(file) {
@@ -975,6 +1145,10 @@
       main.querySelector('#va-export-title').value = '';
       selectedExportPlayerIds = [];
       main.querySelectorAll('.va-export-player-btn').forEach(function (b) { b.classList.remove('active'); });
+      // Refresca la biblioteca para que el clip recién exportado aparezca
+      // sin tener que recargar la página.
+      DATA = await SM.api.fetchAll();
+      refreshLibrary();
     } catch (err) {
       showExportStatus('⚠ ' + err.message, 'error');
     } finally {
