@@ -128,6 +128,32 @@
 
 .va-trim-error { font-size: 12px; font-weight: 700; color: var(--red-bright); text-align: center; }
 
+/* Nodo arrastrable de una línea (u otra forma futura) ya creada. */
+.va-node-handle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  margin-top: -9px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--cyan);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.5);
+  cursor: grab;
+  touch-action: none;
+  z-index: 5;
+}
+
+.va-color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--border-soft);
+  cursor: pointer;
+  padding: 0;
+}
+.va-color-swatch.active { border-color: var(--cyan-bright); box-shadow: 0 0 0 2px oklch(from var(--cyan) l c h / 0.35); }
+
 @media (max-width: 640px) {
   .va-time-label { min-width: 76px; font-size: 11.5px; }
 }

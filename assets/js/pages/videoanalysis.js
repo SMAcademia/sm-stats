@@ -30,6 +30,16 @@
   const ICON_STEP_BACK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="5" width="2.4" height="14"/><path d="M20 5v14L9 12z"/></svg>';
   const ICON_STEP_FWD = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="17.6" y="5" width="2.4" height="14"/><path d="M4 5v14l11-7z"/></svg>';
 
+  // Mismos tonos que theme.css, pero como valores literales: el contexto
+  // 2D del canvas no resuelve var(--cyan), necesita el color ya escrito.
+  const LINE_COLORS = ['oklch(0.97 0 0)', 'oklch(0.80 0.15 205)', 'oklch(0.72 0.22 335)', 'oklch(0.68 0.20 25)', 'oklch(0.80 0.17 80)', 'oklch(0.80 0.19 150)'];
+  const LINE_WIDTH_OPTIONS = [{ px: 2.5, label: 'Fino' }, { px: 5, label: 'Medio' }, { px: 9, label: 'Grueso' }];
+  const DASH_STYLES = [
+    { key: 'solid', label: 'Continuo' },
+    { key: 'dashed', label: 'Discontinuo' },
+    { key: 'longdash', label: 'Guiones largos' }
+  ];
+
   let DATA = null;
 
   SM.sidebar.onSettingsClick(function () {
@@ -72,6 +82,22 @@
   let zoomBoxEl = null;
   let dragState = null;
 
+  // ---- congelar fotograma + anotaciones ----
+  // El fotograma congelado es una copia de píxeles del canvas en ese
+  // instante (incluye el efecto de zoom si estaba activo) — a partir de ahí
+  // se dibuja siempre esa imagen fija, nunca el vídeo, así lo que se anota
+  // no se mueve aunque el vídeo original siga "detrás".
+  let frozen = false;
+  let frozenSourceCanvas = null;
+  let shapes = [];
+  let nextShapeId = 1;
+  let activeTool = null; // null (seleccionar/mover) | 'line'
+  let selectedShapeId = null;
+  let creatingLine = null; // línea en curso mientras se arrastra para crearla
+  let currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: false };
+  let shapeDragState = null; // arrastre de un nodo de una línea ya creada
+  let handleEls = { start: null, end: null };
+
   function renderEmpty() {
     main.innerHTML =
       '<div class="page-header">' +
@@ -99,6 +125,26 @@
       '</div>' +
       '<div class="panel">' +
         '<div class="va-canvas-wrap" id="canvas-wrap"><canvas id="va-canvas"></canvas></div>' +
+
+        '<div id="va-annotate-panel" style="display:none;">' +
+          '<div class="va-group-row">' +
+            '<span class="va-group-label">Herramienta</span>' +
+            '<button type="button" class="pill va-tool-btn" data-tool="line">Línea</button>' +
+            '<span style="flex:1 1 auto;"></span>' +
+            '<button type="button" class="btn btn-outline" id="va-unfreeze-btn">Volver al vídeo</button>' +
+          '</div>' +
+          '<div class="va-group-row" id="va-shape-props" style="display:none;">' +
+            '<span class="va-group-label">Color</span>' +
+            LINE_COLORS.map(function (c) { return '<button type="button" class="va-color-swatch" data-color="' + c + '" style="background:' + c + ';"></button>'; }).join('') +
+            '<span class="va-group-label">Grosor</span>' +
+            LINE_WIDTH_OPTIONS.map(function (w) { return '<button type="button" class="pill va-width-btn" data-width="' + w.px + '">' + w.label + '</button>'; }).join('') +
+            '<span class="va-group-label">Trazo</span>' +
+            DASH_STYLES.map(function (d) { return '<button type="button" class="pill va-dash-btn" data-dash="' + d.key + '">' + d.label + '</button>'; }).join('') +
+            '<button type="button" class="pill va-arrow-toggle">Flecha</button>' +
+            '<button type="button" class="btn btn-outline" id="va-delete-shape" style="color:var(--red-bright);display:none;">Eliminar</button>' +
+          '</div>' +
+        '</div>' +
+
         '<div class="va-controls">' +
           '<div>' +
             '<div class="va-timeline" id="va-timeline">' +
@@ -128,6 +174,7 @@
             '<select id="va-fps" style="font-size:12px;padding:6px 8px;border-radius:8px;">' +
               FPS_OPTIONS.map(function (f) { return '<option value="' + f + '"' + (f === fps ? ' selected' : '') + '>' + f + ' fps</option>'; }).join('') +
             '</select>' +
+            '<button type="button" class="btn btn-primary" id="va-freeze-btn" style="padding:8px 16px;font-size:12.5px;margin-left:10px;">Congelar fotograma</button>' +
           '</div>' +
 
           '<div class="va-group-row">' +
@@ -161,6 +208,10 @@
     duration = 0; inPoint = 0; outPoint = 0; speed = 1; fps = 25;
     zoomLevel = 1; zoomRect = null; zoomPreviewMode = false; zoomBoxEl = null;
     boundedPlayback = false;
+    frozen = false; frozenSourceCanvas = null; shapes = []; nextShapeId = 1;
+    activeTool = null; selectedShapeId = null; creatingLine = null;
+    currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: false };
+    shapeDragState = null; handleEls = { start: null, end: null };
 
     renderEditor();
 
@@ -247,6 +298,76 @@
       updateZoomUiState();
       drawFrame();
     });
+
+    main.querySelector('#va-freeze-btn').addEventListener('click', freezeFrame);
+    main.querySelector('#va-unfreeze-btn').addEventListener('click', unfreeze);
+
+    main.querySelectorAll('.va-tool-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        activeTool = activeTool === btn.getAttribute('data-tool') ? null : btn.getAttribute('data-tool');
+        selectShape(null);
+        updateToolButtonsUi();
+      });
+    });
+    main.querySelectorAll('.va-color-swatch').forEach(function (btn) {
+      btn.addEventListener('click', function () { applyProp('color', btn.getAttribute('data-color')); });
+    });
+    main.querySelectorAll('.va-width-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { applyProp('width', Number(btn.getAttribute('data-width'))); });
+    });
+    main.querySelectorAll('.va-dash-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () { applyProp('dash', btn.getAttribute('data-dash')); });
+    });
+    main.querySelector('.va-arrow-toggle').addEventListener('click', function () {
+      const shape = selectedShapeId != null ? shapes.find(function (s) { return s.id === selectedShapeId; }) : null;
+      applyProp('arrow', !(shape || currentDefaults).arrow);
+    });
+    main.querySelector('#va-delete-shape').addEventListener('click', function () {
+      shapes = shapes.filter(function (s) { return s.id !== selectedShapeId; });
+      selectShape(null);
+    });
+
+    canvas.addEventListener('pointerdown', function (e) {
+      if (!frozen) return;
+      const p = canvasPointFromEvent(e);
+      if (activeTool === 'line') {
+        creatingLine = { x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+        canvas.setPointerCapture(e.pointerId);
+      } else {
+        selectShape(hitTestShapes(p));
+      }
+    });
+    canvas.addEventListener('pointermove', function (e) {
+      if (!creatingLine) return;
+      const p = canvasPointFromEvent(e);
+      creatingLine.x2 = p.x; creatingLine.y2 = p.y;
+      drawFrame();
+    });
+    canvas.addEventListener('pointerup', function () {
+      if (!creatingLine) return;
+      const line = creatingLine;
+      creatingLine = null;
+      const dx = (line.x2 - line.x1) * canvas.width, dy = (line.y2 - line.y1) * canvas.height;
+      if (Math.hypot(dx, dy) < 6) { drawFrame(); return; } // tap accidental, sin arrastre real
+      const shape = Object.assign({ id: nextShapeId++, type: 'line' }, line, currentDefaults);
+      shapes.push(shape);
+      activeTool = null;
+      updateToolButtonsUi();
+      selectShape(shape.id);
+    });
+
+    window.addEventListener('pointermove', function (e) {
+      if (!shapeDragState) return;
+      const shape = shapes.find(function (s) { return s.id === shapeDragState.shapeId; });
+      if (!shape) return;
+      const wrapRect = canvasWrap.getBoundingClientRect();
+      const x = clamp((e.clientX - wrapRect.left) / wrapRect.width, 0, 1);
+      const y = clamp((e.clientY - wrapRect.top) / wrapRect.height, 0, 1);
+      if (shapeDragState.which === 'start') { shape.x1 = x; shape.y1 = y; } else { shape.x2 = x; shape.y2 = y; }
+      positionHandles(shape);
+      drawFrame();
+    });
+    window.addEventListener('pointerup', function () { shapeDragState = null; });
   }
 
   // ---- reproducción ----
@@ -400,10 +521,176 @@
     zoomBoxEl.style.height = (zoomRect.h * wrapRect.height) + 'px';
   }
 
+  // ---- congelar / anotar ----
+
+  function freezeFrame() {
+    if (!video || frozen) return;
+    if (!video.paused) video.pause();
+    frozenSourceCanvas = document.createElement('canvas');
+    frozenSourceCanvas.width = canvas.width;
+    frozenSourceCanvas.height = canvas.height;
+    // Copia tal cual lo que había en pantalla — si el zoom estaba en modo
+    // vista previa, esa imagen ampliada queda "congelada" también.
+    frozenSourceCanvas.getContext('2d').drawImage(canvas, 0, 0);
+    frozen = true;
+    shapes = [];
+    selectedShapeId = null;
+    activeTool = null;
+    if (zoomBoxEl) zoomBoxEl.style.display = 'none';
+    updateFreezeUiState();
+    updateToolButtonsUi();
+    drawFrame();
+  }
+
+  function unfreeze() {
+    frozen = false;
+    frozenSourceCanvas = null;
+    shapes = [];
+    selectedShapeId = null;
+    activeTool = null;
+    removeHandles();
+    updateFreezeUiState();
+    if (zoomLevel > 1) updateZoomUiState();
+    drawFrame();
+  }
+
+  function updateFreezeUiState() {
+    main.querySelector('.va-controls').style.display = frozen ? 'none' : '';
+    main.querySelector('#va-annotate-panel').style.display = frozen ? '' : 'none';
+  }
+
+  function canvasPointFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: clamp((e.clientX - rect.left) / rect.width, 0, 1), y: clamp((e.clientY - rect.top) / rect.height, 0, 1) };
+  }
+
+  function distToSegment(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const lenSq = dx * dx + dy * dy;
+    let t = lenSq ? ((px - x1) * dx + (py - y1) * dy) / lenSq : 0;
+    t = clamp(t, 0, 1);
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+
+  function hitTestShapes(p) {
+    const px = p.x * canvas.width, py = p.y * canvas.height;
+    let best = null, bestDist = 14; // tolerancia en píxeles de canvas
+    shapes.forEach(function (s) {
+      const d = distToSegment(px, py, s.x1 * canvas.width, s.y1 * canvas.height, s.x2 * canvas.width, s.y2 * canvas.height);
+      if (d < bestDist) { bestDist = d; best = s.id; }
+    });
+    return best;
+  }
+
+  function selectShape(id) {
+    selectedShapeId = id;
+    updateShapePropsUi();
+    updateHandles();
+    drawFrame();
+  }
+
+  function applyProp(key, value) {
+    const shape = selectedShapeId != null ? shapes.find(function (s) { return s.id === selectedShapeId; }) : null;
+    if (shape) shape[key] = value; else currentDefaults[key] = value;
+    updateShapePropsUi();
+    drawFrame();
+  }
+
+  function updateToolButtonsUi() {
+    main.querySelectorAll('.va-tool-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-tool') === activeTool); });
+    updateShapePropsUi();
+  }
+
+  function updateShapePropsUi() {
+    const propsRow = main.querySelector('#va-shape-props');
+    const shape = selectedShapeId != null ? shapes.find(function (s) { return s.id === selectedShapeId; }) : null;
+    const showProps = activeTool != null || !!shape;
+    propsRow.style.display = showProps ? '' : 'none';
+    if (!showProps) return;
+    const props = shape || currentDefaults;
+    main.querySelectorAll('.va-color-swatch').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-color') === props.color); });
+    main.querySelectorAll('.va-width-btn').forEach(function (b) { b.classList.toggle('active', Number(b.getAttribute('data-width')) === props.width); });
+    main.querySelectorAll('.va-dash-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-dash') === props.dash); });
+    const arrowBtn = main.querySelector('.va-arrow-toggle');
+    if (arrowBtn) arrowBtn.classList.toggle('active', !!props.arrow);
+    main.querySelector('#va-delete-shape').style.display = shape ? '' : 'none';
+  }
+
+  function removeHandles() {
+    if (handleEls.start) { handleEls.start.remove(); handleEls.start = null; }
+    if (handleEls.end) { handleEls.end.remove(); handleEls.end = null; }
+  }
+
+  function createHandle(which, shapeId) {
+    const el = document.createElement('div');
+    el.className = 'va-node-handle';
+    canvasWrap.appendChild(el);
+    el.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      shapeDragState = { shapeId: shapeId, which: which };
+    });
+    return el;
+  }
+
+  function positionHandles(shape) {
+    const wrapRect = canvasWrap.getBoundingClientRect();
+    if (handleEls.start) { handleEls.start.style.left = (shape.x1 * wrapRect.width) + 'px'; handleEls.start.style.top = (shape.y1 * wrapRect.height) + 'px'; }
+    if (handleEls.end) { handleEls.end.style.left = (shape.x2 * wrapRect.width) + 'px'; handleEls.end.style.top = (shape.y2 * wrapRect.height) + 'px'; }
+  }
+
+  function updateHandles() {
+    removeHandles();
+    if (!frozen || selectedShapeId == null) return;
+    const shape = shapes.find(function (s) { return s.id === selectedShapeId; });
+    if (!shape) return;
+    handleEls.start = createHandle('start', shape.id);
+    handleEls.end = createHandle('end', shape.id);
+    positionHandles(shape);
+  }
+
   // ---- dibujo del fotograma ----
 
+  function drawLineShape(s) {
+    const x1 = s.x1 * canvas.width, y1 = s.y1 * canvas.height, x2 = s.x2 * canvas.width, y2 = s.y2 * canvas.height;
+    const w = s.width;
+    ctx.save();
+    ctx.strokeStyle = s.color;
+    ctx.fillStyle = s.color;
+    ctx.lineWidth = w;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (s.dash === 'dashed') ctx.setLineDash([w * 2.4, w * 2]);
+    else if (s.dash === 'longdash') ctx.setLineDash([w * 5.5, w * 2.4]);
+    else ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    if (s.arrow) {
+      ctx.setLineDash([]);
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      const headLen = Math.max(10, w * 3.2);
+      const headAngle = Math.PI / 7.5;
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - headLen * Math.cos(angle - headAngle), y2 - headLen * Math.sin(angle - headAngle));
+      ctx.lineTo(x2 - headLen * Math.cos(angle + headAngle), y2 - headLen * Math.sin(angle + headAngle));
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function drawFrame() {
-    if (!ctx || !video || !video.videoWidth) return;
+    if (!ctx) return;
+    if (frozen) {
+      if (frozenSourceCanvas) ctx.drawImage(frozenSourceCanvas, 0, 0);
+      shapes.forEach(function (s) { if (s.type === 'line') drawLineShape(s); });
+      if (creatingLine) drawLineShape(Object.assign({ id: 0, type: 'line' }, creatingLine, currentDefaults));
+      return;
+    }
+    if (!video || !video.videoWidth) return;
     if (zoomLevel > 1 && zoomPreviewMode && zoomRect) {
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -419,7 +706,13 @@
     }
   }
 
-  window.addEventListener('resize', function () { if (zoomLevel > 1 && !zoomPreviewMode) updateZoomBoxPosition(); });
+  window.addEventListener('resize', function () {
+    if (zoomLevel > 1 && !zoomPreviewMode) updateZoomBoxPosition();
+    if (frozen && selectedShapeId != null) {
+      const shape = shapes.find(function (s) { return s.id === selectedShapeId; });
+      if (shape) positionHandles(shape);
+    }
+  });
 
   SM.api.fetchAll().then(function (data) {
     DATA = data;
