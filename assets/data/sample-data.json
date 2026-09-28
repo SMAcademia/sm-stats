@@ -480,13 +480,17 @@
       "id": "at1",
       "session_id": "se1",
       "player_id": "p1",
-      "estado": "presente"
+      "estado": "presente",
+      "retraso": true,
+      "motivo_retraso": "Tráfico"
     },
     {
       "id": "at2",
       "session_id": "se1",
       "player_id": "p2",
-      "estado": "presente"
+      "estado": "presente",
+      "retraso": true,
+      "motivo_retraso": ""
     },
     {
       "id": "at3",

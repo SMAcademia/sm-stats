@@ -42,7 +42,10 @@ const SHEETS = {
 const PLAYER_COLUMNS = ['id', 'nombre', 'dorsal', 'posicion', 'posicion_secundaria', 'pie', 'fecha_nacimiento', 'nacionalidad', 'altura_cm', 'peso_kg', 'contacto_emergencia', 'categoria', 'club_anterior', 'fecha_alta', 'foto_url', 'activo', 'motivo_baja', 'fecha_baja', 'ritmo', 'tiro', 'pase', 'regate', 'defensa', 'fisico', 'companerismo', 'sacrificio', 'respeto', 'motivacion', 'esfuerzo', 'constancia', 'blocaje', 'despeje', 'comunicacion', 'posicionamiento', 'unoxuno', 'abp'];
 const STAFF_COLUMNS = ['id', 'nombre', 'rol', 'licencia', 'fecha_alta', 'foto_url'];
 const SESSION_COLUMNS = ['id', 'fecha', 'hora', 'tipo', 'lugar', 'match_id', 'categoria'];
-const ATTENDANCE_COLUMNS = ['id', 'session_id', 'player_id', 'estado'];
+// retraso/motivo_retraso: solo tienen sentido junto a estado=presente (llegar
+// tarde sigue contando como asistencia) — el frontend ya se encarga de que
+// no puedan quedar marcados junto a ausente/justificado.
+const ATTENDANCE_COLUMNS = ['id', 'session_id', 'player_id', 'estado', 'retraso', 'motivo_retraso'];
 const MATCH_COLUMNS = ['id', 'fecha', 'hora', 'rival', 'condicion', 'lugar', 'jornada', 'competicion', 'categoria', 'goles_favor', 'goles_contra', 'jugado'];
 const EVENT_COLUMNS = ['id', 'match_id', 'player_id', 'tipo'];
 const APPEARANCE_COLUMNS = ['id', 'match_id', 'player_id', 'minutos', 'valoracion', 'capitan'];
@@ -312,7 +315,7 @@ function doGet(e) {
       players: sheetToObjects(SHEETS.players).map(coercePlayer),
       staff: sheetToObjects(SHEETS.staff),
       sessions: sheetToObjects(SHEETS.sessions),
-      attendance: sheetToObjects(SHEETS.attendance),
+      attendance: sheetToObjects(SHEETS.attendance).map(coerceAttendance),
       matches: sheetToObjects(SHEETS.matches).map(coerceMatch),
       matchEvents: sheetToObjects(SHEETS.matchEvents),
       matchAppearances: sheetToObjects(SHEETS.matchAppearances).map(coerceAppearance),
@@ -831,6 +834,11 @@ function coerceLiveEvent(le) {
   le.parte = le.parte === '' || le.parte === undefined ? null : Number(le.parte);
   le.dorsal_rival = le.dorsal_rival === '' || le.dorsal_rival === undefined ? null : Number(le.dorsal_rival);
   return le;
+}
+
+function coerceAttendance(a) {
+  a.retraso = a.retraso === true || a.retraso === 'TRUE' || a.retraso === 'true' || a.retraso === 1;
+  return a;
 }
 
 function coerceCheckin(ck) {

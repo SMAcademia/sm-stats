@@ -51,6 +51,7 @@
         STATES.map(function (s) {
           return '<div style="display:flex;align-items:center;gap:8px;"><div style="width:12px;height:12px;border-radius:4px;background:' + SM.ui.alpha(s.color, 0.2) + ';border:1px solid ' + s.color + ';"></div><span style="font-size:12.5px;color:var(--text-dim);font-weight:600;">' + s.label + '</span></div>';
         }).join('') +
+        '<div style="display:flex;align-items:center;gap:8px;"><div style="width:11px;height:11px;border-radius:50%;background:var(--amber);"></div><span style="font-size:12.5px;color:var(--text-dim);font-weight:600;">Retraso</span></div>' +
         '<div style="width:1px;height:16px;background:var(--border-soft);"></div>' +
         '<div style="display:flex;align-items:center;gap:8px;"><div class="dot" style="background:var(--cyan);"></div><span style="font-size:12.5px;color:var(--text-dim);font-weight:600;">Entrenamiento</span></div>' +
         '<div style="display:flex;align-items:center;gap:8px;"><div class="dot" style="background:var(--magenta);"></div><span style="font-size:12.5px;color:var(--text-dim);font-weight:600;">Partido</span></div>' +
@@ -105,19 +106,30 @@
     return Math.round(pcts.reduce(function (a, b) { return a + b; }, 0) / pcts.length);
   }
 
-  function statusIcon(estado) {
+  function statusIcon(row) {
+    const estado = row ? row.estado : null;
+    let inner;
     if (estado === 'presente') {
-      return '<div style="width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:' + SM.ui.alpha('var(--green)', 0.12) + ';border:1px solid ' + SM.ui.alpha('var(--green)', 0.45) + ';box-shadow:0 0 8px ' + SM.ui.alpha('var(--green)', 0.25) + ';">' +
+      inner = '<div style="width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:' + SM.ui.alpha('var(--green)', 0.12) + ';border:1px solid ' + SM.ui.alpha('var(--green)', 0.45) + ';box-shadow:0 0 8px ' + SM.ui.alpha('var(--green)', 0.25) + ';">' +
         '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="oklch(0.85 0.16 150)" stroke-width="3" stroke-linecap="round"><path d="m5 13 5 5L20 7"/></svg></div>';
-    }
-    if (estado === 'ausente') {
-      return '<div style="width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:' + SM.ui.alpha('var(--red)', 0.1) + ';border:1px solid ' + SM.ui.alpha('var(--red)', 0.4) + ';">' +
+    } else if (estado === 'ausente') {
+      inner = '<div style="width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:' + SM.ui.alpha('var(--red)', 0.1) + ';border:1px solid ' + SM.ui.alpha('var(--red)', 0.4) + ';">' +
         '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="oklch(0.72 0.16 25)" stroke-width="2.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></div>';
+    } else if (estado === 'justificado') {
+      inner = '<div style="width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:' + SM.ui.alpha('var(--amber)', 0.12) + ';border:1px solid ' + SM.ui.alpha('var(--amber)', 0.4) + ';font-size:11px;font-weight:800;color:oklch(0.85 0.14 80);">J</div>';
+    } else {
+      inner = '<div style="width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--text-ghost);font-size:12px;">·</div>';
     }
-    if (estado === 'justificado') {
-      return '<div style="width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:' + SM.ui.alpha('var(--amber)', 0.12) + ';border:1px solid ' + SM.ui.alpha('var(--amber)', 0.4) + ';font-size:11px;font-weight:800;color:oklch(0.85 0.14 80);">J</div>';
-    }
-    return '<div style="width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--text-ghost);font-size:12px;">·</div>';
+    // Retraso se guarda como un extra sobre "presente" (sigue contando como
+    // asistencia) — se muestra como una insignia sobre el icono en vez de un
+    // estado aparte, para no perder la distinción presente/ausente/justificado.
+    if (!row || !row.retraso) return inner;
+    const title = row.motivo_retraso ? 'Retraso: ' + row.motivo_retraso : 'Retraso';
+    return '<div style="position:relative;display:inline-flex;" title="' + SM.ui.escapeHtml(title) + '">' + inner +
+      '<div style="position:absolute;bottom:-3px;right:-3px;width:11px;height:11px;border-radius:50%;background:var(--amber);border:1.5px solid var(--bg);display:flex;align-items:center;justify-content:center;">' +
+        '<svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#1a1508" stroke-width="3" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>' +
+      '</div>' +
+    '</div>';
   }
 
   function tableHtml(players, sessions) {
@@ -145,7 +157,7 @@
           return '<div style="display:flex;justify-content:center;"><div style="width:24px;height:24px;"></div></div>';
         }
         const row = DATA.attendance.find(function (a) { return a.session_id === s.id && a.player_id === p.id; });
-        return '<div style="display:flex;justify-content:center;">' + statusIcon(row ? row.estado : null) + '</div>';
+        return '<div style="display:flex;justify-content:center;">' + statusIcon(row) + '</div>';
       }).join('');
       return '<div style="display:grid;' + cols + 'align-items:center;padding:9px 0;border-bottom:1px solid var(--row-border);">' +
         '<div style="display:flex;align-items:center;gap:10px;">' + SM.ui.avatarHtml(p.foto_url, 28) + '<span style="font-size:13.5px;font-weight:600;color:var(--text);">' + SM.ui.escapeHtml(p.nombre) + '</span></div>' +

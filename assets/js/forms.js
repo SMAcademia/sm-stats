@@ -686,7 +686,9 @@ SM.forms = (function () {
       }).sort(function (a, b) { return (a.dorsal || 99) - (b.dorsal || 99); });
       players.forEach(function (p) {
         const row = data.attendance.find(function (a) { return a.session_id === sessionId && a.player_id === p.id; });
-        state[p.id] = row ? row.estado : 'presente';
+        state[p.id] = row
+          ? { estado: row.estado, retraso: !!row.retraso, motivo_retraso: row.motivo_retraso || '' }
+          : { estado: 'presente', retraso: false, motivo_retraso: '' };
       });
       renderToggleList(players);
       renderSessionActions();
@@ -695,22 +697,47 @@ SM.forms = (function () {
     function renderToggleList(players) {
       const list = body.querySelector('#player-toggle-list');
       list.innerHTML = players.map(function (p) {
+        const st = state[p.id];
         return (
-          '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">' +
-            '<div style="display:flex;align-items:center;gap:10px;">' + SM.ui.avatarHtml(p.foto_url, 30) + '<span style="font-size:13.5px;font-weight:600;color:var(--text);">' + SM.ui.escapeHtml(p.nombre) + '</span></div>' +
-            '<div style="display:flex;gap:6px;" data-player="' + p.id + '">' +
-              ATTENDANCE_STATES.map(function (s) {
-                return '<button type="button" class="pill toggle-state" data-state="' + s.key + '" style="padding:6px 12px;font-size:12px;' + (state[p.id] === s.key ? 'background:' + SM.ui.alpha(s.color, 0.18) + ';color:' + s.color + ';font-weight:700;' : '') + '">' + s.label + '</button>';
-              }).join('') +
+          '<div style="display:flex;flex-direction:column;gap:6px;">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">' +
+              '<div style="display:flex;align-items:center;gap:10px;">' + SM.ui.avatarHtml(p.foto_url, 30) + '<span style="font-size:13.5px;font-weight:600;color:var(--text);">' + SM.ui.escapeHtml(p.nombre) + '</span></div>' +
+              '<div style="display:flex;gap:6px;" data-player="' + p.id + '">' +
+                ATTENDANCE_STATES.map(function (s) {
+                  return '<button type="button" class="pill toggle-state" data-state="' + s.key + '" style="padding:6px 12px;font-size:12px;' + (st.estado === s.key ? 'background:' + SM.ui.alpha(s.color, 0.18) + ';color:' + s.color + ';font-weight:700;' : '') + '">' + s.label + '</button>';
+                }).join('') +
+                '<button type="button" class="pill toggle-retraso" style="padding:6px 12px;font-size:12px;' + (st.retraso ? 'background:' + SM.ui.alpha('var(--amber)', 0.18) + ';color:var(--amber-bright);font-weight:700;' : '') + '" title="Cuenta como presente, pero marca que llegó tarde">Retraso</button>' +
+              '</div>' +
             '</div>' +
+            (st.retraso ?
+              '<input type="text" class="retraso-motivo" data-player="' + p.id + '" placeholder="Motivo del retraso (opcional)" value="' + esc(st.motivo_retraso) + '" style="font-size:12px;align-self:flex-end;max-width:320px;">'
+              : '') +
           '</div>'
         );
       }).join('');
       list.querySelectorAll('.toggle-state').forEach(function (btn) {
         btn.addEventListener('click', function () {
           const playerId = btn.parentElement.getAttribute('data-player');
-          state[playerId] = btn.getAttribute('data-state');
+          state[playerId].estado = btn.getAttribute('data-state');
+          // Solo un jugador presente puede llegar tarde — al marcarlo
+          // ausente/justificado no tiene sentido conservar el retraso.
+          if (state[playerId].estado !== 'presente') { state[playerId].retraso = false; state[playerId].motivo_retraso = ''; }
           renderToggleList(players);
+        });
+      });
+      list.querySelectorAll('.toggle-retraso').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const playerId = btn.parentElement.getAttribute('data-player');
+          const st = state[playerId];
+          st.retraso = !st.retraso;
+          if (st.retraso) st.estado = 'presente'; // llegar tarde cuenta como asistencia
+          else st.motivo_retraso = '';
+          renderToggleList(players);
+        });
+      });
+      list.querySelectorAll('.retraso-motivo').forEach(function (input) {
+        input.addEventListener('input', function () {
+          state[input.getAttribute('data-player')].motivo_retraso = input.value;
         });
       });
     }
@@ -721,7 +748,10 @@ SM.forms = (function () {
     const saveBtn = body.querySelector('#save-btn');
     saveBtn.addEventListener('click', withSaving(saveBtn, function () {
       const sessionId = body.querySelector('#session-select').value;
-      const rows = Object.keys(state).map(function (playerId) { return { player_id: playerId, estado: state[playerId] }; });
+      const rows = Object.keys(state).map(function (playerId) {
+        const st = state[playerId];
+        return { player_id: playerId, estado: st.estado, retraso: st.retraso, motivo_retraso: st.motivo_retraso };
+      });
       return SM.api.postAction('saveAttendance', { sessionId: sessionId, rows: rows }).then(function () {
         handle.close();
         return SM.api.fetchAll(true);
