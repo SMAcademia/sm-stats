@@ -107,7 +107,8 @@
   let nextShapeId = 1;
   let activeTool = null; // null (seleccionar/mover) | 'line' | 'curve'
   let selectedShapeId = null;
-  let creatingShape = null; // línea/curva en curso mientras se arrastra para crearla
+  let creatingShape = null; // línea/curva/caja en curso mientras se arrastra para crearla
+  let networkDraft = null; // { nodes: [...] } mientras se van tocando puntos de una red
   let currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none', fillMode: 'border', alpha: 0.55 };
   let shapeDragState = null; // arrastre de un nodo de una forma ya creada: { shapeId, xField, yField }
   let handleEls = {}; // { [handleKey]: elemento DOM }, según HANDLE_DEFS[shape.type]
@@ -145,6 +146,15 @@
       s.r = clamp(Math.hypot(dxPx, dyPx) / canvas.width, 0.03, 1);
     }
   }];
+  HANDLE_DEFS.network = function (s) {
+    return s.nodes.map(function (_, i) {
+      return {
+        key: 'node' + i,
+        get: function (shape) { return shape.nodes[i]; },
+        set: function (shape, x, y) { shape.nodes[i] = { x: x, y: y }; }
+      };
+    });
+  };
 
   function renderEmpty() {
     main.innerHTML =
@@ -183,6 +193,9 @@
             '<button type="button" class="pill va-tool-btn" data-tool="ellipse">Elipse</button>' +
             '<button type="button" class="pill va-tool-btn" data-tool="spotlight">Foco</button>' +
             '<button type="button" class="pill va-tool-btn" data-tool="clone">Clonar jugador</button>' +
+            '<button type="button" class="pill va-tool-btn" data-tool="network">Red de nodos</button>' +
+            '<span id="va-network-status" style="font-size:12px;color:var(--text-mute);font-weight:700;display:none;"></span>' +
+            '<button type="button" class="btn btn-primary" id="va-network-finish" style="padding:6px 14px;font-size:12px;display:none;">Terminar red</button>' +
             '<span style="flex:1 1 auto;"></span>' +
             '<button type="button" class="btn btn-outline" id="va-unfreeze-btn">Volver al vídeo</button>' +
           '</div>' +
@@ -277,7 +290,7 @@
     zoomLevel = 1; zoomRect = null; zoomPreviewMode = false; zoomBoxEl = null;
     boundedPlayback = false;
     frozen = false; frozenSourceCanvas = null; shapes = []; nextShapeId = 1;
-    activeTool = null; selectedShapeId = null; creatingShape = null;
+    activeTool = null; selectedShapeId = null; creatingShape = null; networkDraft = null;
     currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none', fillMode: 'border', alpha: 0.55 };
     shapeDragState = null; handleEls = {};
 
@@ -373,10 +386,12 @@
     main.querySelectorAll('.va-tool-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
         activeTool = activeTool === btn.getAttribute('data-tool') ? null : btn.getAttribute('data-tool');
+        if (activeTool !== 'network') networkDraft = null; // se cambia de herramienta sin terminarla: se descarta
         selectShape(null);
         updateToolButtonsUi();
       });
     });
+    main.querySelector('#va-network-finish').addEventListener('click', finishNetwork);
     main.querySelectorAll('.va-color-swatch').forEach(function (btn) {
       btn.addEventListener('click', function () { applyProp('color', btn.getAttribute('data-color')); });
     });
@@ -417,6 +432,13 @@
         activeTool = null;
         updateToolButtonsUi();
         selectShape(shape.id);
+      } else if (activeTool === 'network') {
+        // Cada tap añade un nodo enlazado al anterior — no hay arrastre que
+        // capturar aquí, se sigue tocando hasta pulsar "Terminar red".
+        if (!networkDraft) networkDraft = { nodes: [] };
+        networkDraft.nodes.push({ x: p.x, y: p.y });
+        updateNetworkStatusUi();
+        drawFrame();
       } else {
         const hitId = hitTestShapes(p);
         selectShape(hitId);
@@ -688,6 +710,7 @@
     shapes = [];
     selectedShapeId = null;
     activeTool = null;
+    networkDraft = null;
     if (zoomBoxEl) zoomBoxEl.style.display = 'none';
     updateFreezeUiState();
     updateToolButtonsUi();
@@ -700,6 +723,7 @@
     shapes = [];
     selectedShapeId = null;
     activeTool = null;
+    networkDraft = null;
     removeHandles();
     updateFreezeUiState();
     if (zoomLevel > 1) updateZoomUiState();
@@ -730,6 +754,17 @@
   }
 
   function distToShape(px, py, s) {
+    if (s.type === 'network') {
+      let best = Infinity;
+      for (let i = 0; i < s.nodes.length - 1; i++) {
+        const a = s.nodes[i], b = s.nodes[i + 1];
+        best = Math.min(best, distToSegment(px, py, a.x * canvas.width, a.y * canvas.height, b.x * canvas.width, b.y * canvas.height));
+      }
+      // Un nodo suelto (red de un solo punto, o clic muy cerca de un nodo
+      // pero fuera de cualquier segmento) también debe poder seleccionarse.
+      s.nodes.forEach(function (n) { best = Math.min(best, Math.hypot(px - n.x * canvas.width, py - n.y * canvas.height)); });
+      return best;
+    }
     if (s.type === 'spotlight') {
       const cx = s.x * canvas.width, cy = s.y * canvas.height, r = s.r * canvas.width;
       const d = Math.hypot(px - cx, py - cy);
@@ -791,6 +826,35 @@
   function updateToolButtonsUi() {
     main.querySelectorAll('.va-tool-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-tool') === activeTool); });
     updateShapePropsUi();
+    updateNetworkStatusUi();
+  }
+
+  function updateNetworkStatusUi() {
+    const statusEl = main.querySelector('#va-network-status');
+    const finishBtn = main.querySelector('#va-network-finish');
+    const active = activeTool === 'network';
+    statusEl.style.display = active ? '' : 'none';
+    finishBtn.style.display = active ? '' : 'none';
+    if (active) {
+      const n = networkDraft ? networkDraft.nodes.length : 0;
+      statusEl.textContent = n + (n === 1 ? ' nodo — toca para enlazar el siguiente' : ' nodos — toca para enlazar el siguiente');
+    }
+  }
+
+  function finishNetwork() {
+    if (networkDraft && networkDraft.nodes.length) {
+      const shape = Object.assign({ id: nextShapeId++, type: 'network', nodes: networkDraft.nodes }, currentDefaults);
+      shapes.push(shape);
+      networkDraft = null;
+      activeTool = null;
+      updateToolButtonsUi();
+      selectShape(shape.id);
+    } else {
+      networkDraft = null;
+      activeTool = null;
+      updateToolButtonsUi();
+      drawFrame();
+    }
   }
 
   function updateShapePropsUi() {
@@ -803,7 +867,7 @@
     const isLineLike = type === 'line' || type === 'curve';
     const isBoxLike = type === 'rect' || type === 'ellipse';
     const isClone = type === 'clone';
-    const hasStyle = isLineLike || isBoxLike; // ni el foco ni el clon tienen color/grosor/trazo propios
+    const hasStyle = isLineLike || isBoxLike || type === 'network'; // ni el foco ni el clon tienen color/grosor/trazo propios
     main.querySelector('#va-base-row').style.display = hasStyle ? '' : 'none';
     main.querySelector('#va-arrow-row').style.display = isLineLike ? '' : 'none';
     main.querySelector('#va-fill-row').style.display = isBoxLike ? '' : 'none';
@@ -835,9 +899,20 @@
     return el;
   }
 
+  // Para la mayoría de formas, los tiradores son una lista fija (2 nodos de
+  // línea, 3 de curva...). Una red tiene un número de nodos que varía según
+  // cuántos taps haya dado el usuario, así que para ese tipo HANDLE_DEFS
+  // guarda una función que los genera a partir de la forma en vez de una
+  // lista fija.
+  function resolveHandleDefs(shape) {
+    const defs = HANDLE_DEFS[shape.type];
+    if (typeof defs === 'function') return defs(shape);
+    return defs || [];
+  }
+
   function positionHandles(shape) {
     const wrapRect = canvasWrap.getBoundingClientRect();
-    (HANDLE_DEFS[shape.type] || []).forEach(function (def) {
+    resolveHandleDefs(shape).forEach(function (def) {
       const el = handleEls[def.key];
       if (!el) return;
       const p = def.get(shape);
@@ -851,7 +926,7 @@
     if (!frozen || selectedShapeId == null) return;
     const shape = shapes.find(function (s) { return s.id === selectedShapeId; });
     if (!shape) return;
-    (HANDLE_DEFS[shape.type] || []).forEach(function (def) {
+    resolveHandleDefs(shape).forEach(function (def) {
       handleEls[def.key] = createHandle(def, shape.id, def.key === 'control');
     });
     positionHandles(shape);
@@ -1015,6 +1090,33 @@
     ctx.restore();
   }
 
+  // Líneas entre nodos consecutivos + un punto en cada nodo (visible aunque
+  // la red no esté seleccionada — útil para ver de un vistazo un sistema
+  // táctico completo, no solo cuando se está editando).
+  function drawNetworkShape(s) {
+    if (!s.nodes || !s.nodes.length) return;
+    ctx.save();
+    ctx.strokeStyle = s.color;
+    ctx.fillStyle = s.color;
+    ctx.lineWidth = s.width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    applyDashPattern(s.width, s.dash);
+    if (s.nodes.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(s.nodes[0].x * canvas.width, s.nodes[0].y * canvas.height);
+      for (let i = 1; i < s.nodes.length; i++) ctx.lineTo(s.nodes[i].x * canvas.width, s.nodes[i].y * canvas.height);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    s.nodes.forEach(function (n) {
+      ctx.beginPath();
+      ctx.arc(n.x * canvas.width, n.y * canvas.height, Math.max(3, s.width * 0.9), 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
   function drawShape(s) {
     if (s.type === 'line') drawLineShape(s);
     else if (s.type === 'curve') drawCurveShape(s);
@@ -1022,6 +1124,7 @@
     else if (s.type === 'ellipse') drawEllipseShape(s);
     else if (s.type === 'spotlight') drawSpotlightShape(s);
     else if (s.type === 'clone') drawCloneShape(s);
+    else if (s.type === 'network') drawNetworkShape(s);
   }
 
   function drawFrame() {
@@ -1030,6 +1133,7 @@
       if (frozenSourceCanvas) ctx.drawImage(frozenSourceCanvas, 0, 0);
       shapes.forEach(drawShape);
       if (creatingShape) drawShape(Object.assign({ id: 0 }, creatingShape, currentDefaults));
+      if (networkDraft) drawShape(Object.assign({ id: 0, type: 'network' }, networkDraft, currentDefaults));
       return;
     }
     if (!video || !video.videoWidth) return;
