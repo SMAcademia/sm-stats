@@ -96,12 +96,21 @@
   let frozenSourceCanvas = null;
   let shapes = [];
   let nextShapeId = 1;
-  let activeTool = null; // null (seleccionar/mover) | 'line'
+  let activeTool = null; // null (seleccionar/mover) | 'line' | 'curve'
   let selectedShapeId = null;
-  let creatingLine = null; // línea en curso mientras se arrastra para crearla
+  let creatingShape = null; // línea/curva en curso mientras se arrastra para crearla
   let currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none' };
-  let shapeDragState = null; // arrastre de un nodo de una línea ya creada
-  let handleEls = { start: null, end: null };
+  let shapeDragState = null; // arrastre de un nodo de una forma ya creada: { shapeId, xField, yField }
+  let handleEls = {}; // { [handleKey]: elemento DOM }, según HANDLE_DEFS[shape.type]
+
+  // Qué nodos arrastrables tiene cada tipo de forma, y a qué campo de
+  // coordenadas (fracciones 0..1) corresponde cada uno. Común a todos los
+  // tipos con nodos (línea, curva, y lo que venga después), así el resto de
+  // funciones de selección/arrastre no necesitan saber de tipos concretos.
+  const HANDLE_DEFS = {
+    line: [{ key: 'start', xField: 'x1', yField: 'y1' }, { key: 'end', xField: 'x2', yField: 'y2' }],
+    curve: [{ key: 'start', xField: 'x1', yField: 'y1' }, { key: 'control', xField: 'cx', yField: 'cy' }, { key: 'end', xField: 'x2', yField: 'y2' }]
+  };
 
   function renderEmpty() {
     main.innerHTML =
@@ -135,6 +144,7 @@
           '<div class="va-group-row">' +
             '<span class="va-group-label">Herramienta</span>' +
             '<button type="button" class="pill va-tool-btn" data-tool="line">Línea</button>' +
+            '<button type="button" class="pill va-tool-btn" data-tool="curve">Curva</button>' +
             '<span style="flex:1 1 auto;"></span>' +
             '<button type="button" class="btn btn-outline" id="va-unfreeze-btn">Volver al vídeo</button>' +
           '</div>' +
@@ -215,9 +225,9 @@
     zoomLevel = 1; zoomRect = null; zoomPreviewMode = false; zoomBoxEl = null;
     boundedPlayback = false;
     frozen = false; frozenSourceCanvas = null; shapes = []; nextShapeId = 1;
-    activeTool = null; selectedShapeId = null; creatingLine = null;
+    activeTool = null; selectedShapeId = null; creatingShape = null;
     currentDefaults = { color: LINE_COLORS[0], width: LINE_WIDTH_OPTIONS[1].px, dash: 'solid', arrow: 'none' };
-    shapeDragState = null; handleEls = { start: null, end: null };
+    shapeDragState = null; handleEls = {};
 
     renderEditor();
 
@@ -335,26 +345,46 @@
     canvas.addEventListener('pointerdown', function (e) {
       if (!frozen) return;
       const p = canvasPointFromEvent(e);
-      if (activeTool === 'line') {
-        creatingLine = { x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+      if (activeTool === 'line' || activeTool === 'curve') {
+        creatingShape = { type: activeTool, x1: p.x, y1: p.y, x2: p.x, y2: p.y, cx: p.x, cy: p.y };
         canvas.setPointerCapture(e.pointerId);
       } else {
         selectShape(hitTestShapes(p));
       }
     });
     canvas.addEventListener('pointermove', function (e) {
-      if (!creatingLine) return;
+      if (!creatingShape) return;
       const p = canvasPointFromEvent(e);
-      creatingLine.x2 = p.x; creatingLine.y2 = p.y;
+      creatingShape.x2 = p.x; creatingShape.y2 = p.y;
+      // Mientras se arrastra, el punto de control sigue el punto medio (la
+      // vista previa sale recta) — la curva visible de verdad se le da al
+      // soltar, ver más abajo.
+      creatingShape.cx = (creatingShape.x1 + p.x) / 2;
+      creatingShape.cy = (creatingShape.y1 + p.y) / 2;
       drawFrame();
     });
     canvas.addEventListener('pointerup', function () {
-      if (!creatingLine) return;
-      const line = creatingLine;
-      creatingLine = null;
-      const dx = (line.x2 - line.x1) * canvas.width, dy = (line.y2 - line.y1) * canvas.height;
+      if (!creatingShape) return;
+      const drawn = creatingShape;
+      creatingShape = null;
+      const dx = (drawn.x2 - drawn.x1) * canvas.width, dy = (drawn.y2 - drawn.y1) * canvas.height;
       if (Math.hypot(dx, dy) < 6) { drawFrame(); return; } // tap accidental, sin arrastre real
-      const shape = Object.assign({ id: nextShapeId++, type: 'line' }, line, currentDefaults);
+      if (drawn.type === 'curve') {
+        // Un punto de control justo en el medio da una "curva" recta, poco
+        // útil de entrada — se desplaza en perpendicular al segmento (en
+        // espacio de píxeles, para no deformarse si el canvas no es
+        // cuadrado) para que la curva nazca ya visiblemente curvada y solo
+        // haga falta afinarla arrastrando el tirador central.
+        const x1px = drawn.x1 * canvas.width, y1px = drawn.y1 * canvas.height;
+        const x2px = drawn.x2 * canvas.width, y2px = drawn.y2 * canvas.height;
+        const midXpx = (x1px + x2px) / 2, midYpx = (y1px + y2px) / 2;
+        const lenPx = Math.hypot(dx, dy) || 1;
+        const perpXpx = -dy / lenPx, perpYpx = dx / lenPx;
+        const offsetPx = 0.18 * lenPx;
+        drawn.cx = (midXpx + perpXpx * offsetPx) / canvas.width;
+        drawn.cy = (midYpx + perpYpx * offsetPx) / canvas.height;
+      }
+      const shape = Object.assign({ id: nextShapeId++ }, drawn, currentDefaults);
       shapes.push(shape);
       activeTool = null;
       updateToolButtonsUi();
@@ -366,9 +396,8 @@
       const shape = shapes.find(function (s) { return s.id === shapeDragState.shapeId; });
       if (!shape) return;
       const wrapRect = canvasWrap.getBoundingClientRect();
-      const x = clamp((e.clientX - wrapRect.left) / wrapRect.width, 0, 1);
-      const y = clamp((e.clientY - wrapRect.top) / wrapRect.height, 0, 1);
-      if (shapeDragState.which === 'start') { shape.x1 = x; shape.y1 = y; } else { shape.x2 = x; shape.y2 = y; }
+      shape[shapeDragState.xField] = clamp((e.clientX - wrapRect.left) / wrapRect.width, 0, 1);
+      shape[shapeDragState.yField] = clamp((e.clientY - wrapRect.top) / wrapRect.height, 0, 1);
       positionHandles(shape);
       drawFrame();
     });
@@ -577,11 +606,31 @@
     return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
   }
 
+  function pointOnQuadCurve(x1, y1, cx, cy, x2, y2, t) {
+    const mt = 1 - t;
+    return { x: mt * mt * x1 + 2 * mt * t * cx + t * t * x2, y: mt * mt * y1 + 2 * mt * t * cy + t * t * y2 };
+  }
+
+  function distToShape(px, py, s) {
+    const x1 = s.x1 * canvas.width, y1 = s.y1 * canvas.height, x2 = s.x2 * canvas.width, y2 = s.y2 * canvas.height;
+    if (s.type === 'curve') {
+      const cx = s.cx * canvas.width, cy = s.cy * canvas.height;
+      let prev = { x: x1, y: y1 }, best = Infinity;
+      for (let i = 1; i <= 16; i++) {
+        const pt = pointOnQuadCurve(x1, y1, cx, cy, x2, y2, i / 16);
+        best = Math.min(best, distToSegment(px, py, prev.x, prev.y, pt.x, pt.y));
+        prev = pt;
+      }
+      return best;
+    }
+    return distToSegment(px, py, x1, y1, x2, y2);
+  }
+
   function hitTestShapes(p) {
     const px = p.x * canvas.width, py = p.y * canvas.height;
     let best = null, bestDist = 14; // tolerancia en píxeles de canvas
     shapes.forEach(function (s) {
-      const d = distToSegment(px, py, s.x1 * canvas.width, s.y1 * canvas.height, s.x2 * canvas.width, s.y2 * canvas.height);
+      const d = distToShape(px, py, s);
       if (d < bestDist) { bestDist = d; best = s.id; }
     });
     return best;
@@ -621,26 +670,30 @@
   }
 
   function removeHandles() {
-    if (handleEls.start) { handleEls.start.remove(); handleEls.start = null; }
-    if (handleEls.end) { handleEls.end.remove(); handleEls.end = null; }
+    Object.keys(handleEls).forEach(function (k) { handleEls[k].remove(); });
+    handleEls = {};
   }
 
-  function createHandle(which, shapeId) {
+  function createHandle(def, shapeId, isControl) {
     const el = document.createElement('div');
-    el.className = 'va-node-handle';
+    el.className = 'va-node-handle' + (isControl ? ' control' : '');
     canvasWrap.appendChild(el);
     el.addEventListener('pointerdown', function (e) {
       e.preventDefault();
       e.stopPropagation();
-      shapeDragState = { shapeId: shapeId, which: which };
+      shapeDragState = { shapeId: shapeId, xField: def.xField, yField: def.yField };
     });
     return el;
   }
 
   function positionHandles(shape) {
     const wrapRect = canvasWrap.getBoundingClientRect();
-    if (handleEls.start) { handleEls.start.style.left = (shape.x1 * wrapRect.width) + 'px'; handleEls.start.style.top = (shape.y1 * wrapRect.height) + 'px'; }
-    if (handleEls.end) { handleEls.end.style.left = (shape.x2 * wrapRect.width) + 'px'; handleEls.end.style.top = (shape.y2 * wrapRect.height) + 'px'; }
+    (HANDLE_DEFS[shape.type] || []).forEach(function (def) {
+      const el = handleEls[def.key];
+      if (!el) return;
+      el.style.left = (shape[def.xField] * wrapRect.width) + 'px';
+      el.style.top = (shape[def.yField] * wrapRect.height) + 'px';
+    });
   }
 
   function updateHandles() {
@@ -648,8 +701,9 @@
     if (!frozen || selectedShapeId == null) return;
     const shape = shapes.find(function (s) { return s.id === selectedShapeId; });
     if (!shape) return;
-    handleEls.start = createHandle('start', shape.id);
-    handleEls.end = createHandle('end', shape.id);
+    (HANDLE_DEFS[shape.type] || []).forEach(function (def) {
+      handleEls[def.key] = createHandle(def, shape.id, def.key === 'control');
+    });
     positionHandles(shape);
   }
 
@@ -693,12 +747,50 @@
     ctx.fill();
   }
 
+  function drawCurveShape(s) {
+    const x1 = s.x1 * canvas.width, y1 = s.y1 * canvas.height;
+    const x2 = s.x2 * canvas.width, y2 = s.y2 * canvas.height;
+    const cx = s.cx * canvas.width, cy = s.cy * canvas.height;
+    const w = s.width;
+    ctx.save();
+    ctx.strokeStyle = s.color;
+    ctx.fillStyle = s.color;
+    ctx.lineWidth = w;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (s.dash === 'dashed') ctx.setLineDash([w * 2.4, w * 2]);
+    else if (s.dash === 'longdash') ctx.setLineDash([w * 5.5, w * 2.4]);
+    else ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.quadraticCurveTo(cx, cy, x2, y2);
+    ctx.stroke();
+    // La punta de la flecha sigue la tangente de la curva en ese extremo
+    // (dirección hacia/desde el punto de control), no la línea recta entre
+    // los dos nodos — si no, se ve claramente desalineada en curvas muy
+    // pronunciadas.
+    if (s.arrow === 'end' || s.arrow === 'both') {
+      ctx.setLineDash([]);
+      drawArrowHead(x2, y2, Math.atan2(y2 - cy, x2 - cx), w);
+    }
+    if (s.arrow === 'both') {
+      ctx.setLineDash([]);
+      drawArrowHead(x1, y1, Math.atan2(y1 - cy, x1 - cx), w);
+    }
+    ctx.restore();
+  }
+
+  function drawShape(s) {
+    if (s.type === 'line') drawLineShape(s);
+    else if (s.type === 'curve') drawCurveShape(s);
+  }
+
   function drawFrame() {
     if (!ctx) return;
     if (frozen) {
       if (frozenSourceCanvas) ctx.drawImage(frozenSourceCanvas, 0, 0);
-      shapes.forEach(function (s) { if (s.type === 'line') drawLineShape(s); });
-      if (creatingLine) drawLineShape(Object.assign({ id: 0, type: 'line' }, creatingLine, currentDefaults));
+      shapes.forEach(drawShape);
+      if (creatingShape) drawShape(Object.assign({ id: 0 }, creatingShape, currentDefaults));
       return;
     }
     if (!video || !video.videoWidth) return;

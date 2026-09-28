@@ -144,6 +144,15 @@
   z-index: 5;
 }
 
+/* Tirador de curvatura (punto de control) de una curva bézier — distinto
+   a los nodos de extremo para que quede claro que "esto la curva, no la
+   mueve". */
+.va-node-handle.control {
+  border-radius: 4px;
+  border-color: var(--magenta);
+  transform: rotate(45deg);
+}
+
 .va-color-swatch {
   width: 24px;
   height: 24px;
