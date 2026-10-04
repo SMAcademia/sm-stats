@@ -384,6 +384,7 @@ function doPost(e) {
       uploadPhoto: uploadPhoto,
       uploadVideoClip: uploadVideoClip,
       setVideoClipPlayers: setVideoClipPlayers,
+      addVideoClipFromDrive: addVideoClipFromDrive,
       saveCallups: saveCallups,
       saveMatchReport: saveMatchReport,
       saveAttendance: saveAttendance,
@@ -592,6 +593,55 @@ function setVideoClipPlayers(payload) {
       titulo: titulo,
       fecha: fecha,
       video_url: payload.videoUrl,
+      categoria: categoriaById[playerId] || ''
+    };
+    appendRow(SHEETS.videoClips, VIDEO_CLIP_COLUMNS, row);
+    return row;
+  });
+}
+
+// Reconoce el id de archivo en los formatos de enlace de Drive más
+// habituales ("…/file/d/<id>/view?usp=sharing", "…/open?id=<id>", o el id
+// suelto si ya lo pega tal cual) — null si no se reconoce ninguno.
+function extractDriveFileId(input) {
+  const s = (input || '').trim();
+  let m = /\/file\/d\/([a-zA-Z0-9_-]+)/.exec(s);
+  if (m) return m[1];
+  m = /[?&]id=([a-zA-Z0-9_-]+)/.exec(s);
+  if (m) return m[1];
+  if (/^[a-zA-Z0-9_-]{10,}$/.test(s)) return s;
+  return null;
+}
+
+// Añade a la Biblioteca un vídeo que el entrenador ya tiene subido a su
+// propio Drive (grabado con el móvil, exportado desde otra app, etc.), sin
+// pasar por la grabación/exportación de video-analisis.html — basta el
+// enlace para compartir. El archivo tiene que ser accesible desde la cuenta
+// de Google con la que está desplegado este Apps Script (su propio Drive, o
+// un archivo que ya esté compartido con ella).
+function addVideoClipFromDrive(payload) {
+  const fileId = extractDriveFileId(payload.driveUrl);
+  if (!fileId) throw new Error('No se reconoce ese enlace de Drive.');
+  const playerIds = payload.playerIds || [];
+  if (!playerIds.length) throw new Error('Falta el jugador.');
+  let file;
+  try {
+    file = DriveApp.getFileById(fileId);
+  } catch (err) {
+    throw new Error('No se encuentra ese vídeo en Drive — revisa el enlace y que la cuenta del club tenga acceso.');
+  }
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  const videoUrl = 'https://drive.google.com/file/d/' + fileId + '/preview';
+  const categoriaById = {};
+  sheetToObjectsOrEmpty(SHEETS.players).forEach(function (p) { categoriaById[p.id] = p.categoria; });
+  const fecha = payload.fecha || new Date().toISOString().slice(0, 10);
+  return playerIds.map(function (playerId) {
+    const row = {
+      id: newId('vc'),
+      player_id: playerId,
+      titulo: payload.titulo || '',
+      fecha: fecha,
+      video_url: videoUrl,
       categoria: categoriaById[playerId] || ''
     };
     appendRow(SHEETS.videoClips, VIDEO_CLIP_COLUMNS, row);

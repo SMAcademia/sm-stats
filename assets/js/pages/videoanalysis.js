@@ -93,11 +93,92 @@
       .sort(function (a, b) { return (b.fecha || '').localeCompare(a.fecha || ''); });
   }
 
+  // ---- añadir a la biblioteca un vídeo que ya está en Drive (sin pasar
+  // por grabar/exportar un clip desde el propio editor) ----
+  let driveAddPlayerIds = [];
+
+  function driveAddFormHtml() {
+    return (
+      '<div class="va-group-row" style="margin-top:12px;">' +
+        '<button type="button" class="btn btn-outline" id="va-library-add-drive-toggle" style="padding:6px 12px;font-size:12px;">+ Añadir vídeo desde Drive</button>' +
+      '</div>' +
+      '<div id="va-library-add-drive-form" style="display:none;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--border-soft);border-radius:10px;margin-top:10px;">' +
+        '<div style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Pega el enlace para compartir de un vídeo que ya tengas en Drive — no hace falta volver a subirlo. El archivo tiene que ser accesible desde la cuenta de Google del club (o estar ya compartido con ella).</div>' +
+        '<input type="text" id="va-drive-url-input" placeholder="https://drive.google.com/file/d/…/view" style="padding:8px 10px;">' +
+        '<input type="text" id="va-drive-title-input" placeholder="Título (opcional)" style="padding:8px 10px;">' +
+        '<div class="va-group-row" style="flex-wrap:wrap;">' +
+          '<span class="va-group-label">Jugadores</span>' +
+          exportPlayers().map(function (p) { return '<button type="button" class="pill va-drive-player-btn" data-player="' + p.id + '">' + esc(p.nombre) + (p.dorsal ? ' (#' + p.dorsal + ')' : '') + '</button>'; }).join('') +
+        '</div>' +
+        '<div class="va-group-row">' +
+          '<button type="button" class="btn btn-primary" id="va-drive-add-btn" style="padding:7px 16px;font-size:12.5px;">Añadir a la biblioteca</button>' +
+        '</div>' +
+        '<div id="va-drive-add-status" style="font-size:12px;font-weight:600;display:none;"></div>' +
+      '</div>'
+    );
+  }
+
+  function showDriveAddStatus(msg, kind) {
+    const el = main.querySelector('#va-drive-add-status');
+    if (!el) return;
+    if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+    el.style.display = 'block';
+    el.style.color = kind === 'error' ? 'var(--red-bright)' : (kind === 'ok' ? 'var(--green)' : 'var(--text-mute)');
+    el.textContent = msg;
+  }
+
+  async function addVideoFromDrive() {
+    const url = main.querySelector('#va-drive-url-input').value.trim();
+    const titulo = main.querySelector('#va-drive-title-input').value.trim();
+    if (!url) { showDriveAddStatus('Pega el enlace del vídeo de Drive.', 'error'); return; }
+    if (!driveAddPlayerIds.length) { showDriveAddStatus('Elige a qué jugador (o jugadores) se lo asignas.', 'error'); return; }
+    const btn = main.querySelector('#va-drive-add-btn');
+    btn.disabled = true;
+    showDriveAddStatus('Añadiendo…', null);
+    try {
+      await SM.api.postAction('addVideoClipFromDrive', {
+        driveUrl: url,
+        titulo: titulo,
+        playerIds: driveAddPlayerIds,
+        fecha: SM.ui.formatDateIso(new Date())
+      });
+      DATA = await SM.api.fetchAll();
+      main.querySelector('#va-drive-url-input').value = '';
+      main.querySelector('#va-drive-title-input').value = '';
+      driveAddPlayerIds = [];
+      main.querySelectorAll('.va-drive-player-btn').forEach(function (b) { b.classList.remove('active'); });
+      showDriveAddStatus('Añadido a la biblioteca.', 'ok');
+      refreshLibrary();
+    } catch (err) {
+      showDriveAddStatus('⚠ ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function wireDriveAddForm() {
+    driveAddPlayerIds = [];
+    main.querySelector('#va-library-add-drive-toggle').addEventListener('click', function () {
+      const form = main.querySelector('#va-library-add-drive-form');
+      form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+    });
+    main.querySelectorAll('.va-drive-player-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const id = btn.getAttribute('data-player');
+        const idx = driveAddPlayerIds.indexOf(id);
+        if (idx === -1) driveAddPlayerIds.push(id); else driveAddPlayerIds.splice(idx, 1);
+        btn.classList.toggle('active', idx === -1);
+      });
+    });
+    main.querySelector('#va-drive-add-btn').addEventListener('click', addVideoFromDrive);
+  }
+
   function libraryPanelHtml() {
     return (
       '<div class="panel" id="va-library-panel">' +
         '<span class="panel-title">Biblioteca de clips</span>' +
         '<div style="font-size:11.5px;color:var(--text-mute);font-weight:600;margin-top:2px;">Todos los clips ya exportados. Desde aquí puedes cambiar el título, añadir o quitar jugadores, o eliminar el clip.</div>' +
+        driveAddFormHtml() +
         '<div id="va-library-list" style="margin-top:12px;">' + renderLibraryHtml() + '</div>' +
       '</div>'
     );
@@ -360,6 +441,7 @@
       if (file) loadVideo(file);
     });
     wireLibrary();
+    wireDriveAddForm();
   }
 
   function renderEditor() {
@@ -494,6 +576,7 @@
 
     wireEditor();
     wireLibrary();
+    wireDriveAddForm();
   }
 
   function loadVideo(file) {

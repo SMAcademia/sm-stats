@@ -69,6 +69,18 @@ SM.api = (function () {
     return prefix + Date.now().toString(36) + Math.floor(Math.random() * 1000);
   }
 
+  // Igual que extractDriveFileId() en Code.gs — se duplica aquí para que el
+  // modo demo reconozca el mismo enlace sin depender del backend real.
+  function extractDriveFileId(input) {
+    const s = (input || '').trim();
+    let m = /\/file\/d\/([a-zA-Z0-9_-]+)/.exec(s);
+    if (m) return m[1];
+    m = /[?&]id=([a-zA-Z0-9_-]+)/.exec(s);
+    if (m) return m[1];
+    if (/^[a-zA-Z0-9_-]{10,}$/.test(s)) return s;
+    return null;
+  }
+
   function applyMockAction(action, payload) {
     const d = cache;
     function createMockMatch(m) {
@@ -167,6 +179,33 @@ SM.api = (function () {
           return row;
         });
         return newRows;
+      }
+      case 'addVideoClipFromDrive': {
+        // Modo demo: no hay Drive real al que consultar, así que se confía
+        // en el enlace tal cual (no se puede verificar que el archivo
+        // exista) — solo sirve para probar el formulario, igual que el
+        // resto de acciones de este modo.
+        const fileId = extractDriveFileId(payload.driveUrl);
+        if (!fileId) throw new Error('No se reconoce ese enlace de Drive.');
+        const playerIds = payload.playerIds || [];
+        if (!playerIds.length) throw new Error('Falta el jugador.');
+        d.videoClips = d.videoClips || [];
+        const players = d.players || [];
+        const videoUrl = 'https://drive.google.com/file/d/' + fileId + '/preview';
+        const titulo = payload.titulo || '';
+        return playerIds.map(function (playerId) {
+          const player = players.find(function (p) { return p.id === playerId; });
+          const row = {
+            id: nextMockId('vc'),
+            player_id: playerId,
+            titulo: titulo,
+            fecha: payload.fecha || new Date().toISOString().slice(0, 10),
+            video_url: videoUrl,
+            categoria: player ? player.categoria : ''
+          };
+          d.videoClips.push(row);
+          return row;
+        });
       }
       case 'addMatch': {
         return createMockMatch(payload);
