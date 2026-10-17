@@ -429,6 +429,18 @@ SM.api = (function () {
         });
         return true;
       }
+      case 'saveMatchResult': {
+        // Igual que en Code.gs: solo toca el marcador y "jugado", sin pedir
+        // convocatoria ni minutos ni tocar esas filas.
+        const mi = d.matches.findIndex(function (m) { return m.id === payload.matchId; });
+        if (mi >= 0) {
+          const hasResult = payload.golesFavor != null && payload.golesContra != null;
+          d.matches[mi].jugado = hasResult;
+          d.matches[mi].goles_favor = hasResult ? payload.golesFavor : '';
+          d.matches[mi].goles_contra = hasResult ? payload.golesContra : '';
+        }
+        return true;
+      }
       case 'updateSettings': {
         d.settings = Object.assign({}, d.settings, payload);
         return d.settings;

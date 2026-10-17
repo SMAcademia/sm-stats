@@ -387,6 +387,7 @@ function doPost(e) {
       addVideoClipFromDrive: addVideoClipFromDrive,
       saveCallups: saveCallups,
       saveMatchReport: saveMatchReport,
+      saveMatchResult: saveMatchResult,
       saveAttendance: saveAttendance,
       updateSettings: updateSettings
     };
@@ -971,6 +972,26 @@ function saveMatchReport(payload) {
   });
   (payload.intervals || []).forEach(function (iv) {
     appendRow(SHEETS.matchIntervals, INTERVAL_COLUMNS, Object.assign({ id: newId('iv') }, iv, { match_id: matchId }));
+  });
+  return true;
+}
+
+// Guarda solo el resultado final (goles a favor/en contra y si se ha
+// jugado), sin exigir convocatoria ni minutos — para poder apuntar el
+// marcador nada más terminar el partido aunque esos datos todavía no estén
+// en limpio. A diferencia de saveMatchReport, NO toca MatchAppearances/
+// MatchEvents/MatchIntervals: si luego se rellena el acta completa, ese
+// resultado se sobrescribe sin problema (y viceversa, rellenar la acta
+// después no pierde nada de lo que ya hubiera).
+function saveMatchResult(payload) {
+  const matchId = payload.matchId;
+  if (!matchId) throw new Error('Falta el id del partido.');
+  const hasResult = payload.golesFavor !== null && payload.golesFavor !== undefined &&
+    payload.golesContra !== null && payload.golesContra !== undefined;
+  updateRowById(SHEETS.matches, MATCH_COLUMNS, matchId, {
+    goles_favor: hasResult ? payload.golesFavor : '',
+    goles_contra: hasResult ? payload.golesContra : '',
+    jugado: hasResult
   });
   return true;
 }

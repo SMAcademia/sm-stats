@@ -435,7 +435,7 @@
             SM.forms.field('Goles a favor', '<input name="golesFavor" type="number" min="0" value="' + (match.goles_favor != null ? match.goles_favor : '') + '">') +
             SM.forms.field('Goles en contra', '<input name="golesContra" type="number" min="0" value="' + (match.goles_contra != null ? match.goles_contra : '') + '">') +
           '</div>' +
-          '<div class="form-hint" style="margin:16px 0 8px;">Marca quién va convocado y guarda la convocatoria en cualquier momento (solo hacen falta 7 convocados, sin rellenar minutos, goles ni tarjetas)' + (extraPlayers.length ? '. Puedes subir jugadores de la categoría inmediatamente inferior (al final de la lista)' : '') + '. Cuando tengas los datos del partido, rellena cambios (minuto de entrada y salida), capitán, nota y eventos, y usa "Guardar acta" — ahí sí hacen falta exactamente 7 titulares en el minuto 0. Duración del partido: ' + duration + ' min' + (match.categoria ? ' (' + SM.ui.escapeHtml(match.categoria) + ')' : '') + '.</div>' +
+          '<div class="form-hint" style="margin:16px 0 8px;">Si solo tienes el resultado, pon los goles arriba y pulsa "Guardar resultado" — no hace falta la convocatoria ni los minutos para eso. Marca quién va convocado y guarda la convocatoria en cualquier momento (solo hacen falta 7 convocados, sin rellenar minutos, goles ni tarjetas)' + (extraPlayers.length ? '. Puedes subir jugadores de la categoría inmediatamente inferior (al final de la lista)' : '') + '. Cuando tengas los datos del partido, rellena cambios (minuto de entrada y salida), capitán, nota y eventos, y usa "Guardar acta" — ahí sí hacen falta exactamente 7 titulares en el minuto 0. Duración del partido: ' + duration + ' min' + (match.categoria ? ' (' + SM.ui.escapeHtml(match.categoria) + ')' : '') + '.</div>' +
           '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
             '<button type="button" class="btn btn-outline" id="select-all-btn" style="padding:6px 12px;font-size:12px;">Seleccionar todos</button>' +
             '<button type="button" class="btn btn-outline" id="select-none-btn" style="padding:6px 12px;font-size:12px;">Ninguno</button>' +
@@ -450,6 +450,7 @@
           '<div class="form-actions">' +
             '<button type="button" class="btn btn-outline" id="delete-match-btn" style="margin-right:auto;color:var(--red-bright);border-color:' + SM.ui.alpha('var(--red)', 0.4) + ';">Eliminar partido</button>' +
             '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
+            '<button type="button" class="btn btn-outline" id="save-result-btn">Guardar resultado</button>' +
             '<button type="button" class="btn btn-outline" id="save-callups-btn">Guardar convocatoria</button>' +
             '<button type="submit" class="btn btn-primary">Guardar acta</button>' +
           '</div>' +
@@ -465,14 +466,18 @@
     let actaSaving = false;
     const submitBtn = body.querySelector('#report-form button[type="submit"]');
     const callupsBtn = body.querySelector('#save-callups-btn');
+    const resultBtn = body.querySelector('#save-result-btn');
     const submitLabel = submitBtn.textContent;
     const callupsLabel = callupsBtn.textContent;
+    const resultLabel = resultBtn.textContent;
     function setActaSaving(saving) {
       actaSaving = saving;
       submitBtn.disabled = saving;
       callupsBtn.disabled = saving;
+      resultBtn.disabled = saving;
       submitBtn.textContent = saving ? 'Guardando…' : submitLabel;
       callupsBtn.textContent = saving ? 'Guardando…' : callupsLabel;
+      resultBtn.textContent = saving ? 'Guardando…' : resultLabel;
     }
     function showActaError(msg) {
       const el = body.querySelector('#acta-error');
@@ -589,6 +594,35 @@
         SM.ui.toast('Datos cargados desde el registro en vivo — revisa y guarda el acta.', 'ok');
       });
     }
+
+    // Guarda solo el marcador (y marca el partido como jugado) — no exige
+    // convocatoria ni minutos, para poder apuntarlo nada más terminar el
+    // partido aunque todavía no se tengan esos datos en limpio.
+    body.querySelector('#save-result-btn').addEventListener('click', function () {
+      if (actaSaving) return;
+      const golesFavorRaw = body.querySelector('[name="golesFavor"]').value;
+      const golesContraRaw = body.querySelector('[name="golesContra"]').value;
+      if ((golesFavorRaw === '') !== (golesContraRaw === '')) {
+        showActaError('Introduce los dos goles, o déjalos vacíos para quitar el resultado.');
+        return;
+      }
+      const golesFavor = golesFavorRaw === '' ? null : Number(golesFavorRaw);
+      const golesContra = golesContraRaw === '' ? null : Number(golesContraRaw);
+      showActaError(null);
+      setActaSaving(true);
+      SM.api.postAction('saveMatchResult', { matchId: match.id, golesFavor: golesFavor, golesContra: golesContra }).then(function () {
+        handle.close();
+        return SM.api.fetchAll(true);
+      }).then(function (data) {
+        setData(data);
+        render();
+        SM.ui.toast('Resultado guardado.', 'ok');
+      }).catch(function (err) {
+        setActaSaving(false);
+        showActaError(err.message);
+        SM.ui.toast(err.message, 'error');
+      });
+    });
 
     // Guarda solo quién va convocado (y el capitán, si ya está decidido) —
     // no exige minutos/goles/tarjetas, para poder prepararla antes de jugar.
