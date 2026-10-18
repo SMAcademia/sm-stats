@@ -50,8 +50,6 @@ const ATTENDANCE_COLUMNS = ['id', 'session_id', 'player_id', 'estado', 'retraso'
 const MATCH_COLUMNS = ['id', 'fecha', 'hora', 'rival', 'condicion', 'lugar', 'jornada', 'competicion', 'categoria', 'goles_favor', 'goles_contra', 'jugado'];
 const EVENT_COLUMNS = ['id', 'match_id', 'player_id', 'tipo'];
 const APPEARANCE_COLUMNS = ['id', 'match_id', 'player_id', 'minutos', 'valoracion', 'capitan'];
-const MIN_CONVOCADOS = 7;
-const TITULARES_MINUTO_CERO = 7;
 // One row per stretch a player spent on the pitch (unlimited substitutions):
 // entrada/salida are match minutes, e.g. 0-17 and 34-54 -> 37 minutes total.
 const INTERVAL_COLUMNS = ['id', 'match_id', 'player_id', 'entrada', 'salida'];
@@ -131,9 +129,18 @@ function setupSheets() {
   if (defaultSheet && ss.getSheets().length > defs.length) ss.deleteSheet(defaultSheet);
 }
 
+// doGet/doPost leen muchas pestañas de golpe (hasta 14 llamadas a
+// sheetToObjects/sheetToObjectsOrEmpty en un solo doGet) — sin este caché,
+// cada una volvía a resolver SHEET_ID y a abrir la hoja de cálculo entera
+// con SpreadsheetApp.openById(), con coste real cada vez. Memoizar el
+// objeto Spreadsheet durante la ejecución convierte esas ~14 aperturas en
+// 1 sola, que es la mayor parte de la lentitud al cargar/guardar.
+let _spreadsheetCache = null;
 function getSpreadsheet() {
+  if (_spreadsheetCache) return _spreadsheetCache;
   const id = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-  return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
+  _spreadsheetCache = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
+  return _spreadsheetCache;
 }
 
 function getSheet(name) {
@@ -385,10 +392,7 @@ function doPost(e) {
       uploadVideoClip: uploadVideoClip,
       setVideoClipPlayers: setVideoClipPlayers,
       addVideoClipFromDrive: addVideoClipFromDrive,
-      saveCallups: saveCallups,
       saveMatchReport: saveMatchReport,
-      saveMatchResult: saveMatchResult,
-      saveMatchCaptain: saveMatchCaptain,
       saveAttendance: saveAttendance,
       updateSettings: updateSettings
     };
@@ -926,35 +930,16 @@ function deleteDevGoal(payload) {
   return true;
 }
 
-// Guarda solo la convocatoria (quién va convocado y el capitán), sin exigir
-// los datos del partido (minutos, goles, tarjetas) — para poder prepararla
-// antes de jugar. Solo toca MatchAppearances; goles/eventos/intervalos se
-// deciden después con saveMatchReport, una vez jugado el partido.
-function saveCallups(payload) {
-  const matchId = payload.matchId;
-  if (!matchId) throw new Error('Falta el id del partido.');
-  if ((payload.appearances || []).length < MIN_CONVOCADOS) {
-    throw new Error('Se necesitan al menos ' + MIN_CONVOCADOS + ' jugadores convocados para guardar la convocatoria.');
-  }
-  deleteRowsWhere(SHEETS.matchAppearances, 'match_id', matchId);
-  (payload.appearances || []).forEach(function (a) {
-    appendRow(SHEETS.matchAppearances, APPEARANCE_COLUMNS, Object.assign({ id: newId('ma') }, a, { match_id: matchId }));
-  });
-  return true;
-}
-
+// Guarda TODO lo que haya del partido de una sola vez — resultado,
+// convocatoria, capitán, minutos, goles/asistencias/tarjetas — sin exigir
+// que esté completo. Sirve igual antes de jugar (solo convocatoria, sin
+// resultado) que justo después (solo resultado, titulares y goleadores,
+// que es lo que normalmente se tiene a mano nada más acabar) o más tarde,
+// cuando se complete con minutos exactos. Vacío un campo (sin convocados,
+// sin resultado) simplemente lo deja vacío — no bloquea guardar el resto.
 function saveMatchReport(payload) {
   const matchId = payload.matchId;
   if (!matchId) throw new Error('Falta el id del partido.');
-  if ((payload.appearances || []).length < MIN_CONVOCADOS) {
-    throw new Error('Se necesitan al menos ' + MIN_CONVOCADOS + ' jugadores convocados para guardar el acta.');
-  }
-  const starters = {};
-  (payload.intervals || []).forEach(function (iv) { if (Number(iv.entrada) === 0) starters[iv.player_id] = true; });
-  const startersCount = Object.keys(starters).length;
-  if (startersCount !== TITULARES_MINUTO_CERO) {
-    throw new Error('El 7 inicial (minuto 0) debe ser exactamente ' + TITULARES_MINUTO_CERO + ' jugadores — ahora mismo hay ' + startersCount + '.');
-  }
   const hasResult = payload.golesFavor !== null && payload.golesFavor !== undefined &&
     payload.golesContra !== null && payload.golesContra !== undefined;
   updateRowById(SHEETS.matches, MATCH_COLUMNS, matchId, {
@@ -974,57 +959,6 @@ function saveMatchReport(payload) {
   (payload.intervals || []).forEach(function (iv) {
     appendRow(SHEETS.matchIntervals, INTERVAL_COLUMNS, Object.assign({ id: newId('iv') }, iv, { match_id: matchId }));
   });
-  return true;
-}
-
-// Guarda solo el resultado final (goles a favor/en contra y si se ha
-// jugado), sin exigir convocatoria ni minutos — para poder apuntar el
-// marcador nada más terminar el partido aunque esos datos todavía no estén
-// en limpio. A diferencia de saveMatchReport, NO toca MatchAppearances/
-// MatchEvents/MatchIntervals: si luego se rellena el acta completa, ese
-// resultado se sobrescribe sin problema (y viceversa, rellenar la acta
-// después no pierde nada de lo que ya hubiera).
-function saveMatchResult(payload) {
-  const matchId = payload.matchId;
-  if (!matchId) throw new Error('Falta el id del partido.');
-  const hasResult = payload.golesFavor !== null && payload.golesFavor !== undefined &&
-    payload.golesContra !== null && payload.golesContra !== undefined;
-  updateRowById(SHEETS.matches, MATCH_COLUMNS, matchId, {
-    goles_favor: hasResult ? payload.golesFavor : '',
-    goles_contra: hasResult ? payload.golesContra : '',
-    jugado: hasResult
-  });
-  return true;
-}
-
-// Guarda solo quién fue capitán, sin exigir convocatoria ni minutos — igual
-// de rápido de apuntar que el resultado, y no hace falta esperar a tener el
-// acta completa. Si el jugador elegido todavía no tenía fila en
-// MatchAppearances (no se había guardado ni convocatoria ni acta para este
-// partido), se le crea una mínima solo para poder marcarlo como capitán;
-// el resto de filas no se tocan salvo para desmarcar un capitán anterior.
-// payload.playerId vacío/null quita el capitán sin asignar uno nuevo.
-function saveMatchCaptain(payload) {
-  const matchId = payload.matchId;
-  if (!matchId) throw new Error('Falta el id del partido.');
-  const sheet = getSheet(SHEETS.matchAppearances);
-  const header = ensureHeader(sheet, APPEARANCE_COLUMNS);
-  const matchCol = header.indexOf('match_id');
-  const playerCol = header.indexOf('player_id');
-  const capCol = header.indexOf('capitan');
-  const values = sheet.getDataRange().getValues();
-  let alreadyHasRow = false;
-  for (let i = 1; i < values.length; i++) {
-    if (String(values[i][matchCol]) !== String(matchId)) continue;
-    const isChosenCaptain = !!payload.playerId && String(values[i][playerCol]) === String(payload.playerId);
-    sheet.getRange(i + 1, capCol + 1).setValue(isChosenCaptain);
-    if (isChosenCaptain) alreadyHasRow = true;
-  }
-  if (payload.playerId && !alreadyHasRow) {
-    appendRow(SHEETS.matchAppearances, APPEARANCE_COLUMNS, {
-      id: newId('ma'), match_id: matchId, player_id: payload.playerId, minutos: '', valoracion: '', capitan: true
-    });
-  }
   return true;
 }
 

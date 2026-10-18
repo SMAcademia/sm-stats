@@ -13,6 +13,36 @@ SM.api = (function () {
     return !!(SM.config && SM.config.APPS_SCRIPT_URL && SM.config.APPS_SCRIPT_URL.trim());
   }
 
+  // SM Stats es un sitio multi-página (sin SPA): cada navegación recarga el
+  // JS desde cero, así que sin esto CADA clic entre pantallas (Partidos →
+  // Plantilla → Asistencia…) repetía la ida y vuelta completa a Apps
+  // Script, que tiene su propia latencia — el caso de uso real es un
+  // entrenador moviéndose rápido entre pantallas durante un entrenamiento o
+  // partido. sessionStorage sobrevive a la recarga de página pero no a
+  // pestañas nuevas ni a cerrar el navegador, así que sirve para "moverse
+  // rápido ahora mismo" sin arriesgarse a enseñar datos de hace días. El
+  // TTL es corto a propósito: de sobra para encadenar varias pantallas
+  // seguidas, pero no tanto como para notarlo si alguien más edita datos
+  // desde otro sitio mientras tanto.
+  const SESSION_CACHE_KEY = 'sm_stats_data_cache_v1';
+  const SESSION_CACHE_TTL_MS = 45000;
+  function readSessionCache() {
+    try {
+      const raw = sessionStorage.getItem(SESSION_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.data || !parsed.ts) return null;
+      if (Date.now() - parsed.ts > SESSION_CACHE_TTL_MS) return null;
+      return parsed.data;
+    } catch (e) { return null; }
+  }
+  function writeSessionCache(data) {
+    try { sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify({ data: data, ts: Date.now() })); } catch (e) { /* cuota llena u otro fallo — simplemente no se cachea */ }
+  }
+  function clearSessionCache() {
+    try { sessionStorage.removeItem(SESSION_CACHE_KEY); } catch (e) { /* noop */ }
+  }
+
   // Sin esto, un fetch a una hoja/wifi lenta (típico en un campo de fútbol)
   // se puede quedar colgado indefinidamente sin dar ningún error — la
   // página parece simplemente "no hacer nada" al pulsar un botón. Con
@@ -41,6 +71,14 @@ SM.api = (function () {
   async function fetchAll(force) {
     const mustHitNetwork = isLive() ? (force || !cache) : !cache;
     if (!mustHitNetwork) return cache;
+    // Antes de pedirle nada a Apps Script, mira si otra página de esta
+    // misma pestaña ya lo cargó hace poco — así cambiar de pantalla se
+    // siente instantáneo en vez de repetir la espera en cada clic. Un
+    // refresco forzado (tras guardar algo) se salta esto a propósito.
+    if (!force && isLive()) {
+      const cached = readSessionCache();
+      if (cached) { cache = cached; return cache; }
+    }
     if (cachePromise && !(force && isLive())) return cachePromise;
     cachePromise = (async () => {
       if (isLive()) {
@@ -49,6 +87,7 @@ SM.api = (function () {
         const json = await res.json();
         if (!json || json.ok === false) throw new Error((json && json.error) || 'No se pudo leer la hoja de cálculo.');
         cache = json.result;
+        writeSessionCache(cache);
       } else {
         const res = await fetch('assets/data/sample-data.json', { cache: 'no-store' });
         if (!res.ok) throw new Error('No se pudo cargar el dataset de ejemplo.');
@@ -63,7 +102,7 @@ SM.api = (function () {
     return cachePromise;
   }
 
-  function invalidate() { cache = null; cachePromise = null; }
+  function invalidate() { cache = null; cachePromise = null; clearSessionCache(); }
 
   function nextMockId(prefix) {
     return prefix + Date.now().toString(36) + Math.floor(Math.random() * 1000);
@@ -388,32 +427,16 @@ SM.api = (function () {
         d.devGoals = (d.devGoals || []).filter(function (g) { return g.id !== payload.id; });
         return true;
       }
-      case 'saveCallups': {
-        if ((payload.appearances || []).length < 7) {
-          throw new Error('Se necesitan al menos 7 jugadores convocados para guardar la convocatoria.');
-        }
-        d.matchAppearances = d.matchAppearances.filter(function (a) { return a.match_id !== payload.matchId; });
-        (payload.appearances || []).forEach(function (a) {
-          d.matchAppearances.push(Object.assign({ id: nextMockId('ma') }, a, { match_id: payload.matchId }));
-        });
-        return true;
-      }
       case 'saveMatchReport': {
-        if ((payload.appearances || []).length < 7) {
-          throw new Error('Se necesitan al menos 7 jugadores convocados para guardar el acta.');
-        }
-        const starterIds = {};
-        (payload.intervals || []).forEach(function (iv) { if (Number(iv.entrada) === 0) starterIds[iv.player_id] = true; });
-        const startersCount = Object.keys(starterIds).length;
-        if (startersCount !== 7) {
-          throw new Error('El 7 inicial (minuto 0) debe ser exactamente 7 jugadores — ahora mismo hay ' + startersCount + '.');
-        }
+        // Guarda TODO lo que haya a la vez (resultado, convocatoria,
+        // capitán, minutos, eventos), sin exigir que esté completo — igual
+        // que en Code.gs.
         const mi = d.matches.findIndex(function (m) { return m.id === payload.matchId; });
         if (mi >= 0) {
           const hasResult = payload.golesFavor != null && payload.golesContra != null;
           d.matches[mi].jugado = hasResult;
-          d.matches[mi].goles_favor = payload.golesFavor;
-          d.matches[mi].goles_contra = payload.golesContra;
+          d.matches[mi].goles_favor = hasResult ? payload.golesFavor : '';
+          d.matches[mi].goles_contra = hasResult ? payload.golesContra : '';
         }
         d.matchAppearances = d.matchAppearances.filter(function (a) { return a.match_id !== payload.matchId; });
         d.matchEvents = d.matchEvents.filter(function (e) { return e.match_id !== payload.matchId; });
@@ -427,39 +450,6 @@ SM.api = (function () {
         (payload.intervals || []).forEach(function (iv) {
           d.matchIntervals.push(Object.assign({ id: nextMockId('iv') }, iv, { match_id: payload.matchId }));
         });
-        return true;
-      }
-      case 'saveMatchResult': {
-        // Igual que en Code.gs: solo toca el marcador y "jugado", sin pedir
-        // convocatoria ni minutos ni tocar esas filas.
-        const mi = d.matches.findIndex(function (m) { return m.id === payload.matchId; });
-        if (mi >= 0) {
-          const hasResult = payload.golesFavor != null && payload.golesContra != null;
-          d.matches[mi].jugado = hasResult;
-          d.matches[mi].goles_favor = hasResult ? payload.golesFavor : '';
-          d.matches[mi].goles_contra = hasResult ? payload.golesContra : '';
-        }
-        return true;
-      }
-      case 'saveMatchCaptain': {
-        // Igual que en Code.gs: solo cambia el campo "capitan" de las filas
-        // ya guardadas de este partido, y crea una fila mínima para el
-        // elegido si todavía no tenía ninguna — sin tocar convocatoria ni
-        // minutos de nadie más.
-        d.matchAppearances = d.matchAppearances || [];
-        let alreadyHasRow = false;
-        d.matchAppearances.forEach(function (a) {
-          if (a.match_id !== payload.matchId) return;
-          const isChosenCaptain = !!payload.playerId && a.player_id === payload.playerId;
-          a.capitan = isChosenCaptain;
-          if (isChosenCaptain) alreadyHasRow = true;
-        });
-        if (payload.playerId && !alreadyHasRow) {
-          d.matchAppearances.push({
-            id: nextMockId('ma'), match_id: payload.matchId, player_id: payload.playerId,
-            minutos: null, valoracion: null, capitan: true
-          });
-        }
         return true;
       }
       case 'updateSettings': {

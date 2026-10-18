@@ -435,7 +435,7 @@
             SM.forms.field('Goles a favor', '<input name="golesFavor" type="number" min="0" value="' + (match.goles_favor != null ? match.goles_favor : '') + '">') +
             SM.forms.field('Goles en contra', '<input name="golesContra" type="number" min="0" value="' + (match.goles_contra != null ? match.goles_contra : '') + '">') +
           '</div>' +
-          '<div class="form-hint" style="margin:16px 0 8px;">Si solo tienes el resultado, pon los goles arriba y pulsa "Guardar resultado" — no hace falta la convocatoria ni los minutos para eso. Lo mismo con el capitán: marca la "C" de la fila y pulsa "Guardar capitán", sin necesidad de rellenar el resto. Marca quién va convocado y guarda la convocatoria en cualquier momento (solo hacen falta 7 convocados, sin rellenar minutos, goles ni tarjetas)' + (extraPlayers.length ? '. Puedes subir jugadores de la categoría inmediatamente inferior (al final de la lista)' : '') + '. Cuando tengas los datos del partido, rellena cambios (minuto de entrada y salida), nota y eventos, y usa "Guardar acta" — ahí sí hacen falta exactamente 7 titulares en el minuto 0. Duración del partido: ' + duration + ' min' + (match.categoria ? ' (' + SM.ui.escapeHtml(match.categoria) + ')' : '') + '.</div>' +
+          '<div class="form-hint" style="margin:16px 0 8px;">Rellena lo que tengas a mano — resultado, titulares/suplentes (marca la convocatoria y, si quieres, el minuto de entrada/salida de cada uno), capitán ("C") y goleadores — y pulsa "Guardar". No hace falta completarlo todo de una vez: puedes guardar solo el resultado y los goleadores nada más acabar, y añadir minutos exactos más tarde' + (extraPlayers.length ? '. Puedes subir jugadores de la categoría inmediatamente inferior (al final de la lista)' : '') + '. Duración del partido: ' + duration + ' min' + (match.categoria ? ' (' + SM.ui.escapeHtml(match.categoria) + ')' : '') + '.</div>' +
           '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
             '<button type="button" class="btn btn-outline" id="select-all-btn" style="padding:6px 12px;font-size:12px;">Seleccionar todos</button>' +
             '<button type="button" class="btn btn-outline" id="select-none-btn" style="padding:6px 12px;font-size:12px;">Ninguno</button>' +
@@ -450,10 +450,7 @@
           '<div class="form-actions">' +
             '<button type="button" class="btn btn-outline" id="delete-match-btn" style="margin-right:auto;color:var(--red-bright);border-color:' + SM.ui.alpha('var(--red)', 0.4) + ';">Eliminar partido</button>' +
             '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
-            '<button type="button" class="btn btn-outline" id="save-result-btn">Guardar resultado</button>' +
-            '<button type="button" class="btn btn-outline" id="save-captain-btn">Guardar capitán</button>' +
-            '<button type="button" class="btn btn-outline" id="save-callups-btn">Guardar convocatoria</button>' +
-            '<button type="submit" class="btn btn-primary">Guardar acta</button>' +
+            '<button type="submit" class="btn btn-primary">Guardar</button>' +
           '</div>' +
         '</form>'
     });
@@ -466,23 +463,11 @@
     // deja el error a la vista (no solo un toast que desaparece solo).
     let actaSaving = false;
     const submitBtn = body.querySelector('#report-form button[type="submit"]');
-    const callupsBtn = body.querySelector('#save-callups-btn');
-    const resultBtn = body.querySelector('#save-result-btn');
-    const captainBtn = body.querySelector('#save-captain-btn');
     const submitLabel = submitBtn.textContent;
-    const callupsLabel = callupsBtn.textContent;
-    const resultLabel = resultBtn.textContent;
-    const captainLabel = captainBtn.textContent;
     function setActaSaving(saving) {
       actaSaving = saving;
       submitBtn.disabled = saving;
-      callupsBtn.disabled = saving;
-      resultBtn.disabled = saving;
-      captainBtn.disabled = saving;
       submitBtn.textContent = saving ? 'Guardando…' : submitLabel;
-      callupsBtn.textContent = saving ? 'Guardando…' : callupsLabel;
-      resultBtn.textContent = saving ? 'Guardando…' : resultLabel;
-      captainBtn.textContent = saving ? 'Guardando…' : captainLabel;
     }
     function showActaError(msg) {
       const el = body.querySelector('#acta-error');
@@ -600,134 +585,50 @@
       });
     }
 
-    // Guarda solo el marcador (y marca el partido como jugado) — no exige
-    // convocatoria ni minutos, para poder apuntarlo nada más terminar el
-    // partido aunque todavía no se tengan esos datos en limpio.
-    body.querySelector('#save-result-btn').addEventListener('click', function () {
-      if (actaSaving) return;
-      const golesFavorRaw = body.querySelector('[name="golesFavor"]').value;
-      const golesContraRaw = body.querySelector('[name="golesContra"]').value;
-      if ((golesFavorRaw === '') !== (golesContraRaw === '')) {
-        showActaError('Introduce los dos goles, o déjalos vacíos para quitar el resultado.');
-        return;
-      }
-      const golesFavor = golesFavorRaw === '' ? null : Number(golesFavorRaw);
-      const golesContra = golesContraRaw === '' ? null : Number(golesContraRaw);
-      showActaError(null);
-      setActaSaving(true);
-      SM.api.postAction('saveMatchResult', { matchId: match.id, golesFavor: golesFavor, golesContra: golesContra }).then(function () {
-        handle.close();
-        return SM.api.fetchAll(true);
-      }).then(function (data) {
-        setData(data);
-        render();
-        SM.ui.toast('Resultado guardado.', 'ok');
-      }).catch(function (err) {
-        setActaSaving(false);
-        showActaError(err.message);
-        SM.ui.toast(err.message, 'error');
-      });
-    });
-
-    // Guarda solo el capitán — igual de rápido que el resultado, sin pedir
-    // convocatoria ni minutos. El radio "C" vive en cada fila de la tabla
-    // independientemente de si esa fila está marcada como convocada.
-    body.querySelector('#save-captain-btn').addEventListener('click', function () {
-      if (actaSaving) return;
-      const capitanId = (body.querySelector('input[name="capitan"]:checked') || {}).value || null;
-      showActaError(null);
-      setActaSaving(true);
-      SM.api.postAction('saveMatchCaptain', { matchId: match.id, playerId: capitanId }).then(function () {
-        handle.close();
-        return SM.api.fetchAll(true);
-      }).then(function (data) {
-        setData(data);
-        render();
-        SM.ui.toast('Capitán guardado.', 'ok');
-      }).catch(function (err) {
-        setActaSaving(false);
-        showActaError(err.message);
-        SM.ui.toast(err.message, 'error');
-      });
-    });
-
-    // Guarda solo quién va convocado (y el capitán, si ya está decidido) —
-    // no exige minutos/goles/tarjetas, para poder prepararla antes de jugar.
-    body.querySelector('#save-callups-btn').addEventListener('click', function () {
-      if (actaSaving) return;
-      const capitanId = (body.querySelector('input[name="capitan"]:checked') || {}).value;
-      const appearances = [];
-      players.forEach(function (p) {
-        const cb = body.querySelector('.conv-cb[data-player="' + p.id + '"]');
-        if (!cb || !cb.checked) return;
-        // Conserva minutos/nota si ya se habían guardado en una acta previa —
-        // esto solo decide quién va convocado, no debe borrar ese dato.
-        const existing = appsByPlayer[p.id];
-        appearances.push({
-          player_id: p.id,
-          minutos: existing ? existing.minutos : null,
-          valoracion: existing ? existing.valoracion : null,
-          capitan: p.id === capitanId
-        });
-      });
-      if (appearances.length < 7) {
-        showActaError('Se necesitan al menos 7 jugadores convocados para guardar la convocatoria.');
-        return;
-      }
-      showActaError(null);
-      setActaSaving(true);
-      SM.api.postAction('saveCallups', { matchId: match.id, appearances: appearances }).then(function () {
-        handle.close();
-        return SM.api.fetchAll(true);
-      }).then(function (data) {
-        setData(data);
-        render();
-        SM.ui.toast('Convocatoria guardada.', 'ok');
-      }).catch(function (err) {
-        setActaSaving(false);
-        showActaError(err.message);
-        SM.ui.toast(err.message, 'error');
-      });
-    });
-
     body.querySelector('#report-form').addEventListener('submit', function (e) {
       e.preventDefault();
       if (actaSaving) return;
       const fd = new FormData(e.target);
-      const golesFavor = fd.get('golesFavor') === '' ? null : Number(fd.get('golesFavor'));
-      const golesContra = fd.get('golesContra') === '' ? null : Number(fd.get('golesContra'));
+      const golesFavorRaw = fd.get('golesFavor');
+      const golesContraRaw = fd.get('golesContra');
+      if ((golesFavorRaw === '') !== (golesContraRaw === '')) {
+        showActaError('Introduce los dos goles, o déjalos vacíos para no guardar el resultado todavía.');
+        return;
+      }
+      const golesFavor = golesFavorRaw === '' ? null : Number(golesFavorRaw);
+      const golesContra = golesContraRaw === '' ? null : Number(golesContraRaw);
       const capitanId = fd.get('capitan');
       const appearances = [];
       const events = [];
       const intervals = [];
       players.forEach(function (p) {
-        if (!fd.get('conv_' + p.id)) return;
+        const gol = Number(fd.get('gol_' + p.id)) || 0;
+        const asis = Number(fd.get('asis_' + p.id)) || 0;
+        const amarilla = !!fd.get('am_' + p.id);
+        const roja = !!fd.get('ro_' + p.id);
+        const playerIntervals = intervalsState[p.id] || [];
+        // Un jugador cuenta como "de este partido" si se ha marcado su
+        // convocatoria O hay cualquier otro dato suyo (es el capitán, tiene
+        // goles/asistencias/tarjetas, o algún cambio de minutos) — así no se
+        // pierde nada aunque no se haya marcado la casilla a propósito, y se
+        // puede guardar solo lo que se tenga a mano (p. ej. goleadores) sin
+        // tener que decidir primero la convocatoria completa.
+        const included = !!fd.get('conv_' + p.id) || p.id === capitanId || gol > 0 || asis > 0 || amarilla || roja || playerIntervals.length > 0;
+        if (!included) return;
         appearances.push({
           player_id: p.id,
           minutos: totalMinutes(p.id),
           valoracion: fd.get('nota_' + p.id) ? Number(fd.get('nota_' + p.id)) : null,
           capitan: p.id === capitanId
         });
-        (intervalsState[p.id] || []).forEach(function (iv) {
+        playerIntervals.forEach(function (iv) {
           intervals.push({ player_id: p.id, entrada: iv.entrada, salida: iv.salida });
         });
-        const gol = Number(fd.get('gol_' + p.id)) || 0;
-        const asis = Number(fd.get('asis_' + p.id)) || 0;
         for (let i = 0; i < gol; i++) events.push({ player_id: p.id, tipo: 'gol' });
         for (let i = 0; i < asis; i++) events.push({ player_id: p.id, tipo: 'asistencia' });
-        if (fd.get('am_' + p.id)) events.push({ player_id: p.id, tipo: 'amarilla' });
-        if (fd.get('ro_' + p.id)) events.push({ player_id: p.id, tipo: 'roja' });
+        if (amarilla) events.push({ player_id: p.id, tipo: 'amarilla' });
+        if (roja) events.push({ player_id: p.id, tipo: 'roja' });
       });
-      if (appearances.length < 7) {
-        showActaError('Se necesitan al menos 7 jugadores convocados para guardar el acta.');
-        return;
-      }
-      const starters = new Set();
-      intervals.forEach(function (iv) { if (Number(iv.entrada) === 0) starters.add(iv.player_id); });
-      if (starters.size !== 7) {
-        showActaError('El 7 inicial (minuto 0) debe ser exactamente 7 jugadores — ahora mismo hay ' + starters.size + '.');
-        return;
-      }
       showActaError(null);
       setActaSaving(true);
       SM.api.postAction('saveMatchReport', { matchId: match.id, golesFavor: golesFavor, golesContra: golesContra, appearances: appearances, events: events, intervals: intervals })
@@ -737,7 +638,7 @@
         }).then(function (data) {
           setData(data);
           render();
-          SM.ui.toast('Acta guardada.', 'ok');
+          SM.ui.toast('Partido guardado.', 'ok');
         }).catch(function (err) {
           setActaSaving(false);
           showActaError(err.message);
