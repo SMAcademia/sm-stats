@@ -43,9 +43,13 @@ python3 -m http.server 8000
 4. En el propio editor de Apps Script, selecciona la función `setupSheets`
    en el desplegable de funciones (arriba) y pulsa **Ejecutar**. La
    primera vez te pedirá autorizar permisos (es tu propio script, es
-   seguro). Esto crea las 7 pestañas necesarias
-   (`Players`, `Staff`, `Sessions`, `Attendance`, `Matches`, `MatchEvents`,
-   `MatchAppearances`) con sus columnas ya preparadas.
+   seguro). Esto crea todas las pestañas necesarias (`Players`, `Staff`,
+   `Sessions`, `Attendance`, `Matches`, `MatchEvents`, `MatchAppearances`,
+   `MatchIntervals`, `MatchLiveEvents`, `Checkins`, `PlanEntries`,
+   `DevGoals`, `VideoClips`, `Cuotas`, `Uniformes`, `Settings`) con sus
+   columnas ya preparadas — vuelve a ejecutarla sin miedo cada vez que
+   actualices `Code.gs` con una versión más reciente del repo: no borra ni
+   toca filas ya existentes, solo añade las pestañas/columnas que falten.
 5. (Opcional pero recomendado) En **Configuración del proyecto → Propiedades
    del script**, añade una propiedad `TOKEN` con un valor secreto a tu
    elección (por ejemplo una cadena aleatoria larga). Esto evita que
@@ -109,8 +113,9 @@ planificacion.html      Objetivos de entrenamiento por día (cuerpo técnico)
 cuadrante.html          Cuadrante semanal (todas las categorías) + descarga PNG
 partidos.html           Partidos (próximo, jugados, acta)
 estadisticas.html       Estadísticas comparativas del equipo
-acceso.html             Login privado para familias/jugadores y staff
+acceso.html             Login privado para familias/jugadores, staff y directiva
 mi-jugador.html         Portal reducido de familia (?id=...)
+directiva.html          Portal de gestión de la directiva (cuotas, uniformes, datos personales)
 assets/
   css/theme.css          Tokens de diseño (colores, tipografía) y componentes
   js/config.js            URL del Apps Script + token
@@ -147,6 +152,14 @@ existen en la Sheet.
 - **Cuerpo técnico** — mismo esquema pero con la fecha de alta en vez de
   la de nacimiento (p. ej. `MARC2022`). Entran directamente a la app
   completa, con el mismo acceso que tú.
+- **Directiva** — mismo esquema que el resto del staff (nombre + fecha de
+  alta), pero marcando "¿Es directiva?" → Sí al dar de alta a esa persona
+  en Plantilla → Cuerpo técnico. Entran a su propio portal
+  (`directiva.html`): datos personales/contacto de los jugadores, cuotas
+  mensuales (cuadrícula jugador × mes, con un importe por defecto
+  configurable en Ajustes) y uniformes (kits de entrenamiento/paseo por
+  jugador: talla, pedido, entregado, pagado) — **sin** ningún dato
+  deportivo (atributos, partidos, asistencia a entrenamientos, bienestar).
 
 Desde la ficha de cada jugador (`jugador.html`) y desde la tarjeta de cada
 miembro del staff en Plantilla puedes ver y copiar sus credenciales con un

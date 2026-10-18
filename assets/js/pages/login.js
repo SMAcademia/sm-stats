@@ -1,9 +1,12 @@
-/* SM Stats — Acceso privado (familias/jugadores y cuerpo técnico).
-   Página standalone (acceso.html), sin sidebar. Las credenciales las da
-   el entrenador: usuario = nombre en mayúsculas, contraseña = 4 primeras
-   letras del nombre + año (ver assets/js/auth.js). Un jugador entra a su
-   ficha reducida (mi-jugador.html); el staff entra directo a la app
-   completa (index.html) — tiene el mismo acceso que el entrenador. */
+/* SM Stats — Acceso privado (familias/jugadores, cuerpo técnico y
+   directiva). Página standalone (acceso.html), sin sidebar. Las
+   credenciales las da el entrenador: usuario = nombre en mayúsculas,
+   contraseña = 4 primeras letras del nombre + año (ver assets/js/auth.js).
+   Un jugador entra a su ficha reducida (mi-jugador.html); un miembro del
+   staff marcado como directiva entra a su propio portal de gestión
+   (directiva.html, sin datos deportivos); el resto del staff entra directo
+   a la app completa (index.html) — tiene el mismo acceso que el
+   entrenador. */
 
 (function () {
   const root = document.getElementById('live-root');
@@ -69,6 +72,12 @@
       if (match.type === 'player') {
         SM.auth.saveFamilySession(match.player.id);
         window.location.href = safeNext() || ('mi-jugador.html?id=' + match.player.id);
+      } else if (match.staff.es_directiva) {
+        // Directiva: acceso de gestión (cuotas/uniformes/datos personales),
+        // sin nada deportivo — portal propio, no la app completa del cuerpo
+        // técnico.
+        SM.auth.saveStaffSession(match.staff.id);
+        window.location.href = 'directiva.html';
       } else {
         // "next" es solo para destinos de jugador (p. ej. volver a la
         // encuesta de bienestar) — el staff siempre entra a la app completa.

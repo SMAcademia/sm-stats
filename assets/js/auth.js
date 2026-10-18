@@ -63,6 +63,14 @@ SM.auth = (function () {
     try { localStorage.setItem(SESSION_KEY, JSON.stringify({ type: 'player', id: playerId })); } catch (e) { /* noop */ }
   }
 
+  // Misma clave que la sesión de familia (readFamilySession/clearFamilySession
+  // ya son genéricas, solo serializan el objeto que se les dé) — así
+  // directiva.html reutiliza exactamente el mismo guardado/lectura/cierre de
+  // sesión que mi-jugador.html, sin duplicar nada.
+  function saveStaffSession(staffId) {
+    try { localStorage.setItem(SESSION_KEY, JSON.stringify({ type: 'staff', id: staffId })); } catch (e) { /* noop */ }
+  }
+
   function readFamilySession() {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
@@ -79,6 +87,7 @@ SM.auth = (function () {
     staffCredentials: staffCredentials,
     login: login,
     saveFamilySession: saveFamilySession,
+    saveStaffSession: saveStaffSession,
     readFamilySession: readFamilySession,
     clearFamilySession: clearFamilySession
   };

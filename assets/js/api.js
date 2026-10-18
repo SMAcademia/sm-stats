@@ -149,7 +149,7 @@ SM.api = (function () {
         return true;
       }
       case 'addStaffMember': {
-        const row = Object.assign({ id: nextMockId('s') }, payload);
+        const row = Object.assign({ id: nextMockId('s') }, payload, { es_directiva: payload.es_directiva === 'true' || payload.es_directiva === true });
         d.staff.push(row);
         return row;
       }
@@ -426,6 +426,34 @@ SM.api = (function () {
       case 'deleteDevGoal': {
         d.devGoals = (d.devGoals || []).filter(function (g) { return g.id !== payload.id; });
         return true;
+      }
+      case 'saveCuota': {
+        if (!payload.player_id) throw new Error('Falta el jugador.');
+        if (!payload.periodo) throw new Error('Falta el período.');
+        d.cuotas = d.cuotas || [];
+        const patch = { player_id: payload.player_id, periodo: payload.periodo, importe: payload.importe, pagado: !!payload.pagado, fecha_pago: payload.fecha_pago || '' };
+        if (payload.id) {
+          const i = d.cuotas.findIndex(function (c) { return c.id === payload.id; });
+          if (i >= 0) d.cuotas[i] = Object.assign({}, d.cuotas[i], patch);
+          return d.cuotas[i];
+        }
+        const row = Object.assign({ id: nextMockId('cu') }, patch);
+        d.cuotas.push(row);
+        return row;
+      }
+      case 'saveUniforme': {
+        if (!payload.player_id) throw new Error('Falta el jugador.');
+        if (!payload.tipo) throw new Error('Falta el tipo de kit.');
+        d.uniformes = d.uniformes || [];
+        const patch = { player_id: payload.player_id, tipo: payload.tipo, talla: payload.talla || '', pedido: !!payload.pedido, entregado: !!payload.entregado, pagado: !!payload.pagado };
+        if (payload.id) {
+          const i = d.uniformes.findIndex(function (u) { return u.id === payload.id; });
+          if (i >= 0) d.uniformes[i] = Object.assign({}, d.uniformes[i], patch);
+          return d.uniformes[i];
+        }
+        const row = Object.assign({ id: nextMockId('un') }, patch);
+        d.uniformes.push(row);
+        return row;
       }
       case 'saveMatchReport': {
         // Guarda TODO lo que haya a la vez (resultado, convocatoria,

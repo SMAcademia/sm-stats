@@ -3,7 +3,8 @@
     "club_nombre": "CD Ribera",
     "entrenador_nombre": "Marcos Vidal",
     "entrenador_rol": "Entrenador",
-    "liga_nombre": "Liga Alevín A · Grupo 3"
+    "liga_nombre": "Liga Alevín A · Grupo 3",
+    "cuota_mensual": 25
   },
   "players": [
     {
@@ -326,7 +327,8 @@
       "rol": "Entrenador principal",
       "licencia": "UEFA Pro",
       "fecha_alta": "2022",
-      "foto_url": ""
+      "foto_url": "",
+      "es_directiva": false
     },
     {
       "id": "s2",
@@ -334,7 +336,8 @@
       "rol": "2ª entrenadora · Porteros",
       "licencia": "UEFA B",
       "fecha_alta": "2023",
-      "foto_url": ""
+      "foto_url": "",
+      "es_directiva": false
     },
     {
       "id": "s3",
@@ -342,7 +345,8 @@
       "rol": "Preparador físico",
       "licencia": "Grado en CAFyD",
       "fecha_alta": "2022",
-      "foto_url": ""
+      "foto_url": "",
+      "es_directiva": false
     },
     {
       "id": "s4",
@@ -350,7 +354,8 @@
       "rol": "Fisioterapeuta",
       "licencia": "Fisioterapia deportiva",
       "fecha_alta": "2024",
-      "foto_url": ""
+      "foto_url": "",
+      "es_directiva": false
     },
     {
       "id": "s5",
@@ -358,7 +363,17 @@
       "rol": "Delegado de equipo",
       "licencia": "Logística y viajes",
       "fecha_alta": "2021",
-      "foto_url": ""
+      "foto_url": "",
+      "es_directiva": false
+    },
+    {
+      "id": "s6",
+      "nombre": "Patricia Soler",
+      "rol": "Tesorera de la directiva",
+      "licencia": "",
+      "fecha_alta": "2021",
+      "foto_url": "",
+      "es_directiva": true
     }
   ],
   "sessions": [

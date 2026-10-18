@@ -204,6 +204,7 @@
           '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">' +
             '<span class="name" style="font-size:16px;">' + SM.ui.escapeHtml(s.nombre) + '</span>' +
             '<span class="position" style="color:var(--cyan);text-align:center;">' + SM.ui.escapeHtml(s.rol).toUpperCase() + '</span>' +
+            (s.es_directiva ? '<span class="badge" style="background:' + SM.ui.alpha('var(--amber)', 0.14) + ';border:1px solid ' + SM.ui.alpha('var(--amber)', 0.5) + ';color:var(--amber-bright);margin-top:2px;">DIRECTIVA</span>' : '') +
           '</div>' +
         '</div>' +
         '<div style="display:flex;flex-direction:column;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">' +

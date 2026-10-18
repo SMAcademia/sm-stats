@@ -89,8 +89,10 @@ SM.forms = (function () {
           field('Rol', '<input name="rol" required placeholder="Ej. Preparador físico" value="' + esc(s.rol) + '">') +
           field('Licencia / formación', '<input name="licencia" value="' + esc(s.licencia) + '">') +
           field('En el club desde', '<input name="fecha_alta" placeholder="Ej. 2026" value="' + esc(s.fecha_alta) + '">') +
+          field('¿Es directiva?', selectHtml('es_directiva', [['false', 'No'], ['true', 'Sí']], s.es_directiva ? 'true' : 'false')) +
           photoFieldHtml(s) +
         '</div>' +
+        '<div class="form-hint" style="margin-top:4px;">La directiva entra con las mismas credenciales (usuario/contraseña derivados del nombre) pero a su propio portal de gestión — cuotas, uniformes y datos personales, sin nada deportivo.</div>' +
         '<div class="form-actions">' +
           '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
           '<button type="submit" class="btn btn-primary">Guardar</button>' +
@@ -422,6 +424,7 @@ SM.forms = (function () {
           field('Nombre del entrenador/a', '<input name="entrenador_nombre" required value="' + esc(s.entrenador_nombre) + '">', true) +
           field('Rol', '<input name="entrenador_rol" value="' + esc(s.entrenador_rol || 'Entrenador') + '">', true) +
           field('Liga / competición (texto libre)', '<input name="liga_nombre" placeholder="Ej. Liga Alevín A · Grupo 3" value="' + esc(s.liga_nombre) + '">', true) +
+          field('Cuota mensual por defecto (€)', '<input name="cuota_mensual" type="number" min="0" step="0.01" value="' + esc(s.cuota_mensual != null ? s.cuota_mensual : '') + '">') +
         '</div>' +
         '<div class="form-actions">' +
           '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
@@ -440,6 +443,10 @@ SM.forms = (function () {
       e.preventDefault();
       const payload = {};
       new FormData(e.target).forEach(function (v, k) { payload[k] = v; });
+      // Único campo numérico del formulario — sin esto se guarda como texto
+      // (la hoja no lo convierte sola al escribir) y luego no cuadra con
+      // aritmética en directiva.html.
+      if (payload.cuota_mensual !== undefined && payload.cuota_mensual !== '') payload.cuota_mensual = Number(payload.cuota_mensual);
       SM.api.postAction('updateSettings', payload).then(function () {
         handle.close();
         return SM.api.fetchAll(true);

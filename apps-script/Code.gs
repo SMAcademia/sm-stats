@@ -32,6 +32,8 @@ const SHEETS = {
   planEntries: 'PlanEntries',
   devGoals: 'DevGoals',
   videoClips: 'VideoClips',
+  cuotas: 'Cuotas',
+  uniformes: 'Uniformes',
   settings: 'Settings'
 };
 
@@ -41,7 +43,7 @@ const SHEETS = {
 // intactas en sus propias hojas, solo dejan de contarse mientras esté de
 // baja porque el resto de la app ya filtra por activo.
 const PLAYER_COLUMNS = ['id', 'nombre', 'dorsal', 'posicion', 'posicion_secundaria', 'pie', 'fecha_nacimiento', 'nacionalidad', 'altura_cm', 'peso_kg', 'contacto_emergencia', 'categoria', 'club_anterior', 'fecha_alta', 'foto_url', 'activo', 'motivo_baja', 'fecha_baja', 'ritmo', 'tiro', 'pase', 'regate', 'defensa', 'fisico', 'companerismo', 'sacrificio', 'respeto', 'motivacion', 'esfuerzo', 'constancia', 'blocaje', 'despeje', 'comunicacion', 'posicionamiento', 'unoxuno', 'abp'];
-const STAFF_COLUMNS = ['id', 'nombre', 'rol', 'licencia', 'fecha_alta', 'foto_url'];
+const STAFF_COLUMNS = ['id', 'nombre', 'rol', 'licencia', 'fecha_alta', 'foto_url', 'es_directiva'];
 const SESSION_COLUMNS = ['id', 'fecha', 'hora', 'tipo', 'lugar', 'match_id', 'categoria'];
 // retraso/motivo_retraso: solo tienen sentido junto a estado=presente (llegar
 // tarde sigue contando como asistencia) — el frontend ya se encarga de que
@@ -81,9 +83,19 @@ const DEV_GOAL_COLUMNS = ['id', 'player_id', 'categoria', 'texto', 'estado', 'fe
 // (con las anotaciones incrustadas si las había) — aquí solo se guarda el
 // enlace de Drive resultante y a quién pertenece.
 const VIDEO_CLIP_COLUMNS = ['id', 'player_id', 'titulo', 'fecha', 'video_url', 'categoria'];
+// Cuotas mensuales (ver directiva.html) — una fila por jugador y período
+// ("2026-09" año-mes) una vez se toca esa celda de la cuadrícula; su sola
+// existencia no implica pagado, pagado es su propio campo (así se puede
+// dejar constancia de una cuota pendiente con un importe concreto, p. ej.
+// una beca o un precio distinto al de cuota_mensual en Settings).
+const CUOTA_COLUMNS = ['id', 'player_id', 'periodo', 'importe', 'pagado', 'fecha_pago'];
+// Uniformes (ver directiva.html) — dos kits por jugador (tipo: 'entrenamiento'
+// | 'paseo'), cada uno con su propia talla y tres estados independientes
+// (se puede pagar antes de entregar, pedir sin haber cobrado, etc.).
+const UNIFORME_COLUMNS = ['id', 'player_id', 'tipo', 'talla', 'pedido', 'entregado', 'pagado'];
 // Settings is a singleton sheet: header row + exactly one data row (row 2).
-const SETTINGS_COLUMNS = ['club_nombre', 'entrenador_nombre', 'entrenador_rol', 'liga_nombre'];
-const DEFAULT_SETTINGS = { club_nombre: 'Mi Club', entrenador_nombre: 'Nombre del entrenador', entrenador_rol: 'Entrenador', liga_nombre: 'Liga Regional · Grupo B' };
+const SETTINGS_COLUMNS = ['club_nombre', 'entrenador_nombre', 'entrenador_rol', 'liga_nombre', 'cuota_mensual'];
+const DEFAULT_SETTINGS = { club_nombre: 'Mi Club', entrenador_nombre: 'Nombre del entrenador', entrenador_rol: 'Entrenador', liga_nombre: 'Liga Regional · Grupo B', cuota_mensual: 25 };
 
 /** Crea las pestañas con sus cabeceras si no existen todavía.
  *  Ejecuta esta función UNA VEZ desde el editor de Apps Script (botón
@@ -104,6 +116,8 @@ function setupSheets() {
     [SHEETS.planEntries, PLAN_COLUMNS],
     [SHEETS.devGoals, DEV_GOAL_COLUMNS],
     [SHEETS.videoClips, VIDEO_CLIP_COLUMNS],
+    [SHEETS.cuotas, CUOTA_COLUMNS],
+    [SHEETS.uniformes, UNIFORME_COLUMNS],
     [SHEETS.settings, SETTINGS_COLUMNS]
   ];
   defs.forEach(function (def) {
@@ -327,7 +341,7 @@ function doGet(e) {
     if (action !== 'data') throw new Error('Acción GET desconocida: ' + action);
     const data = {
       players: sheetToObjects(SHEETS.players).map(coercePlayer),
-      staff: sheetToObjects(SHEETS.staff),
+      staff: sheetToObjects(SHEETS.staff).map(coerceStaff),
       sessions: sheetToObjects(SHEETS.sessions),
       attendance: sheetToObjects(SHEETS.attendance).map(coerceAttendance),
       matches: sheetToObjects(SHEETS.matches).map(coerceMatch),
@@ -339,6 +353,8 @@ function doGet(e) {
       planEntries: sheetToObjectsOrEmpty(SHEETS.planEntries),
       devGoals: sheetToObjectsOrEmpty(SHEETS.devGoals),
       videoClips: sheetToObjectsOrEmpty(SHEETS.videoClips),
+      cuotas: sheetToObjectsOrEmpty(SHEETS.cuotas).map(coerceCuota),
+      uniformes: sheetToObjectsOrEmpty(SHEETS.uniformes).map(coerceUniforme),
       settings: readSingletonRow(SHEETS.settings, SETTINGS_COLUMNS, DEFAULT_SETTINGS)
     };
     return jsonResponse({ ok: true, result: data });
@@ -388,6 +404,8 @@ function doPost(e) {
       deletePlanEntry: deletePlanEntry,
       saveDevGoal: saveDevGoal,
       deleteDevGoal: deleteDevGoal,
+      saveCuota: saveCuota,
+      saveUniforme: saveUniforme,
       uploadPhoto: uploadPhoto,
       uploadVideoClip: uploadVideoClip,
       setVideoClipPlayers: setVideoClipPlayers,
@@ -437,6 +455,7 @@ function deletePlayer(payload) {
 
 function addStaffMember(payload) {
   const row = Object.assign({ id: newId('s') }, payload);
+  row.es_directiva = payload.es_directiva === 'true' || payload.es_directiva === true;
   appendRow(SHEETS.staff, STAFF_COLUMNS, row);
   return row;
 }
@@ -930,6 +949,52 @@ function deleteDevGoal(payload) {
   return true;
 }
 
+// Cuotas mensuales (ver directiva.html) — una fila por jugador y período
+// ("2026-09") tocado desde la cuadrícula. payload.id decide alta/edición,
+// igual que saveDevGoal: con id, actualiza esa fila; sin id, crea una
+// nueva. El frontend ya tiene todas las cuotas cargadas y decide si la
+// fila existe antes de llamar.
+function saveCuota(payload) {
+  if (!payload.player_id) throw new Error('Falta el jugador.');
+  if (!payload.periodo) throw new Error('Falta el período.');
+  const patch = {
+    player_id: payload.player_id,
+    periodo: payload.periodo,
+    importe: payload.importe,
+    pagado: !!payload.pagado,
+    fecha_pago: payload.fecha_pago || ''
+  };
+  if (payload.id) {
+    updateRowById(SHEETS.cuotas, CUOTA_COLUMNS, payload.id, patch);
+    return Object.assign({ id: payload.id }, patch);
+  }
+  const row = Object.assign({ id: newId('cu') }, patch);
+  appendRow(SHEETS.cuotas, CUOTA_COLUMNS, row);
+  return row;
+}
+
+// Uniformes (ver directiva.html) — una fila por jugador y tipo de kit
+// ('entrenamiento' | 'paseo'). Mismo patrón de alta/edición por id.
+function saveUniforme(payload) {
+  if (!payload.player_id) throw new Error('Falta el jugador.');
+  if (!payload.tipo) throw new Error('Falta el tipo de kit.');
+  const patch = {
+    player_id: payload.player_id,
+    tipo: payload.tipo,
+    talla: payload.talla || '',
+    pedido: !!payload.pedido,
+    entregado: !!payload.entregado,
+    pagado: !!payload.pagado
+  };
+  if (payload.id) {
+    updateRowById(SHEETS.uniformes, UNIFORME_COLUMNS, payload.id, patch);
+    return Object.assign({ id: payload.id }, patch);
+  }
+  const row = Object.assign({ id: newId('un') }, patch);
+  appendRow(SHEETS.uniformes, UNIFORME_COLUMNS, row);
+  return row;
+}
+
 // Guarda TODO lo que haya del partido de una sola vez — resultado,
 // convocatoria, capitán, minutos, goles/asistencias/tarjetas — sin exigir
 // que esté completo. Sirve igual antes de jugar (solo convocatoria, sin
@@ -1024,4 +1089,22 @@ function coerceCheckin(ck) {
   ck.satisfaccion = ck.satisfaccion === '' || ck.satisfaccion === undefined ? null : Number(ck.satisfaccion);
   ck.rendimiento = ck.rendimiento === '' || ck.rendimiento === undefined ? null : Number(ck.rendimiento);
   return ck;
+}
+
+function coerceStaff(s) {
+  s.es_directiva = s.es_directiva === true || s.es_directiva === 'TRUE' || s.es_directiva === 'true' || s.es_directiva === 1;
+  return s;
+}
+
+function coerceCuota(c) {
+  c.importe = c.importe === '' || c.importe === undefined ? null : Number(c.importe);
+  c.pagado = c.pagado === true || c.pagado === 'TRUE' || c.pagado === 'true' || c.pagado === 1;
+  return c;
+}
+
+function coerceUniforme(u) {
+  ['pedido', 'entregado', 'pagado'].forEach(function (k) {
+    u[k] = u[k] === true || u[k] === 'TRUE' || u[k] === 'true' || u[k] === 1;
+  });
+  return u;
 }
