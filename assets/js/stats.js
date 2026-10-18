@@ -80,8 +80,23 @@ SM.stats = (function () {
     return (data.matches || []).filter(function (m) { return m.jugado; });
   }
 
+  // "Hoy" en la zona horaria local (no UTC) — igual que SM.ui.formatDateIso,
+  // duplicado aquí porque stats.js son helpers puros que solo dependen de
+  // `data`, sin tocar otros módulos.
+  function todayIso() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  // Por FECHA, no por si ya se ha introducido el resultado — un partido
+  // jugado hace días cuyo acta/resultado todavía no se ha rellenado (jugado
+  // sigue en false) no debe seguir apareciendo como "próximo" para siempre;
+  // en cuanto pasa su fecha, deja de contar, tenga datos o no. El filtro
+  // !jugado es solo para el caso (raro) de que el resultado ya se haya
+  // guardado el mismo día — ahí ya no es "próximo", es un resultado reciente.
   function upcomingMatches(data) {
-    return (data.matches || []).filter(function (m) { return !m.jugado; })
+    const today = todayIso();
+    return (data.matches || []).filter(function (m) { return m.fecha >= today && !m.jugado; })
       .sort(function (a, b) { return a.fecha.localeCompare(b.fecha); });
   }
 
