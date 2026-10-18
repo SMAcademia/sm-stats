@@ -18,36 +18,48 @@
   let DATA = null;
   let sortKey = 'goles';
   let sortDir = -1;
+  let competitionFilter = 'liga';
 
   SM.sidebar.onSettingsClick(function () {
     SM.forms.openSettingsForm(DATA && DATA.settings, function (data) { DATA = SM.team.filterData(data, SM.team.current()); });
   });
 
   function render() {
-    const rows = SM.stats.fullStatsTable(DATA);
-    const scorers = SM.stats.topScorers(DATA, 6);
-    const assisters = SM.stats.topAssisters(DATA, 6);
+    // Goles/goleadores/asistencias/tabla respetan el filtro de competición —
+    // la asistencia por posición no, no depende de partidos.
+    const scoped = SM.stats.filterByCompetition(DATA, competitionFilter);
+    const rows = SM.stats.fullStatsTable(scoped);
+    const scorers = SM.stats.topScorers(scoped, 6);
+    const assisters = SM.stats.topAssisters(scoped, 6);
     const byPosition = SM.stats.attendanceByPosition(DATA);
+    const filterLabel = SM.stats.COMPETITION_FILTER_OPTIONS.find(function (o) { return o.key === competitionFilter; }).label;
 
     main.innerHTML =
       '<div class="page-header">' +
         '<div><div class="page-title">Estadísticas del equipo</div><div class="page-subtitle">Comparativa de toda la plantilla · Temporada 2026/27</div></div>' +
-        '<div class="badge" style="background:var(--panel);border:1px solid var(--border-soft);color:var(--text-dim);">' + SM.stats.playedMatches(DATA).length + ' partidos jugados</div>' +
+        '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
+          '<div class="tabbar" id="competition-tabbar">' +
+            SM.stats.COMPETITION_FILTER_OPTIONS.map(function (o) {
+              return '<button class="tab' + (o.key === competitionFilter ? ' active' : '') + '" data-competition="' + o.key + '">' + o.label + '</button>';
+            }).join('') +
+          '</div>' +
+          '<div class="badge" style="background:var(--panel);border:1px solid var(--border-soft);color:var(--text-dim);">' + SM.stats.playedMatches(scoped).length + ' partidos jugados</div>' +
+        '</div>' +
       '</div>' +
 
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">' +
-        '<div class="panel"><span class="panel-title">Goles por jugador</span><div style="display:flex;flex-direction:column;gap:12px;margin-top:18px;">' +
+        '<div class="panel"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px;"><span class="panel-title">Goles por jugador</span><span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">' + filterLabel + '</span></div><div style="display:flex;flex-direction:column;gap:12px;margin-top:18px;">' +
           (scorers.length ? SM.charts.barList(scorers.map(function (r) { return { label: r.player.nombre, value: r.count }; }), { color: 'var(--green)' }) : '<div class="empty-state">Sin goles todavía</div>') +
         '</div></div>' +
-        '<div class="panel"><span class="panel-title">Asistencias (pases de gol)</span><div style="display:flex;flex-direction:column;gap:12px;margin-top:18px;">' +
+        '<div class="panel"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px;"><span class="panel-title">Asistencias (pases de gol)</span><span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">' + filterLabel + '</span></div><div style="display:flex;flex-direction:column;gap:12px;margin-top:18px;">' +
           (assisters.length ? SM.charts.barList(assisters.map(function (r) { return { label: r.player.nombre, value: r.count }; }), { color: 'var(--cyan)' }) : '<div class="empty-state">Sin asistencias todavía</div>') +
         '</div></div>' +
       '</div>' +
 
       '<div class="panel" style="overflow-x:auto;">' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px;">' +
           '<span class="panel-title">Estadísticas de la plantilla</span>' +
-          '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Ordenado por ' + COLUMNS.find(function (c) { return c.key === sortKey; }).label.toLowerCase() + '</span>' +
+          '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">' + filterLabel + ' · Ordenado por ' + COLUMNS.find(function (c) { return c.key === sortKey; }).label.toLowerCase() + '</span>' +
         '</div>' +
         tableHtml(rows) +
       '</div>' +
@@ -73,6 +85,12 @@
         if (sortKey === key) sortDir = -sortDir; else { sortKey = key; sortDir = -1; }
         render();
       });
+    });
+    main.querySelector('#competition-tabbar').addEventListener('click', function (e) {
+      const btn = e.target.closest('[data-competition]');
+      if (!btn) return;
+      competitionFilter = btn.getAttribute('data-competition');
+      render();
     });
   }
 

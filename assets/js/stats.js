@@ -80,6 +80,36 @@ SM.stats = (function () {
     return (data.matches || []).filter(function (m) { return m.jugado; });
   }
 
+  // Separa las cifras "oficiales" (Liga) de los amistosos y torneos, que no
+  // deberían contar igual en goles/goleadores/resultados recientes/etc. —
+  // a diferencia de SM.team.filterData (que escoge por categoría y toca
+  // todo el dataset), esto solo filtra partidos y lo que cuelga de ellos
+  // (goles/asistencias/tarjetas, convocatorias); jugadores, sesiones y
+  // asistencia quedan igual. "Copa" no entra en ninguno de los dos grupos a
+  // propósito — solo se ve en "Todas", sin asumir si cuenta como oficial.
+  const COMPETITION_FILTER_OPTIONS = [
+    { key: 'liga', label: 'Liga' },
+    { key: 'amistoso_torneo', label: 'Amistosos y torneos' },
+    { key: 'todos', label: 'Todas' }
+  ];
+  const COMPETITION_FILTER_PREDICATES = {
+    liga: function (c) { return c === 'liga'; },
+    amistoso_torneo: function (c) { return c === 'amistoso' || c === 'torneo'; },
+    todos: function () { return true; }
+  };
+  function filterByCompetition(data, filterKey) {
+    const matchFilter = COMPETITION_FILTER_PREDICATES[filterKey] || COMPETITION_FILTER_PREDICATES.todos;
+    const matches = (data.matches || []).filter(function (m) { return matchFilter(m.competicion); });
+    const matchIds = {};
+    matches.forEach(function (m) { matchIds[m.id] = true; });
+    return Object.assign({}, data, {
+      matches: matches,
+      matchEvents: (data.matchEvents || []).filter(function (e) { return matchIds[e.match_id]; }),
+      matchAppearances: (data.matchAppearances || []).filter(function (a) { return matchIds[a.match_id]; }),
+      matchIntervals: (data.matchIntervals || []).filter(function (iv) { return matchIds[iv.match_id]; })
+    });
+  }
+
   // "Hoy" en la zona horaria local (no UTC) — igual que SM.ui.formatDateIso,
   // duplicado aquí porque stats.js son helpers puros que solo dependen de
   // `data`, sin tocar otros módulos.
@@ -339,6 +369,8 @@ SM.stats = (function () {
     upcomingMatches: upcomingMatches,
     nextMatch: nextMatch,
     recentResults: recentResults,
+    COMPETITION_FILTER_OPTIONS: COMPETITION_FILTER_OPTIONS,
+    filterByCompetition: filterByCompetition,
     eventCountInMatch: eventCountInMatch,
     goalsForPlayer: goalsForPlayer,
     assistsForPlayer: assistsForPlayer,

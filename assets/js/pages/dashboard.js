@@ -42,6 +42,8 @@
     );
   }
 
+  let competitionFilter = 'liga';
+
   function render(data) {
     const settings = data.settings || SM.sidebar.DEFAULT_SETTINGS;
     const clubName = settings.club_nombre;
@@ -50,8 +52,13 @@
     const kpis = SM.stats.teamKpis(data);
     const nextMatch = kpis.nextMatch;
     const upcomingTrainings = SM.stats.upcomingSessions(data, { tipo: 'entrenamiento', n: 3 });
-    const topScorers = SM.stats.topScorers(data, 4);
-    const results = SM.stats.recentResults(data, 4);
+    // Goles/goleadores/resultados recientes respetan el filtro de
+    // competición — jugadores activos, asistencia y próximo partido NO (no
+    // son "cifras de partido" en ese sentido, se ven igual siempre).
+    const scopedData = SM.stats.filterByCompetition(data, competitionFilter);
+    const totalGoals = SM.stats.totalGoals(scopedData);
+    const topScorers = SM.stats.topScorers(scopedData, 4);
+    const results = SM.stats.recentResults(scopedData, 4);
     const trend = SM.stats.weeklyAttendanceTrend(data, 1)[0];
     const birthdays = SM.stats.birthdaysToday(data);
     const captainRanking = SM.stats.captainRanking(data);
@@ -61,7 +68,12 @@
     main.innerHTML =
       '<div class="page-header">' +
         '<div><div class="page-title">Hola, ' + SM.ui.escapeHtml(coachFirstName) + '</div><div class="page-subtitle">' + todayHeader() + '</div></div>' +
-        '<div style="display:flex;align-items:center;gap:14px;">' +
+        '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
+          '<div class="tabbar" id="competition-tabbar">' +
+            SM.stats.COMPETITION_FILTER_OPTIONS.map(function (o) {
+              return '<button class="tab' + (o.key === competitionFilter ? ' active' : '') + '" data-competition="' + o.key + '">' + o.label + '</button>';
+            }).join('') +
+          '</div>' +
           '<div class="badge" style="background:var(--panel);border:1px solid var(--border-soft);color:var(--text-dim);">' + SM.ui.escapeHtml(ligaNombre) + '</div>' +
         '</div>' +
       '</div>' +
@@ -73,7 +85,7 @@
           'var(--green)', '<circle cx="9" cy="8" r="3.2"/><path d="M2.5 19.5c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="8.5" r="2.6"/><path d="M15.8 13.7c2.9.3 5.2 2.5 5.2 5.8"/>') +
         kpiCard('Asistencia media', kpis.avgAttendance != null ? kpis.avgAttendance + '%' : '—', { text: 'Temporada 2026/27' },
           'var(--cyan)', '<rect x="3.5" y="5" width="17" height="16" rx="2.4"/><path d="M3.5 9.5h17"/><path d="M8.5 13.3l2 2 4.2-4.4"/>') +
-        kpiCard('Goles totales', kpis.totalGoals, { text: 'Partidos jugados' },
+        kpiCard('Goles totales', totalGoals, { text: competitionFilterLabel() },
           'var(--magenta)', '<circle cx="12" cy="12" r="9"/><path d="M12 6.6 15.4 9l-1.3 3.9H9.9L8.6 9z"/>') +
         kpiCard('Próximo partido', daysLabel, { text: nextMatch ? SM.ui.formatDateShort(nextMatch.fecha) + ' · ' + nextMatch.hora : 'Sin programar', color: 'var(--text-dim)' },
           'var(--amber)', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5.5l3.6 2.1"/>') +
@@ -86,7 +98,8 @@
 
       '<div style="display:grid;grid-template-columns:1.2fr 0.8fr 1fr;gap:20px;">' +
         '<div class="panel">' +
-          '<span class="panel-title">Top goleadores</span>' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px;"><span class="panel-title">Top goleadores</span>' +
+          '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">' + competitionFilterLabel() + '</span></div>' +
           '<div style="display:flex;flex-direction:column;gap:14px;margin-top:18px;">' +
             (topScorers.length ? SM.charts.barList(topScorers.map(function (r) { return { label: r.player.nombre, value: r.count }; }), { color: 'var(--green)' })
               : '<div class="empty-state">Todavía no hay goles registrados</div>') +
@@ -102,12 +115,25 @@
       '</div>' +
 
       '<div class="panel">' +
-        '<span class="panel-title">Últimos resultados</span>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px;"><span class="panel-title">Últimos resultados</span>' +
+        '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">' + competitionFilterLabel() + '</span></div>' +
         '<div style="display:grid;grid-template-columns:repeat(4, minmax(0,1fr));gap:16px;margin-top:16px;">' +
           (results.length ? results.map(resultChip).join('') : '<div class="empty-state">Todavía no hay partidos jugados</div>') +
         '</div>' +
       '</div>';
+
+    main.querySelector('#competition-tabbar').addEventListener('click', function (e) {
+      const btn = e.target.closest('[data-competition]');
+      if (!btn) return;
+      competitionFilter = btn.getAttribute('data-competition');
+      render(data);
+    });
   }
+
+  function competitionFilterLabel() {
+    return SM.stats.COMPETITION_FILTER_OPTIONS.find(function (o) { return o.key === competitionFilter; }).label;
+  }
+
 
   // Full roster, most-captained first, zero-count players included — lets
   // the coach see at a glance who's due a turn as captain (rotaciones).
