@@ -85,8 +85,7 @@ SM.stats = (function () {
   // a diferencia de SM.team.filterData (que escoge por categoría y toca
   // todo el dataset), esto solo filtra partidos y lo que cuelga de ellos
   // (goles/asistencias/tarjetas, convocatorias); jugadores, sesiones y
-  // asistencia quedan igual. "Copa" no entra en ninguno de los dos grupos a
-  // propósito — solo se ve en "Todas", sin asumir si cuenta como oficial.
+  // asistencia quedan igual.
   const COMPETITION_FILTER_OPTIONS = [
     { key: 'liga', label: 'Liga' },
     { key: 'amistoso_torneo', label: 'Amistosos y torneos' },

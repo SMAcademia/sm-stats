@@ -76,7 +76,7 @@ SM.ui = (function () {
       .replace(/'/g, '&#39;');
   }
 
-  const COMPETITION_LABELS = { liga: 'Liga', copa: 'Copa', torneo: 'Torneo', amistoso: 'Amistoso' };
+  const COMPETITION_LABELS = { liga: 'Liga', torneo: 'Torneo', amistoso: 'Amistoso' };
   function competitionLabel(code) {
     return COMPETITION_LABELS[code] || '—';
   }

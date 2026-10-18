@@ -161,7 +161,7 @@
           SM.forms.field('Hora', '<input name="hora" type="time" required value="17:00">') +
           SM.forms.field('Condición', SM.forms.selectHtml('condicion', [['local', 'Local'], ['visitante', 'Visitante']], 'local')) +
           SM.forms.field('Jornada', '<input name="jornada" type="number" min="1">') +
-          SM.forms.field('Competición', SM.forms.selectHtml('competicion', [['liga', 'Liga'], ['copa', 'Copa'], ['torneo', 'Torneo'], ['amistoso', 'Amistoso']], 'liga')) +
+          SM.forms.field('Competición', SM.forms.selectHtml('competicion', [['liga', 'Liga'], ['torneo', 'Torneo'], ['amistoso', 'Amistoso']], 'liga')) +
           SM.forms.field('Categoría', SM.forms.selectHtml('categoria', categoryOptions(), SM.team.current())) +
           SM.forms.field('Lugar', '<input name="lugar" placeholder="Campo Municipal La Ribera">', true) +
         '</div><div class="form-actions">' +
@@ -261,7 +261,7 @@
     const body = SM.ui.el('div', {
       html:
         '<div class="form-grid">' +
-          SM.forms.field('Competición (para todos)', SM.forms.selectHtml('competicion', [['liga', 'Liga'], ['copa', 'Copa'], ['torneo', 'Torneo'], ['amistoso', 'Amistoso']], 'liga')) +
+          SM.forms.field('Competición (para todos)', SM.forms.selectHtml('competicion', [['liga', 'Liga'], ['torneo', 'Torneo'], ['amistoso', 'Amistoso']], 'liga')) +
           SM.forms.field('Categoría (para todos)', SM.forms.selectHtml('categoria', categoryOptions(), SM.team.current())) +
           SM.forms.field('Lugar por defecto (opcional)', '<input name="lugarDefecto" placeholder="Campo Municipal La Ribera">', true) +
         '</div>' +
