@@ -388,6 +388,7 @@ function doPost(e) {
       saveCallups: saveCallups,
       saveMatchReport: saveMatchReport,
       saveMatchResult: saveMatchResult,
+      saveMatchCaptain: saveMatchCaptain,
       saveAttendance: saveAttendance,
       updateSettings: updateSettings
     };
@@ -993,6 +994,37 @@ function saveMatchResult(payload) {
     goles_contra: hasResult ? payload.golesContra : '',
     jugado: hasResult
   });
+  return true;
+}
+
+// Guarda solo quién fue capitán, sin exigir convocatoria ni minutos — igual
+// de rápido de apuntar que el resultado, y no hace falta esperar a tener el
+// acta completa. Si el jugador elegido todavía no tenía fila en
+// MatchAppearances (no se había guardado ni convocatoria ni acta para este
+// partido), se le crea una mínima solo para poder marcarlo como capitán;
+// el resto de filas no se tocan salvo para desmarcar un capitán anterior.
+// payload.playerId vacío/null quita el capitán sin asignar uno nuevo.
+function saveMatchCaptain(payload) {
+  const matchId = payload.matchId;
+  if (!matchId) throw new Error('Falta el id del partido.');
+  const sheet = getSheet(SHEETS.matchAppearances);
+  const header = ensureHeader(sheet, APPEARANCE_COLUMNS);
+  const matchCol = header.indexOf('match_id');
+  const playerCol = header.indexOf('player_id');
+  const capCol = header.indexOf('capitan');
+  const values = sheet.getDataRange().getValues();
+  let alreadyHasRow = false;
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][matchCol]) !== String(matchId)) continue;
+    const isChosenCaptain = !!payload.playerId && String(values[i][playerCol]) === String(payload.playerId);
+    sheet.getRange(i + 1, capCol + 1).setValue(isChosenCaptain);
+    if (isChosenCaptain) alreadyHasRow = true;
+  }
+  if (payload.playerId && !alreadyHasRow) {
+    appendRow(SHEETS.matchAppearances, APPEARANCE_COLUMNS, {
+      id: newId('ma'), match_id: matchId, player_id: payload.playerId, minutos: '', valoracion: '', capitan: true
+    });
+  }
   return true;
 }
 

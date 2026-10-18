@@ -441,6 +441,27 @@ SM.api = (function () {
         }
         return true;
       }
+      case 'saveMatchCaptain': {
+        // Igual que en Code.gs: solo cambia el campo "capitan" de las filas
+        // ya guardadas de este partido, y crea una fila mínima para el
+        // elegido si todavía no tenía ninguna — sin tocar convocatoria ni
+        // minutos de nadie más.
+        d.matchAppearances = d.matchAppearances || [];
+        let alreadyHasRow = false;
+        d.matchAppearances.forEach(function (a) {
+          if (a.match_id !== payload.matchId) return;
+          const isChosenCaptain = !!payload.playerId && a.player_id === payload.playerId;
+          a.capitan = isChosenCaptain;
+          if (isChosenCaptain) alreadyHasRow = true;
+        });
+        if (payload.playerId && !alreadyHasRow) {
+          d.matchAppearances.push({
+            id: nextMockId('ma'), match_id: payload.matchId, player_id: payload.playerId,
+            minutos: null, valoracion: null, capitan: true
+          });
+        }
+        return true;
+      }
       case 'updateSettings': {
         d.settings = Object.assign({}, d.settings, payload);
         return d.settings;
