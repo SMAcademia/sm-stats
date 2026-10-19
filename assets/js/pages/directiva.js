@@ -44,6 +44,20 @@
       .sort(function (a, b) { return (a.categoria || '').localeCompare(b.categoria || '') || (a.dorsal || 99) - (b.dorsal || 99); });
   }
 
+  function kpiCard(label, value, subtitle, color, iconPath) {
+    return (
+      '<div class="panel kpi-card">' +
+        '<div class="panel-glow" style="top:-30px;right:-30px;width:110px;height:110px;background:radial-gradient(circle, ' + SM.ui.alpha(color, 0.16) + ', transparent 70%);"></div>' +
+        '<div class="kpi-head">' +
+          '<span class="kpi-label">' + label + '</span>' +
+          '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="' + color + '" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + iconPath + '</svg>' +
+        '</div>' +
+        '<div class="kpi-value">' + value + '</div>' +
+        '<div class="kpi-delta" style="color:' + color + ';">' + subtitle + '</div>' +
+      '</div>'
+    );
+  }
+
   function render() {
     const clubName = (DATA.settings && DATA.settings.club_nombre) || 'Mi club';
     main.innerHTML =
@@ -107,6 +121,41 @@
     return map;
   }
 
+  // Periodos de la temporada que ya han empezado (hasta el mes actual) —
+  // los que quedan por venir no cuentan como "pendientes" todavía.
+  function elapsedPeriods(periods) {
+    const now = new Date();
+    const current = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    return periods.filter(function (per) { return per <= current; });
+  }
+
+  function cuotaKpis(players) {
+    const periods = seasonPeriods();
+    const elapsed = elapsedPeriods(periods);
+    const byKey = cuotasByKey();
+    const playerIds = players.map(function (p) { return p.id; });
+    const expected = players.length * elapsed.length;
+    let paidCount = 0;
+    let recaudado = 0;
+    (DATA.cuotas || []).forEach(function (c) {
+      if (playerIds.indexOf(c.player_id) === -1 || periods.indexOf(c.periodo) === -1 || !c.pagado) return;
+      recaudado += c.importe || 0;
+      if (elapsed.indexOf(c.periodo) !== -1) paidCount++;
+    });
+    const pendientes = Math.max(0, expected - paidCount);
+    const pctAlDia = expected > 0 ? Math.round((paidCount / expected) * 100) : null;
+    return (
+      '<div class="kpi-grid" style="margin-bottom:18px;">' +
+        kpiCard('Recaudado (temporada)', recaudado.toLocaleString('es-ES') + '€', 'cuotas marcadas como pagadas',
+          'var(--green)', '<circle cx="12" cy="12" r="9"/><path d="M9 9.2h5.2M9 12.3h4M15 7.6a4.3 4.3 0 100 8.8"/>') +
+        kpiCard('Cuotas pendientes', pendientes, 'de ' + expected + ' esperadas hasta este mes',
+          pendientes > 0 ? 'var(--amber)' : 'var(--green)', '<rect x="4.5" y="3.5" width="15" height="17" rx="2.2"/><path d="M8 8h8M8 11.5h8M8 15h5"/>') +
+        kpiCard('Al día', pctAlDia != null ? pctAlDia + '%' : '—', 'pagos del periodo ya transcurrido',
+          'var(--cyan)', '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.6L16 9.3"/>') +
+      '</div>'
+    );
+  }
+
   function cuotasTabHtml() {
     const players = activePlayers();
     if (!players.length) return '<div class="empty-state">Todavía no hay jugadores dados de alta.</div>';
@@ -128,6 +177,7 @@
       return '<tr><td style="text-align:left;font-weight:700;color:var(--text-strong);white-space:nowrap;">' + esc(p.nombre) + '</td>' + cells + '</tr>';
     }).join('');
     return (
+      cuotaKpis(players) +
       '<div class="panel" style="overflow-x:auto;">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">' +
           '<span class="panel-title">Cuotas de la temporada</span>' +
@@ -206,6 +256,30 @@
     return '<td><span class="badge" style="background:' + (on ? SM.ui.alpha('var(--green)', 0.14) : 'var(--panel-2)') + ';border:1px solid ' + (on ? SM.ui.alpha('var(--green)', 0.5) : 'var(--border-soft)') + ';color:' + (on ? 'var(--green)' : 'var(--text-ghost)') + ';">' + (on ? 'Sí' : 'No') + '</span></td>';
   }
 
+  function uniformeKpis(players) {
+    const byKey = uniformesByKey();
+    let entregadoEntreno = 0;
+    let entregadoPaseo = 0;
+    let pendientePago = 0;
+    players.forEach(function (p) {
+      KIT_TYPES.forEach(function (kit) {
+        const u = byKey[p.id + '::' + kit.key];
+        if (u && u.entregado) { if (kit.key === 'entrenamiento') entregadoEntreno++; else entregadoPaseo++; }
+        if (u && (u.pedido || u.entregado) && !u.pagado) pendientePago++;
+      });
+    });
+    return (
+      '<div class="kpi-grid" style="margin-bottom:18px;">' +
+        kpiCard('Entrenamiento entregado', entregadoEntreno + '/' + players.length, 'kits de entrenamiento entregados',
+          entregadoEntreno === players.length ? 'var(--green)' : 'var(--amber)', '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.6L16 9.3"/>') +
+        kpiCard('Paseo entregado', entregadoPaseo + '/' + players.length, 'kits de paseo entregados',
+          entregadoPaseo === players.length ? 'var(--green)' : 'var(--amber)', '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.6L16 9.3"/>') +
+        kpiCard('Pendiente de pago', pendientePago, 'kits pedidos/entregados sin cobrar',
+          pendientePago > 0 ? 'var(--magenta)' : 'var(--green)', '<rect x="4.5" y="3.5" width="15" height="17" rx="2.2"/><path d="M8 8h8M8 11.5h8M8 15h5"/>') +
+      '</div>'
+    );
+  }
+
   function uniformesTabHtml() {
     const players = activePlayers();
     if (!players.length) return '<div class="empty-state">Todavía no hay jugadores dados de alta.</div>';
@@ -227,6 +301,7 @@
       }).join('');
     }).join('');
     return (
+      uniformeKpis(players) +
       '<div class="panel" style="overflow-x:auto;">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">' +
           '<span class="panel-title">Uniformes</span>' +
