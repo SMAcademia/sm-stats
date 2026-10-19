@@ -157,9 +157,13 @@ existen en la Sheet.
   en Plantilla → Cuerpo técnico. Entran a su propio portal
   (`directiva.html`): datos personales/contacto de los jugadores, cuotas
   mensuales (cuadrícula jugador × mes, con un importe por defecto
-  configurable en Ajustes) y uniformes (kits de entrenamiento/paseo por
-  jugador: talla, pedido, entregado, pagado) — **sin** ningún dato
-  deportivo (atributos, partidos, asistencia a entrenamientos, bienestar).
+  configurable en Ajustes, y un resumen de recaudado/pendiente/al día) y
+  uniformes (kits de entrenamiento/paseo por jugador: talla, pedido,
+  entregado, pagado, con su propio resumen de entregas y pagos pendientes)
+  — **sin** ningún dato deportivo (atributos, partidos, asistencia a
+  entrenamientos, bienestar). Tú, como entrenador/a, también tienes acceso
+  directo a este portal desde el enlace "Directiva" de la barra lateral de
+  la app completa, sin necesidad de pasar por `acceso.html`.
 
 Desde la ficha de cada jugador (`jugador.html`) y desde la tarjeta de cada
 miembro del staff en Plantilla puedes ver y copiar sus credenciales con un

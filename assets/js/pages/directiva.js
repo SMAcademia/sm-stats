@@ -2,16 +2,23 @@
    Acceso de gestión para la junta directiva: cuotas mensuales, uniformes
    y datos personales de contacto de los jugadores — sin nada deportivo
    (ni atributos, ni partidos, ni asistencia a entrenamientos, ni
-   bienestar). Protegido por SM.auth igual que mi-jugador.html: si no hay
-   sesión de staff guardada para este dispositivo, o el miembro ya no
-   tiene marcado "Es directiva" en Plantilla, se manda a acceso.html. */
+   bienestar). Dos formas de entrar:
+   - Un miembro de la directiva via acceso.html: se guarda una sesión de
+     staff y aquí se comprueba que siga marcado "Es directiva" en
+     Plantilla; si no, se manda a acceso.html.
+   - El propio entrenador/a, directamente desde el enlace "Directiva" de
+     la barra lateral de la app completa: sin sesión guardada, igual que
+     el resto de páginas de la app (mismo nivel de acceso que ya tiene a
+     todo lo demás). Solo se bloquea una sesión guardada que NO sea de
+     staff (p. ej. un enlace de mi-jugador.html abierto en el mismo
+     dispositivo). */
 
 (function () {
   const main = document.getElementById('main');
   const esc = SM.ui.escapeHtml;
 
   const session = SM.auth.readFamilySession();
-  if (!session || session.type !== 'staff' || !session.id) {
+  if (session && (session.type !== 'staff' || !session.id)) {
     window.location.href = 'acceso.html';
     return;
   }
@@ -60,10 +67,11 @@
 
   function render() {
     const clubName = (DATA.settings && DATA.settings.club_nombre) || 'Mi club';
+    const personName = staffMember ? staffMember.nombre : ((DATA.settings && DATA.settings.entrenador_nombre) || 'Entrenador/a');
     main.innerHTML =
       '<div class="page-header">' +
-        '<div><div class="page-title">Directiva</div><div class="page-subtitle">' + esc(clubName) + ' · ' + esc(staffMember.nombre) + '</div></div>' +
-        '<button type="button" id="logout-btn" class="btn btn-outline">Salir</button>' +
+        '<div><div class="page-title">Directiva</div><div class="page-subtitle">' + esc(clubName) + ' · ' + esc(personName) + '</div></div>' +
+        (session ? '<button type="button" id="logout-btn" class="btn btn-outline">Salir</button>' : '<a href="index.html" class="btn btn-outline">Volver a la app</a>') +
       '</div>' +
       '<div class="tabbar" id="section-tabbar" style="margin-bottom:18px;">' +
         '<button class="tab' + (tab === 'jugadores' ? ' active' : '') + '" data-tab="jugadores">Jugadores</button>' +
@@ -72,7 +80,8 @@
       '</div>' +
       (tab === 'jugadores' ? jugadoresTabHtml() : tab === 'cuotas' ? cuotasTabHtml() : uniformesTabHtml());
 
-    main.querySelector('#logout-btn').addEventListener('click', function () {
+    const logoutBtn = main.querySelector('#logout-btn');
+    if (logoutBtn) logoutBtn.addEventListener('click', function () {
       SM.auth.clearFamilySession();
       window.location.href = 'acceso.html';
     });
@@ -401,11 +410,13 @@
 
   SM.api.fetchAll().then(function (data) {
     DATA = data;
-    staffMember = (DATA.staff || []).find(function (s) { return s.id === session.id; });
-    if (!staffMember || !staffMember.es_directiva) {
-      SM.auth.clearFamilySession();
-      window.location.href = 'acceso.html';
-      return;
+    if (session) {
+      staffMember = (DATA.staff || []).find(function (s) { return s.id === session.id; });
+      if (!staffMember || !staffMember.es_directiva) {
+        SM.auth.clearFamilySession();
+        window.location.href = 'acceso.html';
+        return;
+      }
     }
     render();
   }).catch(function (err) {
