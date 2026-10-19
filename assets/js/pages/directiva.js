@@ -193,7 +193,7 @@
         const paid = !!(c && c.pagado);
         return (
           '<td>' +
-            '<button type="button" class="cuota-cell" data-player="' + p.id + '" data-periodo="' + per + '" title="' + (paid ? 'Pagado — toca para desmarcar' : 'Pendiente — toca para marcar pagado') + '" style="width:100%;min-width:40px;padding:7px 4px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--border-soft)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.12) : 'var(--panel-2)') + ';color:' + (paid ? 'var(--green)' : 'var(--text-ghost)') + ';font-weight:800;font-size:14px;cursor:pointer;">' + (paid ? '✓' : '–') + '</button>' +
+            '<button type="button" class="cuota-cell" data-player="' + p.id + '" data-periodo="' + per + '" title="' + (paid ? 'Pagado — toca para desmarcar' : 'Pendiente — toca para marcar pagado') + '" style="touch-action:manipulation;width:100%;min-width:40px;padding:7px 4px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--border-soft)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.12) : 'var(--panel-2)') + ';color:' + (paid ? 'var(--green)' : 'var(--text-ghost)') + ';font-weight:800;font-size:14px;cursor:pointer;">' + (paid ? '✓' : '–') + '</button>' +
           '</td>'
         );
       }).join('');
@@ -220,7 +220,14 @@
   function wireCuotasTab() {
     main.querySelectorAll('.cuota-cell').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        toggleCuotaPagado(btn.getAttribute('data-player'), btn.getAttribute('data-periodo'));
+        if (btn.disabled) return;
+        // Feedback inmediato al tocar — antes de esperar a la red, para que
+        // se note el toque incluso si la hoja tarda en responder (y para
+        // poder distinguir "no ha reaccionado al toque" de "ha tardado").
+        btn.disabled = true;
+        btn.style.opacity = '0.45';
+        btn.textContent = '…';
+        toggleCuotaPagado(btn.getAttribute('data-player'), btn.getAttribute('data-periodo'), btn);
       });
     });
   }
@@ -229,7 +236,7 @@
   // El importe se calcula solo (cuota por defecto de Ajustes, o la
   // personalizada de la ficha del jugador si tiene una) — no se edita a
   // mano aquí.
-  function toggleCuotaPagado(playerId, periodo) {
+  function toggleCuotaPagado(playerId, periodo, btn) {
     const player = (DATA.players || []).find(function (p) { return p.id === playerId; });
     const existing = (DATA.cuotas || []).find(function (c) { return c.player_id === playerId && c.periodo === periodo; });
     const willPay = !(existing && existing.pagado);
@@ -246,7 +253,10 @@
     }).then(function (data) {
       DATA = data;
       render();
-    }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+    }).catch(function (err) {
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.textContent = willPay ? '–' : '✓'; }
+      SM.ui.toast(err.message, 'error');
+    });
   }
 
   // ---- Uniformes: dos kits por jugador (entrenamiento/paseo) ----
@@ -307,7 +317,7 @@
             statusBadgeHtml(u && u.pedido) +
             statusBadgeHtml(u && u.entregado) +
             '<td>' + (precio ? precio.toLocaleString('es-ES') + '€' : '—') + '</td>' +
-            '<td><button type="button" class="uniforme-pagado-cell" data-player="' + p.id + '" data-tipo="' + kit.key + '" title="' + (paid ? 'Pagado — toca para desmarcar' : 'Pendiente — toca para marcar pagado') + '" style="padding:6px 16px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--border-soft)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.12) : 'var(--panel-2)') + ';color:' + (paid ? 'var(--green)' : 'var(--text-ghost)') + ';font-weight:800;font-size:14px;cursor:pointer;">' + (paid ? '✓' : '–') + '</button></td>' +
+            '<td><button type="button" class="uniforme-pagado-cell" data-player="' + p.id + '" data-tipo="' + kit.key + '" title="' + (paid ? 'Pagado — toca para desmarcar' : 'Pendiente — toca para marcar pagado') + '" style="touch-action:manipulation;padding:6px 16px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--border-soft)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.12) : 'var(--panel-2)') + ';color:' + (paid ? 'var(--green)' : 'var(--text-ghost)') + ';font-weight:800;font-size:14px;cursor:pointer;">' + (paid ? '✓' : '–') + '</button></td>' +
             '<td><button type="button" class="btn btn-outline uniforme-edit-btn" data-player="' + p.id + '" data-tipo="' + kit.key + '" style="padding:5px 12px;font-size:11.5px;">Editar</button></td>' +
           '</tr>'
         );
@@ -336,7 +346,12 @@
     });
     main.querySelectorAll('.uniforme-pagado-cell').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        toggleUniformePagado(btn.getAttribute('data-player'), btn.getAttribute('data-tipo'));
+        if (btn.disabled) return;
+        const wasPaid = btn.textContent.trim() === '✓';
+        btn.disabled = true;
+        btn.style.opacity = '0.45';
+        btn.textContent = '…';
+        toggleUniformePagado(btn.getAttribute('data-player'), btn.getAttribute('data-tipo'), btn, wasPaid);
       });
     });
     const bulkBtn = main.querySelector('#bulk-training-btn');
@@ -346,7 +361,7 @@
   // Toca la columna "Pagado" -> alterna pagado/pendiente directamente, sin
   // modal (igual que las cuotas) — conserva talla/pedido/entregado tal
   // cual estuvieran.
-  function toggleUniformePagado(playerId, tipo) {
+  function toggleUniformePagado(playerId, tipo, btn, wasPaid) {
     const byKey = uniformesByKey();
     const existing = byKey[playerId + '::' + tipo];
     const payload = {
@@ -363,7 +378,10 @@
     }).then(function (data) {
       DATA = data;
       render();
-    }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
+    }).catch(function (err) {
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.textContent = wasPaid ? '✓' : '–'; }
+      SM.ui.toast(err.message, 'error');
+    });
   }
 
   function openUniformeModal(playerId, tipo) {
