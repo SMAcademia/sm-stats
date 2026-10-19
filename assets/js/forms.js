@@ -53,6 +53,12 @@ SM.forms = (function () {
           field('En el club desde', '<input name="fecha_alta" type="date" value="' + esc(p.fecha_alta) + '">') +
           photoFieldHtml(p) +
         '</div>' +
+        '<div class="form-hint" style="margin-top:16px;">Condiciones económicas personalizadas (opcional) — déjalas en blanco para usar los valores por defecto de Ajustes. Las usa el portal de Directiva al calcular cuotas y precios de uniforme para este jugador.</div>' +
+        '<div class="form-grid">' +
+          field('Cuota mensual personalizada (€)', '<input name="cuota_mensual_custom" type="number" min="0" step="0.01" placeholder="usa el valor por defecto" value="' + esc(p.cuota_mensual_custom) + '">') +
+          field('Uniforme entrenamiento — precio personalizado (€)', '<input name="uniforme_precio_entrenamiento_custom" type="number" min="0" step="0.01" placeholder="usa el valor por defecto" value="' + esc(p.uniforme_precio_entrenamiento_custom) + '">') +
+          field('Uniforme paseo — precio personalizado (€)', '<input name="uniforme_precio_paseo_custom" type="number" min="0" step="0.01" placeholder="usa el valor por defecto" value="' + esc(p.uniforme_precio_paseo_custom) + '">') +
+        '</div>' +
         '<div class="form-hint" id="attrs-outfield-hint" style="margin-top:16px;">Atributos (0-100) — alimentan el radar del perfil del jugador.</div>' +
         '<div class="form-grid" id="attrs-outfield-block">' +
           SM.stats.ATTR_KEYS.map(function (k) {
@@ -223,7 +229,7 @@ SM.forms = (function () {
   function formToPayload(form) {
     const payload = {};
     new FormData(form).forEach(function (value, key) { payload[key] = value; });
-    ['dorsal', 'altura_cm', 'peso_kg'].concat(SM.stats.ATTR_KEYS).concat(SM.stats.GK_ATTR_KEYS).concat(SM.stats.VALUE_KEYS).forEach(function (k) {
+    ['dorsal', 'altura_cm', 'peso_kg', 'cuota_mensual_custom', 'uniforme_precio_entrenamiento_custom', 'uniforme_precio_paseo_custom'].concat(SM.stats.ATTR_KEYS).concat(SM.stats.GK_ATTR_KEYS).concat(SM.stats.VALUE_KEYS).forEach(function (k) {
       if (payload[k] !== undefined && payload[k] !== '') payload[k] = Number(payload[k]);
     });
     return payload;
@@ -425,6 +431,8 @@ SM.forms = (function () {
           field('Rol', '<input name="entrenador_rol" value="' + esc(s.entrenador_rol || 'Entrenador') + '">', true) +
           field('Liga / competición (texto libre)', '<input name="liga_nombre" placeholder="Ej. Liga Alevín A · Grupo 3" value="' + esc(s.liga_nombre) + '">', true) +
           field('Cuota mensual por defecto (€)', '<input name="cuota_mensual" type="number" min="0" step="0.01" value="' + esc(s.cuota_mensual != null ? s.cuota_mensual : '') + '">') +
+          field('Uniforme entrenamiento — precio por defecto (€)', '<input name="uniforme_precio_entrenamiento" type="number" min="0" step="0.01" value="' + esc(s.uniforme_precio_entrenamiento != null ? s.uniforme_precio_entrenamiento : '') + '">') +
+          field('Uniforme paseo — precio por defecto (€)', '<input name="uniforme_precio_paseo" type="number" min="0" step="0.01" value="' + esc(s.uniforme_precio_paseo != null ? s.uniforme_precio_paseo : '') + '">') +
         '</div>' +
         '<div class="form-actions">' +
           '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
@@ -443,10 +451,12 @@ SM.forms = (function () {
       e.preventDefault();
       const payload = {};
       new FormData(e.target).forEach(function (v, k) { payload[k] = v; });
-      // Único campo numérico del formulario — sin esto se guarda como texto
-      // (la hoja no lo convierte sola al escribir) y luego no cuadra con
+      // Campos numéricos del formulario — sin esto se guardan como texto
+      // (la hoja no los convierte sola al escribir) y luego no cuadran con
       // aritmética en directiva.html.
-      if (payload.cuota_mensual !== undefined && payload.cuota_mensual !== '') payload.cuota_mensual = Number(payload.cuota_mensual);
+      ['cuota_mensual', 'uniforme_precio_entrenamiento', 'uniforme_precio_paseo'].forEach(function (k) {
+        if (payload[k] !== undefined && payload[k] !== '') payload[k] = Number(payload[k]);
+      });
       SM.api.postAction('updateSettings', payload).then(function () {
         handle.close();
         return SM.api.fetchAll(true);

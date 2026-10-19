@@ -4,7 +4,9 @@
     "entrenador_nombre": "Marcos Vidal",
     "entrenador_rol": "Entrenador",
     "liga_nombre": "Liga Alevín A · Grupo 3",
-    "cuota_mensual": 25
+    "cuota_mensual": 30,
+    "uniforme_precio_entrenamiento": 10,
+    "uniforme_precio_paseo": 0
   },
   "players": [
     {

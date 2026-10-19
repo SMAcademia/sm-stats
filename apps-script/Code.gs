@@ -42,7 +42,12 @@ const SHEETS = {
 // afectan a ninguna otra fila: todas las estadísticas del jugador siguen
 // intactas en sus propias hojas, solo dejan de contarse mientras esté de
 // baja porque el resto de la app ya filtra por activo.
-const PLAYER_COLUMNS = ['id', 'nombre', 'dorsal', 'posicion', 'posicion_secundaria', 'pie', 'fecha_nacimiento', 'nacionalidad', 'altura_cm', 'peso_kg', 'contacto_emergencia', 'categoria', 'club_anterior', 'fecha_alta', 'foto_url', 'activo', 'motivo_baja', 'fecha_baja', 'ritmo', 'tiro', 'pase', 'regate', 'defensa', 'fisico', 'companerismo', 'sacrificio', 'respeto', 'motivacion', 'esfuerzo', 'constancia', 'blocaje', 'despeje', 'comunicacion', 'posicionamiento', 'unoxuno', 'abp'];
+// cuota_mensual_custom/uniforme_precio_*_custom: condiciones económicas
+// individuales (ver directiva.html) — en blanco significa "usa el valor
+// por defecto de Ajustes", solo se rellenan para una excepción puntual
+// (beca, talla especial, etc.). Las lee el portal de Directiva, nunca se
+// muestran en el resto de la app.
+const PLAYER_COLUMNS = ['id', 'nombre', 'dorsal', 'posicion', 'posicion_secundaria', 'pie', 'fecha_nacimiento', 'nacionalidad', 'altura_cm', 'peso_kg', 'contacto_emergencia', 'categoria', 'club_anterior', 'fecha_alta', 'foto_url', 'activo', 'motivo_baja', 'fecha_baja', 'cuota_mensual_custom', 'uniforme_precio_entrenamiento_custom', 'uniforme_precio_paseo_custom', 'ritmo', 'tiro', 'pase', 'regate', 'defensa', 'fisico', 'companerismo', 'sacrificio', 'respeto', 'motivacion', 'esfuerzo', 'constancia', 'blocaje', 'despeje', 'comunicacion', 'posicionamiento', 'unoxuno', 'abp'];
 const STAFF_COLUMNS = ['id', 'nombre', 'rol', 'licencia', 'fecha_alta', 'foto_url', 'es_directiva'];
 const SESSION_COLUMNS = ['id', 'fecha', 'hora', 'tipo', 'lugar', 'match_id', 'categoria'];
 // retraso/motivo_retraso: solo tienen sentido junto a estado=presente (llegar
@@ -84,18 +89,19 @@ const DEV_GOAL_COLUMNS = ['id', 'player_id', 'categoria', 'texto', 'estado', 'fe
 // enlace de Drive resultante y a quién pertenece.
 const VIDEO_CLIP_COLUMNS = ['id', 'player_id', 'titulo', 'fecha', 'video_url', 'categoria'];
 // Cuotas mensuales (ver directiva.html) — una fila por jugador y período
-// ("2026-09" año-mes) una vez se toca esa celda de la cuadrícula; su sola
-// existencia no implica pagado, pagado es su propio campo (así se puede
-// dejar constancia de una cuota pendiente con un importe concreto, p. ej.
-// una beca o un precio distinto al de cuota_mensual en Settings).
+// ("2026-09" año-mes) una vez se toca esa casilla de la cuadrícula para
+// marcarla pagada/pendiente. importe se rellena solo al marcar pagado, con
+// el valor vigente en ese momento (cuota_mensual de Settings, o la
+// excepción de ese jugador en cuota_mensual_custom si tiene una) — no se
+// edita a mano.
 const CUOTA_COLUMNS = ['id', 'player_id', 'periodo', 'importe', 'pagado', 'fecha_pago'];
 // Uniformes (ver directiva.html) — dos kits por jugador (tipo: 'entrenamiento'
 // | 'paseo'), cada uno con su propia talla y tres estados independientes
 // (se puede pagar antes de entregar, pedir sin haber cobrado, etc.).
 const UNIFORME_COLUMNS = ['id', 'player_id', 'tipo', 'talla', 'pedido', 'entregado', 'pagado'];
 // Settings is a singleton sheet: header row + exactly one data row (row 2).
-const SETTINGS_COLUMNS = ['club_nombre', 'entrenador_nombre', 'entrenador_rol', 'liga_nombre', 'cuota_mensual'];
-const DEFAULT_SETTINGS = { club_nombre: 'Mi Club', entrenador_nombre: 'Nombre del entrenador', entrenador_rol: 'Entrenador', liga_nombre: 'Liga Regional · Grupo B', cuota_mensual: 25 };
+const SETTINGS_COLUMNS = ['club_nombre', 'entrenador_nombre', 'entrenador_rol', 'liga_nombre', 'cuota_mensual', 'uniforme_precio_entrenamiento', 'uniforme_precio_paseo'];
+const DEFAULT_SETTINGS = { club_nombre: 'Mi Club', entrenador_nombre: 'Nombre del entrenador', entrenador_rol: 'Entrenador', liga_nombre: 'Liga Regional · Grupo B', cuota_mensual: 30, uniforme_precio_entrenamiento: 10, uniforme_precio_paseo: 0 };
 
 /** Crea las pestañas con sus cabeceras si no existen todavía.
  *  Ejecuta esta función UNA VEZ desde el editor de Apps Script (botón
@@ -1045,7 +1051,7 @@ function saveAttendance(payload) {
 // ---- coercion (una hoja editada a mano puede guardar números/booleans como texto) ----
 
 function coercePlayer(p) {
-  ['dorsal', 'altura_cm', 'peso_kg', 'ritmo', 'tiro', 'pase', 'regate', 'defensa', 'fisico', 'companerismo', 'sacrificio', 'respeto', 'motivacion', 'esfuerzo', 'constancia', 'blocaje', 'despeje', 'comunicacion', 'posicionamiento', 'unoxuno', 'abp'].forEach(function (k) {
+  ['dorsal', 'altura_cm', 'peso_kg', 'cuota_mensual_custom', 'uniforme_precio_entrenamiento_custom', 'uniforme_precio_paseo_custom', 'ritmo', 'tiro', 'pase', 'regate', 'defensa', 'fisico', 'companerismo', 'sacrificio', 'respeto', 'motivacion', 'esfuerzo', 'constancia', 'blocaje', 'despeje', 'comunicacion', 'posicionamiento', 'unoxuno', 'abp'].forEach(function (k) {
     p[k] = p[k] === '' || p[k] === undefined ? null : Number(p[k]);
   });
   p.activo = p.activo === true || p.activo === 'TRUE' || p.activo === 'true' || p.activo === 1;

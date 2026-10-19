@@ -51,6 +51,20 @@
       .sort(function (a, b) { return (a.categoria || '').localeCompare(b.categoria || '') || (a.dorsal || 99) - (b.dorsal || 99); });
   }
 
+  // Condiciones económicas: el valor por defecto viene de Ajustes, pero un
+  // jugador puede tener su propia excepción guardada en su ficha (beca,
+  // precio distinto...) — se detecta sola, sin tocar nada aquí.
+  function effectiveCuota(player) {
+    const custom = player && player.cuota_mensual_custom;
+    if (custom != null && custom !== '') return Number(custom);
+    return (DATA.settings && DATA.settings.cuota_mensual) || 0;
+  }
+  function effectiveUniformePrecio(player, tipo) {
+    const custom = player && player['uniforme_precio_' + tipo + '_custom'];
+    if (custom != null && custom !== '') return Number(custom);
+    return (DATA.settings && DATA.settings['uniforme_precio_' + tipo]) || 0;
+  }
+
   function kpiCard(label, value, subtitle, color, iconPath) {
     return (
       '<div class="panel kpi-card">' +
@@ -173,24 +187,28 @@
     const defaultImporte = DATA.settings && DATA.settings.cuota_mensual;
     const head = '<tr><th style="text-align:left;">Jugador</th>' + periods.map(function (per) { return '<th>' + periodLabel(per) + '</th>'; }).join('') + '</tr>';
     const rows = players.map(function (p) {
+      const hasCustom = p.cuota_mensual_custom != null && p.cuota_mensual_custom !== '';
       const cells = periods.map(function (per) {
         const c = byKey[p.id + '::' + per];
         const paid = !!(c && c.pagado);
-        const label = paid ? (c.importe != null ? c.importe + '€' : '✓') : '–';
         return (
           '<td>' +
-            '<button type="button" class="cuota-cell" data-player="' + p.id + '" data-periodo="' + per + '" style="width:100%;min-width:52px;padding:6px 4px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--border-soft)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.12) : 'var(--panel-2)') + ';color:' + (paid ? 'var(--green)' : 'var(--text-mute)') + ';font-weight:700;font-size:12px;cursor:pointer;">' + label + '</button>' +
+            '<button type="button" class="cuota-cell" data-player="' + p.id + '" data-periodo="' + per + '" title="' + (paid ? 'Pagado — toca para desmarcar' : 'Pendiente — toca para marcar pagado') + '" style="width:100%;min-width:40px;padding:7px 4px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--border-soft)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.12) : 'var(--panel-2)') + ';color:' + (paid ? 'var(--green)' : 'var(--text-ghost)') + ';font-weight:800;font-size:14px;cursor:pointer;">' + (paid ? '✓' : '–') + '</button>' +
           '</td>'
         );
       }).join('');
-      return '<tr><td style="text-align:left;font-weight:700;color:var(--text-strong);white-space:nowrap;">' + esc(p.nombre) + '</td>' + cells + '</tr>';
+      return (
+        '<tr><td style="text-align:left;font-weight:700;color:var(--text-strong);white-space:nowrap;">' + esc(p.nombre) +
+          (hasCustom ? ' <span style="font-weight:600;color:var(--amber);font-size:11px;" title="Cuota personalizada en su ficha">(' + effectiveCuota(p) + '€)</span>' : '') +
+        '</td>' + cells + '</tr>'
+      );
     }).join('');
     return (
       cuotaKpis(players) +
       '<div class="panel" style="overflow-x:auto;">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">' +
           '<span class="panel-title">Cuotas de la temporada</span>' +
-          '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Cuota por defecto: ' + (defaultImporte != null ? defaultImporte + '€/mes' : '— (configúrala en Ajustes)') + ' · toca una celda para editarla</span>' +
+          '<span style="font-size:11.5px;color:var(--text-mute);font-weight:600;">Cuota por defecto: ' + (defaultImporte != null ? defaultImporte + '€/mes' : '— (configúrala en Ajustes)') + ' · toca una casilla para marcar pagado/pendiente</span>' +
         '</div>' +
         '<table class="data-table" style="margin-top:12px;min-width:900px;">' +
           '<thead>' + head + '</thead><tbody>' + rows + '</tbody>' +
@@ -202,54 +220,33 @@
   function wireCuotasTab() {
     main.querySelectorAll('.cuota-cell').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        openCuotaModal(btn.getAttribute('data-player'), btn.getAttribute('data-periodo'));
+        toggleCuotaPagado(btn.getAttribute('data-player'), btn.getAttribute('data-periodo'));
       });
     });
   }
 
-  function openCuotaModal(playerId, periodo) {
+  // Toca una casilla -> alterna pagado/pendiente directamente, sin modal.
+  // El importe se calcula solo (cuota por defecto de Ajustes, o la
+  // personalizada de la ficha del jugador si tiene una) — no se edita a
+  // mano aquí.
+  function toggleCuotaPagado(playerId, periodo) {
     const player = (DATA.players || []).find(function (p) { return p.id === playerId; });
     const existing = (DATA.cuotas || []).find(function (c) { return c.player_id === playerId && c.periodo === periodo; });
-    const defaultImporte = DATA.settings && DATA.settings.cuota_mensual;
-    const importe = existing && existing.importe != null ? existing.importe : (defaultImporte != null ? defaultImporte : '');
-    const pagado = !!(existing && existing.pagado);
-    const fechaPago = (existing && existing.fecha_pago) || SM.ui.formatDateIso(new Date());
-    const body = SM.ui.el('div', {
-      html:
-        '<form id="cuota-form">' +
-          '<div class="form-grid">' +
-            '<div class="form-field"><label>Importe (€)</label><input name="importe" type="number" min="0" step="0.01" value="' + esc(importe) + '"></div>' +
-            '<div class="form-field"><label>Fecha de pago</label><input name="fecha_pago" type="date" value="' + esc(fechaPago) + '"></div>' +
-          '</div>' +
-          '<div class="form-actions" style="justify-content:space-between;">' +
-            '<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);"><input type="checkbox" name="pagado"' + (pagado ? ' checked' : '') + '> Pagado</label>' +
-            '<div style="display:flex;gap:10px;"><button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>' +
-          '</div>' +
-        '</form>'
-    });
-    const handle = SM.ui.openModal('Cuota · ' + (player ? player.nombre : '') + ' · ' + periodLabel(periodo), body);
-    body.querySelector('#cancel-btn').addEventListener('click', handle.close);
-    body.querySelector('#cuota-form').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const fd = new FormData(e.target);
-      const pagadoChecked = !!fd.get('pagado');
-      const payload = {
-        id: existing ? existing.id : undefined,
-        player_id: playerId,
-        periodo: periodo,
-        importe: fd.get('importe') === '' ? null : Number(fd.get('importe')),
-        pagado: pagadoChecked,
-        fecha_pago: pagadoChecked ? fd.get('fecha_pago') : ''
-      };
-      SM.api.postAction('saveCuota', payload).then(function () {
-        handle.close();
-        return SM.api.fetchAll(true);
-      }).then(function (data) {
-        DATA = data;
-        render();
-        SM.ui.toast('Cuota guardada.', 'ok');
-      }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
-    });
+    const willPay = !(existing && existing.pagado);
+    const payload = {
+      id: existing ? existing.id : undefined,
+      player_id: playerId,
+      periodo: periodo,
+      importe: willPay ? effectiveCuota(player) : null,
+      pagado: willPay,
+      fecha_pago: willPay ? SM.ui.formatDateIso(new Date()) : ''
+    };
+    SM.api.postAction('saveCuota', payload).then(function () {
+      return SM.api.fetchAll(true);
+    }).then(function (data) {
+      DATA = data;
+      render();
+    }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
   }
 
   // ---- Uniformes: dos kits por jugador (entrenamiento/paseo) ----
@@ -270,11 +267,15 @@
     let entregadoEntreno = 0;
     let entregadoPaseo = 0;
     let pendientePago = 0;
+    let pendienteImporte = 0;
     players.forEach(function (p) {
       KIT_TYPES.forEach(function (kit) {
         const u = byKey[p.id + '::' + kit.key];
         if (u && u.entregado) { if (kit.key === 'entrenamiento') entregadoEntreno++; else entregadoPaseo++; }
-        if (u && (u.pedido || u.entregado) && !u.pagado) pendientePago++;
+        if (u && (u.pedido || u.entregado) && !u.pagado) {
+          pendientePago++;
+          pendienteImporte += effectiveUniformePrecio(p, kit.key);
+        }
       });
     });
     return (
@@ -283,7 +284,7 @@
           entregadoEntreno === players.length ? 'var(--green)' : 'var(--amber)', '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.6L16 9.3"/>') +
         kpiCard('Paseo entregado', entregadoPaseo + '/' + players.length, 'kits de paseo entregados',
           entregadoPaseo === players.length ? 'var(--green)' : 'var(--amber)', '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.6L16 9.3"/>') +
-        kpiCard('Pendiente de pago', pendientePago, 'kits pedidos/entregados sin cobrar',
+        kpiCard('Pendiente de pago', pendientePago, pendienteImporte > 0 ? ('≈ ' + pendienteImporte.toLocaleString('es-ES') + '€ por cobrar') : 'kits pedidos/entregados sin cobrar',
           pendientePago > 0 ? 'var(--magenta)' : 'var(--green)', '<rect x="4.5" y="3.5" width="15" height="17" rx="2.2"/><path d="M8 8h8M8 11.5h8M8 15h5"/>') +
       '</div>'
     );
@@ -296,6 +297,8 @@
     const rows = players.map(function (p) {
       return KIT_TYPES.map(function (kit) {
         const u = byKey[p.id + '::' + kit.key];
+        const paid = !!(u && u.pagado);
+        const precio = effectiveUniformePrecio(p, kit.key);
         return (
           '<tr>' +
             '<td style="text-align:left;font-weight:700;color:var(--text-strong);">' + esc(p.nombre) + '</td>' +
@@ -303,7 +306,8 @@
             '<td>' + esc((u && u.talla) || '—') + '</td>' +
             statusBadgeHtml(u && u.pedido) +
             statusBadgeHtml(u && u.entregado) +
-            statusBadgeHtml(u && u.pagado) +
+            '<td>' + (precio ? precio.toLocaleString('es-ES') + '€' : '—') + '</td>' +
+            '<td><button type="button" class="uniforme-pagado-cell" data-player="' + p.id + '" data-tipo="' + kit.key + '" title="' + (paid ? 'Pagado — toca para desmarcar' : 'Pendiente — toca para marcar pagado') + '" style="padding:6px 16px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--border-soft)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.12) : 'var(--panel-2)') + ';color:' + (paid ? 'var(--green)' : 'var(--text-ghost)') + ';font-weight:800;font-size:14px;cursor:pointer;">' + (paid ? '✓' : '–') + '</button></td>' +
             '<td><button type="button" class="btn btn-outline uniforme-edit-btn" data-player="' + p.id + '" data-tipo="' + kit.key + '" style="padding:5px 12px;font-size:11.5px;">Editar</button></td>' +
           '</tr>'
         );
@@ -316,8 +320,8 @@
           '<span class="panel-title">Uniformes</span>' +
           '<button type="button" class="btn btn-outline" id="bulk-training-btn" style="padding:6px 14px;font-size:12px;">Marcar entrenamiento pedido + entregado a todos</button>' +
         '</div>' +
-        '<table class="data-table" style="margin-top:12px;min-width:640px;">' +
-          '<thead><tr><th style="text-align:left;">Jugador</th><th>Kit</th><th>Talla</th><th>Pedido</th><th>Entregado</th><th>Pagado</th><th></th></tr></thead>' +
+        '<table class="data-table" style="margin-top:12px;min-width:760px;">' +
+          '<thead><tr><th style="text-align:left;">Jugador</th><th>Kit</th><th>Talla</th><th>Pedido</th><th>Entregado</th><th>Precio</th><th>Pagado</th><th></th></tr></thead>' +
           '<tbody>' + rows + '</tbody>' +
         '</table>' +
       '</div>'
@@ -330,8 +334,36 @@
         openUniformeModal(btn.getAttribute('data-player'), btn.getAttribute('data-tipo'));
       });
     });
+    main.querySelectorAll('.uniforme-pagado-cell').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        toggleUniformePagado(btn.getAttribute('data-player'), btn.getAttribute('data-tipo'));
+      });
+    });
     const bulkBtn = main.querySelector('#bulk-training-btn');
     if (bulkBtn) bulkBtn.addEventListener('click', bulkMarkTrainingDelivered);
+  }
+
+  // Toca la columna "Pagado" -> alterna pagado/pendiente directamente, sin
+  // modal (igual que las cuotas) — conserva talla/pedido/entregado tal
+  // cual estuvieran.
+  function toggleUniformePagado(playerId, tipo) {
+    const byKey = uniformesByKey();
+    const existing = byKey[playerId + '::' + tipo];
+    const payload = {
+      id: existing ? existing.id : undefined,
+      player_id: playerId,
+      tipo: tipo,
+      talla: existing ? existing.talla : '',
+      pedido: existing ? existing.pedido : false,
+      entregado: existing ? existing.entregado : false,
+      pagado: !(existing && existing.pagado)
+    };
+    SM.api.postAction('saveUniforme', payload).then(function () {
+      return SM.api.fetchAll(true);
+    }).then(function (data) {
+      DATA = data;
+      render();
+    }).catch(function (err) { SM.ui.toast(err.message, 'error'); });
   }
 
   function openUniformeModal(playerId, tipo) {
@@ -347,8 +379,8 @@
           '<div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;">' +
             '<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);"><input type="checkbox" name="pedido"' + (existing && existing.pedido ? ' checked' : '') + '> Pedido</label>' +
             '<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);"><input type="checkbox" name="entregado"' + (existing && existing.entregado ? ' checked' : '') + '> Entregado</label>' +
-            '<label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);"><input type="checkbox" name="pagado"' + (existing && existing.pagado ? ' checked' : '') + '> Pagado</label>' +
           '</div>' +
+          '<div class="form-hint" style="margin-top:10px;">El estado de pago se marca directamente desde la tabla (columna "Pagado") — aquí solo talla, pedido y entregado.</div>' +
           '<div class="form-actions">' +
             '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
             '<button type="submit" class="btn btn-primary">Guardar</button>' +
@@ -367,7 +399,7 @@
         talla: fd.get('talla') || '',
         pedido: !!fd.get('pedido'),
         entregado: !!fd.get('entregado'),
-        pagado: !!fd.get('pagado')
+        pagado: existing ? !!existing.pagado : false
       };
       SM.api.postAction('saveUniforme', payload).then(function () {
         handle.close();

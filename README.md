@@ -156,14 +156,22 @@ existen en la Sheet.
   alta), pero marcando "¿Es directiva?" → Sí al dar de alta a esa persona
   en Plantilla → Cuerpo técnico. Entran a su propio portal
   (`directiva.html`): datos personales/contacto de los jugadores, cuotas
-  mensuales (cuadrícula jugador × mes, con un importe por defecto
-  configurable en Ajustes, y un resumen de recaudado/pendiente/al día) y
+  mensuales (cuadrícula jugador × mes — toca una casilla para marcar
+  pagado/pendiente, con un resumen de recaudado/pendiente/al día) y
   uniformes (kits de entrenamiento/paseo por jugador: talla, pedido,
-  entregado, pagado, con su propio resumen de entregas y pagos pendientes)
-  — **sin** ningún dato deportivo (atributos, partidos, asistencia a
-  entrenamientos, bienestar). Tú, como entrenador/a, también tienes acceso
-  directo a este portal desde el enlace "Directiva" de la barra lateral de
-  la app completa, sin necesidad de pasar por `acceso.html`.
+  entregado y pagado — este último también se marca tocando la celda, con
+  su propio resumen de entregas y pagos pendientes) — **sin** ningún dato
+  deportivo (atributos, partidos, asistencia a entrenamientos, bienestar).
+  Tú, como entrenador/a, también tienes acceso directo a este portal desde
+  el enlace "Directiva" de la barra lateral de la app completa, sin
+  necesidad de pasar por `acceso.html`.
+
+  El importe de la cuota y el precio de cada kit de uniforme se calculan
+  solos: usan el valor por defecto de Ajustes (cuota mensual, precio de
+  uniforme de entrenamiento y de paseo) salvo que ese jugador tenga su
+  propia excepción guardada en su ficha (sección "Condiciones económicas
+  personalizadas" en Plantilla → editar jugador) — útil para una beca o un
+  precio distinto sin tener que tocarlo cada mes a mano.
 
 Desde la ficha de cada jugador (`jugador.html`) y desde la tarjeta de cada
 miembro del staff en Plantilla puedes ver y copiar sus credenciales con un
