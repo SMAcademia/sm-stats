@@ -102,6 +102,17 @@ SM.sidebar = (function () {
       btn.addEventListener('mouseenter', function () { btn.style.background = 'var(--panel-2)'; btn.style.color = 'var(--text)'; });
       btn.addEventListener('mouseleave', function () { btn.style.background = 'transparent'; btn.style.color = 'var(--text-mute)'; });
     }
+    // El enlace a Directiva debe entrar siempre con el mismo acceso que el
+    // resto de la app (ver directiva.js) — si este dispositivo tiene
+    // guardada una sesión de familia/staff de alguna prueba anterior (p. ej.
+    // tu propio acceso de staff, que no está marcado "Es directiva"), la
+    // borramos al navegar desde aquí para que nunca bloquee la entrada.
+    const directivaLink = shellEl.querySelector('a.nav-item[href="directiva.html"]');
+    if (directivaLink) {
+      directivaLink.addEventListener('click', function () {
+        try { localStorage.removeItem('sm_stats_family_session'); } catch (e) { /* noop */ }
+      });
+    }
     const teamSelect = document.getElementById('sidebar-team-select');
     if (teamSelect) {
       teamSelect.addEventListener('change', function (e) {
