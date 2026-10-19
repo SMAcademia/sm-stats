@@ -17,6 +17,31 @@
   const main = document.getElementById('main');
   const esc = SM.ui.escapeHtml;
 
+  // Las celdas de Cuotas/Uniformes son pequeñas y viven dentro de una tabla
+  // con scroll horizontal — en el móvil, el navegador a veces interpreta el
+  // dedo al tocar como el inicio de ese scroll y cancela el "click" nativo
+  // sin avisar (se ve el resalte azul de "tocado" pero no pasa nada más).
+  // Para no depender de esa síntesis, se calcula el toque a mano con
+  // Pointer Events: solo cuenta como toque si el dedo no se ha movido más
+  // de unos pocos píxeles entre bajar y soltar.
+  function wireTapButtons(selector, handler) {
+    main.querySelectorAll(selector).forEach(function (btn) {
+      let startX = 0, startY = 0, tracking = false;
+      btn.addEventListener('pointerdown', function (e) {
+        if (btn.disabled) return;
+        tracking = true;
+        startX = e.clientX;
+        startY = e.clientY;
+      });
+      btn.addEventListener('pointerup', function (e) {
+        if (!tracking || btn.disabled) return;
+        tracking = false;
+        if (Math.abs(e.clientX - startX) < 12 && Math.abs(e.clientY - startY) < 12) handler(btn);
+      });
+      btn.addEventListener('pointercancel', function () { tracking = false; });
+    });
+  }
+
   const session = SM.auth.readFamilySession();
   if (session && (session.type !== 'staff' || !session.id)) {
     window.location.href = 'acceso.html';
@@ -193,7 +218,7 @@
         const paid = !!(c && c.pagado);
         return (
           '<td>' +
-            '<button type="button" class="cuota-cell" data-player="' + p.id + '" data-periodo="' + per + '" title="' + (paid ? 'Pagado — toca para desmarcar' : 'Pendiente — toca para marcar pagado') + '" style="touch-action:manipulation;width:100%;min-width:40px;padding:7px 4px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--border-soft)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.12) : 'var(--panel-2)') + ';color:' + (paid ? 'var(--green)' : 'var(--text-ghost)') + ';font-weight:800;font-size:14px;cursor:pointer;">' + (paid ? '✓' : '–') + '</button>' +
+            '<button type="button" class="cuota-cell" data-player="' + p.id + '" data-periodo="' + per + '" title="' + (paid ? 'Pagado — toca para desmarcar' : 'Pendiente — toca para marcar pagado') + '" style="touch-action:none;width:100%;min-width:40px;padding:7px 4px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--border-soft)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.12) : 'var(--panel-2)') + ';color:' + (paid ? 'var(--green)' : 'var(--text-ghost)') + ';font-weight:800;font-size:14px;cursor:pointer;">' + (paid ? '✓' : '–') + '</button>' +
           '</td>'
         );
       }).join('');
@@ -218,17 +243,14 @@
   }
 
   function wireCuotasTab() {
-    main.querySelectorAll('.cuota-cell').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        if (btn.disabled) return;
-        // Feedback inmediato al tocar — antes de esperar a la red, para que
-        // se note el toque incluso si la hoja tarda en responder (y para
-        // poder distinguir "no ha reaccionado al toque" de "ha tardado").
-        btn.disabled = true;
-        btn.style.opacity = '0.45';
-        btn.textContent = '…';
-        toggleCuotaPagado(btn.getAttribute('data-player'), btn.getAttribute('data-periodo'), btn);
-      });
+    wireTapButtons('.cuota-cell', function (btn) {
+      // Feedback inmediato al tocar — antes de esperar a la red, para que
+      // se note el toque incluso si la hoja tarda en responder (y para
+      // poder distinguir "no ha reaccionado al toque" de "ha tardado").
+      btn.disabled = true;
+      btn.style.opacity = '0.45';
+      btn.textContent = '…';
+      toggleCuotaPagado(btn.getAttribute('data-player'), btn.getAttribute('data-periodo'), btn);
     });
   }
 
@@ -317,7 +339,7 @@
             statusBadgeHtml(u && u.pedido) +
             statusBadgeHtml(u && u.entregado) +
             '<td>' + (precio ? precio.toLocaleString('es-ES') + '€' : '—') + '</td>' +
-            '<td><button type="button" class="uniforme-pagado-cell" data-player="' + p.id + '" data-tipo="' + kit.key + '" title="' + (paid ? 'Pagado — toca para desmarcar' : 'Pendiente — toca para marcar pagado') + '" style="touch-action:manipulation;padding:6px 16px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--border-soft)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.12) : 'var(--panel-2)') + ';color:' + (paid ? 'var(--green)' : 'var(--text-ghost)') + ';font-weight:800;font-size:14px;cursor:pointer;">' + (paid ? '✓' : '–') + '</button></td>' +
+            '<td><button type="button" class="uniforme-pagado-cell" data-player="' + p.id + '" data-tipo="' + kit.key + '" title="' + (paid ? 'Pagado — toca para desmarcar' : 'Pendiente — toca para marcar pagado') + '" style="touch-action:none;padding:6px 16px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--border-soft)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.12) : 'var(--panel-2)') + ';color:' + (paid ? 'var(--green)' : 'var(--text-ghost)') + ';font-weight:800;font-size:14px;cursor:pointer;">' + (paid ? '✓' : '–') + '</button></td>' +
             '<td><button type="button" class="btn btn-outline uniforme-edit-btn" data-player="' + p.id + '" data-tipo="' + kit.key + '" style="padding:5px 12px;font-size:11.5px;">Editar</button></td>' +
           '</tr>'
         );
@@ -344,15 +366,12 @@
         openUniformeModal(btn.getAttribute('data-player'), btn.getAttribute('data-tipo'));
       });
     });
-    main.querySelectorAll('.uniforme-pagado-cell').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        if (btn.disabled) return;
-        const wasPaid = btn.textContent.trim() === '✓';
-        btn.disabled = true;
-        btn.style.opacity = '0.45';
-        btn.textContent = '…';
-        toggleUniformePagado(btn.getAttribute('data-player'), btn.getAttribute('data-tipo'), btn, wasPaid);
-      });
+    wireTapButtons('.uniforme-pagado-cell', function (btn) {
+      const wasPaid = btn.textContent.trim() === '✓';
+      btn.disabled = true;
+      btn.style.opacity = '0.45';
+      btn.textContent = '…';
+      toggleUniformePagado(btn.getAttribute('data-player'), btn.getAttribute('data-tipo'), btn, wasPaid);
     });
     const bulkBtn = main.querySelector('#bulk-training-btn');
     if (bulkBtn) bulkBtn.addEventListener('click', bulkMarkTrainingDelivered);
