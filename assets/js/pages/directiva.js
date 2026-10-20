@@ -277,7 +277,10 @@
       render();
     }).catch(function (err) {
       if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.textContent = willPay ? '✕' : '✓'; }
-      SM.ui.toast(err.message, 'error');
+      // alert() en vez de (o además de) un toast que puede pasar
+      // desapercibido en 3 segundos — necesitamos ver el texto exacto del
+      // error para saber qué está fallando de verdad en el guardado.
+      window.alert('No se pudo guardar la cuota:\n\n' + err.message);
     });
   }
 
@@ -399,7 +402,7 @@
       render();
     }).catch(function (err) {
       if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.textContent = wasPaid ? '✓' : '✕'; }
-      SM.ui.toast(err.message, 'error');
+      window.alert('No se pudo guardar el uniforme:\n\n' + err.message);
     });
   }
 
