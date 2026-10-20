@@ -163,9 +163,20 @@ function getSpreadsheet() {
   return _spreadsheetCache;
 }
 
-function getSheet(name) {
-  const sheet = getSpreadsheet().getSheetByName(name);
-  if (!sheet) throw new Error('No existe la pestaña "' + name + '". Ejecuta setupSheets() primero.');
+// Con `columns`, crea la pestaña sola si todavía no existe (con su
+// cabecera) en vez de obligar a ejecutar setupSheets() a mano — pensado
+// para appendRow/updateRowById, que ya saben qué columnas necesitan.
+// Sin `columns` (lecturas, acciones que no dan de alta nada nuevo) se
+// mantiene el error de siempre: ahí no hay forma de saber qué cabecera
+// poner, y crear una pestaña vacía solo ocultaría el problema real.
+function getSheet(name, columns) {
+  let sheet = getSpreadsheet().getSheetByName(name);
+  if (!sheet) {
+    if (!columns) throw new Error('No existe la pestaña "' + name + '". Ejecuta setupSheets() primero.');
+    sheet = getSpreadsheet().insertSheet(name);
+    sheet.getRange(1, 1, 1, columns.length).setValues([columns]);
+    sheet.setFrozenRows(1);
+  }
   return sheet;
 }
 
@@ -228,8 +239,11 @@ function ensureHeader(sheet, columns) {
 
 // Appends by column NAME (via the sheet's actual header), not by array
 // position — safe even if the sheet's column order doesn't match `columns`.
+// Crea la pestaña sola si hiciera falta (ver getSheet) — así una acción
+// que da de alta el primer registro de un tipo nuevo (p. ej. la primera
+// cuota marcada) nunca falla solo porque nadie ha ejecutado setupSheets().
 function appendRow(name, columns, obj) {
-  const sheet = getSheet(name);
+  const sheet = getSheet(name, columns);
   const header = ensureHeader(sheet, columns);
   sheet.appendRow(header.map(function (c) { return obj[c] !== undefined ? obj[c] : ''; }));
 }

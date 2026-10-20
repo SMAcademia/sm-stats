@@ -50,6 +50,11 @@ python3 -m http.server 8000
    columnas ya preparadas — vuelve a ejecutarla sin miedo cada vez que
    actualices `Code.gs` con una versión más reciente del repo: no borra ni
    toca filas ya existentes, solo añade las pestañas/columnas que falten.
+   Aun así, si alguna vez te saltas este paso tras actualizar `Code.gs` y
+   usas una función que da de alta el primer registro de una pestaña
+   nueva (p. ej. la primera cuota o el primer uniforme marcado), la app la
+   crea sola en ese momento — no hace falta que el error te obligue a
+   volver aquí.
 5. (Opcional pero recomendado) En **Configuración del proyecto → Propiedades
    del script**, añade una propiedad `TOKEN` con un valor secreto a tu
    elección (por ejemplo una cadena aleatoria larga). Esto evita que
