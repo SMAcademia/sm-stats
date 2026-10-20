@@ -437,6 +437,12 @@ function doPost(e) {
     const handler = handlers[body.action];
     if (!handler) throw new Error('Acción desconocida: ' + body.action);
     const result = handler(body.payload || {});
+    // Apps Script agrupa los cambios a la Sheet y los aplica en lote por
+    // rendimiento — sin forzarlo aquí, una lectura (doGet) hecha justo
+    // después de este guardado (como la que hace el frontend nada más
+    // guardar, para refrescar la pantalla) puede llegar antes de que el
+    // cambio esté realmente confirmado y devolver el dato todavía viejo.
+    SpreadsheetApp.flush();
     return jsonResponse({ ok: true, result: result });
   } catch (err) {
     return jsonResponse({ ok: false, error: err.message });

@@ -270,10 +270,18 @@
       pagado: willPay,
       fecha_pago: willPay ? SM.ui.formatDateIso(new Date()) : ''
     };
-    SM.api.postAction('saveCuota', payload).then(function () {
-      return SM.api.fetchAll(true);
-    }).then(function (data) {
-      DATA = data;
+    SM.api.postAction('saveCuota', payload).then(function (result) {
+      // Actualiza DATA con la fila que acaba de devolver el propio
+      // guardado, en vez de volver a pedir todos los datos — así no hay
+      // que esperar a que la hoja "confirme" la lectura por separado
+      // (evita una condición de carrera: una lectura justo después de
+      // escribir a veces llegaba antes de que el cambio estuviera
+      // realmente reflejado, y la casilla se quedaba en rojo aunque el
+      // guardado hubiera ido bien).
+      DATA.cuotas = DATA.cuotas || [];
+      const i = DATA.cuotas.findIndex(function (c) { return c.id === result.id; });
+      if (i >= 0) DATA.cuotas[i] = Object.assign({}, DATA.cuotas[i], result);
+      else DATA.cuotas.push(result);
       render();
     }).catch(function (err) {
       if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.textContent = willPay ? '✕' : '✓'; }
@@ -395,10 +403,13 @@
       entregado: existing ? existing.entregado : false,
       pagado: !(existing && existing.pagado)
     };
-    SM.api.postAction('saveUniforme', payload).then(function () {
-      return SM.api.fetchAll(true);
-    }).then(function (data) {
-      DATA = data;
+    SM.api.postAction('saveUniforme', payload).then(function (result) {
+      // Misma razón que en toggleCuotaPagado: usar directamente la fila
+      // que devuelve el guardado, no volver a pedir todos los datos.
+      DATA.uniformes = DATA.uniformes || [];
+      const i = DATA.uniformes.findIndex(function (u) { return u.id === result.id; });
+      if (i >= 0) DATA.uniformes[i] = Object.assign({}, DATA.uniformes[i], result);
+      else DATA.uniformes.push(result);
       render();
     }).catch(function (err) {
       if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.textContent = wasPaid ? '✓' : '✕'; }
