@@ -969,11 +969,27 @@ function deleteDevGoal(payload) {
   return true;
 }
 
+// Busca la fila cuyo valor en col1/col2 coincide con val1/val2 (p. ej.
+// player_id+periodo, o player_id+tipo) y devuelve su id, o null si no
+// hay ninguna. Usado por saveCuota/saveUniforme para no duplicar una
+// fila cuando el cliente reintenta un guardado sin saber todavía que la
+// primera vez SÍ llegó a escribirse (toque repetido por un guardado
+// lento, pestaña reabierta a medio camino...) — el id que mande el
+// cliente es solo un atajo cuando lo tiene, nunca la única comprobación.
+function findRowIdByColumns(sheet, col1, val1, col2, val2) {
+  const values = sheet.getDataRange().getValues();
+  const header = values[0].map(String);
+  const idCol = header.indexOf('id'), c1 = header.indexOf(col1), c2 = header.indexOf(col2);
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][c1]) === String(val1) && String(values[i][c2]) === String(val2)) return values[i][idCol];
+  }
+  return null;
+}
+
 // Cuotas mensuales (ver directiva.html) — una fila por jugador y período
-// ("2026-09") tocado desde la cuadrícula. payload.id decide alta/edición,
-// igual que saveDevGoal: con id, actualiza esa fila; sin id, crea una
-// nueva. El frontend ya tiene todas las cuotas cargadas y decide si la
-// fila existe antes de llamar.
+// ("2026-09") tocado desde la cuadrícula. Se identifica por jugador+
+// período (no solo por id) para que nunca se duplique una cuota, pase lo
+// que pase en el cliente.
 function saveCuota(payload) {
   if (!payload.player_id) throw new Error('Falta el jugador.');
   if (!payload.periodo) throw new Error('Falta el período.');
@@ -984,9 +1000,11 @@ function saveCuota(payload) {
     pagado: !!payload.pagado,
     fecha_pago: payload.fecha_pago || ''
   };
-  if (payload.id) {
-    updateRowById(SHEETS.cuotas, CUOTA_COLUMNS, payload.id, patch);
-    return Object.assign({ id: payload.id }, patch);
+  const sheet = getSheet(SHEETS.cuotas, CUOTA_COLUMNS);
+  const id = payload.id || findRowIdByColumns(sheet, 'player_id', payload.player_id, 'periodo', payload.periodo);
+  if (id) {
+    updateRowById(SHEETS.cuotas, CUOTA_COLUMNS, id, patch);
+    return Object.assign({ id: id }, patch);
   }
   const row = Object.assign({ id: newId('cu') }, patch);
   appendRow(SHEETS.cuotas, CUOTA_COLUMNS, row);
@@ -994,7 +1012,8 @@ function saveCuota(payload) {
 }
 
 // Uniformes (ver directiva.html) — una fila por jugador y tipo de kit
-// ('entrenamiento' | 'paseo'). Mismo patrón de alta/edición por id.
+// ('entrenamiento' | 'paseo'), identificada por jugador+tipo por el mismo
+// motivo que saveCuota — nunca duplicar aunque el cliente reintente.
 function saveUniforme(payload) {
   if (!payload.player_id) throw new Error('Falta el jugador.');
   if (!payload.tipo) throw new Error('Falta el tipo de kit.');
@@ -1006,13 +1025,49 @@ function saveUniforme(payload) {
     entregado: !!payload.entregado,
     pagado: !!payload.pagado
   };
-  if (payload.id) {
-    updateRowById(SHEETS.uniformes, UNIFORME_COLUMNS, payload.id, patch);
-    return Object.assign({ id: payload.id }, patch);
+  const sheet = getSheet(SHEETS.uniformes, UNIFORME_COLUMNS);
+  const id = payload.id || findRowIdByColumns(sheet, 'player_id', payload.player_id, 'tipo', payload.tipo);
+  if (id) {
+    updateRowById(SHEETS.uniformes, UNIFORME_COLUMNS, id, patch);
+    return Object.assign({ id: id }, patch);
   }
   const row = Object.assign({ id: newId('un') }, patch);
   appendRow(SHEETS.uniformes, UNIFORME_COLUMNS, row);
   return row;
+}
+
+// Limpieza puntual de las duplicadas que se crearon antes de este
+// arreglo (ver saveCuota/saveUniforme) — ejecútala UNA VEZ desde el
+// editor de Apps Script (selecciona la función en el desplegable de
+// arriba y pulsa Ejecutar). Se queda con la fila MÁS RECIENTE de cada
+// jugador+período/tipo y borra el resto; si no hay duplicadas no toca
+// nada. Mira el registro de ejecución (Ver → Registros) para ver cuántas
+// borró.
+function dedupeCuotasYUniformes() {
+  dedupeSheetByColumns(SHEETS.cuotas, CUOTA_COLUMNS, 'player_id', 'periodo');
+  dedupeSheetByColumns(SHEETS.uniformes, UNIFORME_COLUMNS, 'player_id', 'tipo');
+}
+
+function dedupeSheetByColumns(name, columns, col1, col2) {
+  const sheet = getSheet(name, columns);
+  const values = sheet.getDataRange().getValues();
+  const header = values[0].map(String);
+  const c1 = header.indexOf(col1), c2 = header.indexOf(col2);
+  const seen = {};
+  const rowsToDelete = [];
+  // De abajo arriba: la primera vez que se ve una combinación es la fila
+  // más reciente (las nuevas se añaden al final) — esa se conserva: el
+  // resto de apariciones (más antiguas) se marcan para borrar.
+  for (let i = values.length - 1; i >= 1; i--) {
+    const key = values[i][c1] + '::' + values[i][c2];
+    if (seen[key]) {
+      rowsToDelete.push(i + 1);
+    } else {
+      seen[key] = true;
+    }
+  }
+  rowsToDelete.forEach(function (rowIndex) { sheet.deleteRow(rowIndex); });
+  Logger.log(name + ': borradas ' + rowsToDelete.length + ' filas duplicadas.');
 }
 
 // Guarda TODO lo que haya del partido de una sola vez — resultado,

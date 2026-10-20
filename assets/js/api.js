@@ -432,11 +432,11 @@ SM.api = (function () {
         if (!payload.periodo) throw new Error('Falta el período.');
         d.cuotas = d.cuotas || [];
         const patch = { player_id: payload.player_id, periodo: payload.periodo, importe: payload.importe, pagado: !!payload.pagado, fecha_pago: payload.fecha_pago || '' };
-        if (payload.id) {
-          const i = d.cuotas.findIndex(function (c) { return c.id === payload.id; });
-          if (i >= 0) d.cuotas[i] = Object.assign({}, d.cuotas[i], patch);
-          return d.cuotas[i];
-        }
+        // Por id si lo trae, si no por jugador+periodo — igual que en
+        // Code.gs, para que un reintento nunca duplique la fila.
+        let i = payload.id ? d.cuotas.findIndex(function (c) { return c.id === payload.id; }) : -1;
+        if (i === -1) i = d.cuotas.findIndex(function (c) { return c.player_id === payload.player_id && c.periodo === payload.periodo; });
+        if (i >= 0) { d.cuotas[i] = Object.assign({}, d.cuotas[i], patch); return d.cuotas[i]; }
         const row = Object.assign({ id: nextMockId('cu') }, patch);
         d.cuotas.push(row);
         return row;
@@ -446,11 +446,10 @@ SM.api = (function () {
         if (!payload.tipo) throw new Error('Falta el tipo de kit.');
         d.uniformes = d.uniformes || [];
         const patch = { player_id: payload.player_id, tipo: payload.tipo, talla: payload.talla || '', pedido: !!payload.pedido, entregado: !!payload.entregado, pagado: !!payload.pagado };
-        if (payload.id) {
-          const i = d.uniformes.findIndex(function (u) { return u.id === payload.id; });
-          if (i >= 0) d.uniformes[i] = Object.assign({}, d.uniformes[i], patch);
-          return d.uniformes[i];
-        }
+        // Por id si lo trae, si no por jugador+tipo — igual que en Code.gs.
+        let i = payload.id ? d.uniformes.findIndex(function (u) { return u.id === payload.id; }) : -1;
+        if (i === -1) i = d.uniformes.findIndex(function (u) { return u.player_id === payload.player_id && u.tipo === payload.tipo; });
+        if (i >= 0) { d.uniformes[i] = Object.assign({}, d.uniformes[i], patch); return d.uniformes[i]; }
         const row = Object.assign({ id: nextMockId('un') }, patch);
         d.uniformes.push(row);
         return row;
