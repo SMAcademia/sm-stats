@@ -218,7 +218,7 @@
         const paid = !!(c && c.pagado);
         return (
           '<td>' +
-            '<button type="button" class="cuota-cell" data-player="' + p.id + '" data-periodo="' + per + '" title="' + (paid ? 'Pagado — toca para desmarcar' : 'Pendiente — toca para marcar pagado') + '" style="touch-action:none;width:100%;min-width:40px;padding:7px 4px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--border-soft)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.12) : 'var(--panel-2)') + ';color:' + (paid ? 'var(--green)' : 'var(--text-ghost)') + ';font-weight:800;font-size:14px;cursor:pointer;">' + (paid ? '✓' : '–') + '</button>' +
+            '<button type="button" class="cuota-cell" data-player="' + p.id + '" data-periodo="' + per + '" title="' + (paid ? 'Pagado — toca para desmarcar' : 'Pendiente — toca para marcar pagado') + '" style="touch-action:none;width:100%;min-width:40px;padding:7px 4px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--red)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.16) : SM.ui.alpha('var(--red)', 0.16)) + ';color:' + (paid ? 'var(--green)' : 'var(--red-bright)') + ';font-weight:800;font-size:14px;cursor:pointer;">' + (paid ? '✓' : '✕') + '</button>' +
           '</td>'
         );
       }).join('');
@@ -276,7 +276,7 @@
       DATA = data;
       render();
     }).catch(function (err) {
-      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.textContent = willPay ? '–' : '✓'; }
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.textContent = willPay ? '✕' : '✓'; }
       SM.ui.toast(err.message, 'error');
     });
   }
@@ -339,7 +339,7 @@
             statusBadgeHtml(u && u.pedido) +
             statusBadgeHtml(u && u.entregado) +
             '<td>' + (precio ? precio.toLocaleString('es-ES') + '€' : '—') + '</td>' +
-            '<td><button type="button" class="uniforme-pagado-cell" data-player="' + p.id + '" data-tipo="' + kit.key + '" title="' + (paid ? 'Pagado — toca para desmarcar' : 'Pendiente — toca para marcar pagado') + '" style="touch-action:none;padding:6px 16px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--border-soft)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.12) : 'var(--panel-2)') + ';color:' + (paid ? 'var(--green)' : 'var(--text-ghost)') + ';font-weight:800;font-size:14px;cursor:pointer;">' + (paid ? '✓' : '–') + '</button></td>' +
+            '<td><button type="button" class="uniforme-pagado-cell" data-player="' + p.id + '" data-tipo="' + kit.key + '" title="' + (paid ? 'Pagado — toca para desmarcar' : 'Pendiente — toca para marcar pagado') + '" style="touch-action:none;padding:6px 16px;border-radius:7px;border:1px solid ' + (paid ? 'var(--green)' : 'var(--red)') + ';background:' + (paid ? SM.ui.alpha('var(--green)', 0.16) : SM.ui.alpha('var(--red)', 0.16)) + ';color:' + (paid ? 'var(--green)' : 'var(--red-bright)') + ';font-weight:800;font-size:14px;cursor:pointer;">' + (paid ? '✓' : '✕') + '</button></td>' +
             '<td><button type="button" class="btn btn-outline uniforme-edit-btn" data-player="' + p.id + '" data-tipo="' + kit.key + '" style="padding:5px 12px;font-size:11.5px;">Editar</button></td>' +
           '</tr>'
         );
@@ -398,7 +398,7 @@
       DATA = data;
       render();
     }).catch(function (err) {
-      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.textContent = wasPaid ? '✓' : '–'; }
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.textContent = wasPaid ? '✓' : '✕'; }
       SM.ui.toast(err.message, 'error');
     });
   }
