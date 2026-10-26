@@ -271,6 +271,7 @@ SM.stats = (function () {
     return {
       player: player,
       pj: appearancesCount(data, player.id),
+      minutos: minutesForPlayer(data, player.id),
       goles: goalsForPlayer(data, player.id),
       asistencias: assistsForPlayer(data, player.id),
       amarillas: yellowsForPlayer(data, player.id),

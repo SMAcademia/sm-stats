@@ -9,6 +9,7 @@
     { key: 'nombre', label: 'JUGADOR', align: 'left' },
     { key: 'posicion', label: 'POS.' },
     { key: 'pj', label: 'PJ' },
+    { key: 'minutos', label: 'MIN' },
     { key: 'goles', label: 'GOLES' },
     { key: 'asistencias', label: 'ASISTENC.' },
     { key: 'tarjetas', label: 'AM / ROJ', sortable: false },
@@ -123,6 +124,7 @@
           '<td style="font-weight:700;color:var(--text-strong);">' + SM.ui.escapeHtml(r.player.nombre) + '</td>' +
           '<td style="color:' + meta.color + ';font-weight:700;">' + r.player.posicion + '</td>' +
           '<td>' + r.pj + '</td>' +
+          '<td style="font-family:var(--font-display);font-weight:700;">' + r.minutos + '\'</td>' +
           '<td style="font-family:var(--font-display);font-weight:700;' + (r.goles > 0 ? 'color:var(--green);' : '') + '">' + r.goles + '</td>' +
           '<td>' + r.asistencias + '</td>' +
           '<td' + (r.amarillas + r.rojas > 0 ? ' style="color:var(--amber);font-weight:700;"' : '') + '>' + r.amarillas + ' / ' + r.rojas + '</td>' +
