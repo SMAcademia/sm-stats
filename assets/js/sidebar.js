@@ -15,7 +15,8 @@ SM.sidebar = (function () {
     bienestar: '<circle cx="12" cy="12" r="9"/><circle cx="9" cy="10.3" r="1" fill="currentColor"/><circle cx="15" cy="10.3" r="1" fill="currentColor"/><path d="M8 14.2c1.1 1.5 2.5 2.3 4 2.3s2.9-.8 4-2.3"/>',
     estadisticas: '<path d="M4 20V10M11 20V4M18 20v-7"/><path d="M2.5 20h19"/>',
     video: '<path d="M4 6.5h11a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 16V8A1.5 1.5 0 0 1 4 6.5Z"/><path d="m16.5 10.3 4-2.4v8.2l-4-2.4"/>',
-    directiva: '<path d="M4 20V9.5l8-5 8 5V20"/><path d="M9.5 20v-6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v6"/>'
+    directiva: '<path d="M4 20V9.5l8-5 8 5V20"/><path d="M9.5 20v-6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v6"/>',
+    usuarios: '<circle cx="8" cy="15" r="4"/><path d="M11.5 11.5 20 3"/><path d="M16.5 7l2.5-2.5"/><path d="M19 9.5l2-2"/>'
   };
 
   const ITEMS = [
@@ -30,7 +31,8 @@ SM.sidebar = (function () {
     { key: 'bienestar', label: 'Bienestar', href: 'bienestar.html' },
     { key: 'video', label: 'Vídeo análisis', href: 'video-analisis.html' },
     { key: 'estadisticas', label: 'Estadísticas', href: 'estadisticas.html' },
-    { key: 'directiva', label: 'Directiva', href: 'directiva.html' }
+    { key: 'directiva', label: 'Directiva', href: 'directiva.html' },
+    { key: 'usuarios', label: 'Usuarios', href: 'usuarios.html' }
   ];
 
   // Shown until the real Settings row loads from Sheets (or in demo mode,
