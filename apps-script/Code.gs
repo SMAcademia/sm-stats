@@ -237,6 +237,11 @@ function ensureHeader(sheet, columns) {
   return header;
 }
 
+// Columnas tipo "2026-09" que Sheets puede confundir con una fecha y
+// reescribir sola como 2026-09-01 si la celda no está forzada a texto
+// plano antes de escribir — ver coerceCuota para la parte de lectura.
+const TEXT_FORCED_COLUMNS = ['periodo'];
+
 // Appends by column NAME (via the sheet's actual header), not by array
 // position — safe even if the sheet's column order doesn't match `columns`.
 // Crea la pestaña sola si hiciera falta (ver getSheet) — así una acción
@@ -245,7 +250,12 @@ function ensureHeader(sheet, columns) {
 function appendRow(name, columns, obj) {
   const sheet = getSheet(name, columns);
   const header = ensureHeader(sheet, columns);
-  sheet.appendRow(header.map(function (c) { return obj[c] !== undefined ? obj[c] : ''; }));
+  const rowIndex = sheet.getLastRow() + 1;
+  header.forEach(function (col, i) {
+    const cell = sheet.getRange(rowIndex, i + 1);
+    if (TEXT_FORCED_COLUMNS.indexOf(col) !== -1) cell.setNumberFormat('@');
+    cell.setValue(obj[col] !== undefined ? obj[col] : '');
+  });
 }
 
 function findRowIndexById(sheet, id) {
@@ -266,7 +276,10 @@ function updateRowById(name, columns, id, patch) {
   // columna antes de poder escribir en ella, o el valor se pierde en silencio.
   const header = ensureHeader(sheet, columns);
   header.forEach(function (col, i) {
-    if (patch[col] !== undefined) sheet.getRange(rowIndex, i + 1).setValue(patch[col]);
+    if (patch[col] === undefined) return;
+    const cell = sheet.getRange(rowIndex, i + 1);
+    if (TEXT_FORCED_COLUMNS.indexOf(col) !== -1) cell.setNumberFormat('@');
+    cell.setValue(patch[col]);
   });
 }
 
@@ -1180,6 +1193,16 @@ function coerceStaff(s) {
 function coerceCuota(c) {
   c.importe = c.importe === '' || c.importe === undefined ? null : Number(c.importe);
   c.pagado = c.pagado === true || c.pagado === 'TRUE' || c.pagado === 'true' || c.pagado === 1;
+  // Sheets puede autodetectar "2026-09" como fecha al escribirla y
+  // guardarla como 2026-09-01 (normalizeCell ya la habrá pasado a texto
+  // "2026-09-01" en este punto) — se recorta a "YYYY-MM" para que siga
+  // casando con los períodos que espera la cuadrícula de Cuotas. No hace
+  // falta arreglar nada a mano en la hoja: esto sana filas ya guardadas
+  // así, y saveCuota ya fuerza texto plano al escribir para que no vuelva
+  // a pasar.
+  if (typeof c.periodo === 'string' && /^\d{4}-\d{2}-\d{2}/.test(c.periodo)) {
+    c.periodo = c.periodo.slice(0, 7);
+  }
   return c;
 }
 

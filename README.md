@@ -195,3 +195,10 @@ barra lateral ("Acceso familias / staff").
   la ficha del jugador.
 - Es una app de un solo equipo/club (no multi-usuario ni multi-equipo) por
   diseño, a juego con el alcance pedido.
+- Cada `<script src="assets/js/...">` y el `<link>` de `theme.css` llevan
+  `?v=AAAAMMDD` al final — sin eso, el navegador (sobre todo en móvil)
+  puede seguir sirviendo el JS/CSS antiguo en caché durante días después
+  de un despliegue nuevo, aunque recargues la página. Cambia esa fecha
+  (en todos los HTML a la vez) cada vez que edites algo en `assets/js/` o
+  `assets/css/theme.css`, para forzar a que se descargue la versión
+  nueva.

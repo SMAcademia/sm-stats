@@ -163,9 +163,17 @@
   }
 
   // ---- Cuotas: cuadrícula jugador × mes de la temporada ----
+  // Si alguna vez Sheets confundió "2026-09" con una fecha y la guardó
+  // como "2026-09-01" (al no estar la celda forzada a texto plano), esto
+  // la recorta de vuelta a "YYYY-MM" — defensa doble junto a la misma
+  // normalización ya hecha en Code.gs (coerceCuota), por si el Apps
+  // Script desplegado todavía no tiene ese arreglo.
+  function normPeriodo(p) {
+    return typeof p === 'string' && /^\d{4}-\d{2}-\d{2}/.test(p) ? p.slice(0, 7) : p;
+  }
   function cuotasByKey() {
     const map = {};
-    (DATA.cuotas || []).forEach(function (c) { map[c.player_id + '::' + c.periodo] = c; });
+    (DATA.cuotas || []).forEach(function (c) { map[c.player_id + '::' + normPeriodo(c.periodo)] = c; });
     return map;
   }
 
@@ -186,9 +194,10 @@
     let paidCount = 0;
     let recaudado = 0;
     (DATA.cuotas || []).forEach(function (c) {
-      if (playerIds.indexOf(c.player_id) === -1 || periods.indexOf(c.periodo) === -1 || !c.pagado) return;
+      const periodo = normPeriodo(c.periodo);
+      if (playerIds.indexOf(c.player_id) === -1 || periods.indexOf(periodo) === -1 || !c.pagado) return;
       recaudado += c.importe || 0;
-      if (elapsed.indexOf(c.periodo) !== -1) paidCount++;
+      if (elapsed.indexOf(periodo) !== -1) paidCount++;
     });
     const pendientes = Math.max(0, expected - paidCount);
     const pctAlDia = expected > 0 ? Math.round((paidCount / expected) * 100) : null;
@@ -260,7 +269,7 @@
   // mano aquí.
   function toggleCuotaPagado(playerId, periodo, btn) {
     const player = (DATA.players || []).find(function (p) { return p.id === playerId; });
-    const existing = (DATA.cuotas || []).find(function (c) { return c.player_id === playerId && c.periodo === periodo; });
+    const existing = (DATA.cuotas || []).find(function (c) { return c.player_id === playerId && normPeriodo(c.periodo) === periodo; });
     const willPay = !(existing && existing.pagado);
     const payload = {
       id: existing ? existing.id : undefined,
