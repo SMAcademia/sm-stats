@@ -50,12 +50,20 @@
     main.innerHTML =
       '<div class="page-header">' +
         '<div><div class="page-title">Usuarios</div><div class="page-subtitle">Accesos derivados de jugadores y staff — solo visible para ti</div></div>' +
+        '<button type="button" class="btn btn-primary" id="add-user-btn">+ Añadir usuario</button>' +
       '</div>' +
+      '<div class="form-hint" style="margin-top:-8px;margin-bottom:18px;">Solo para cuerpo técnico/directiva — los jugadores se dan de alta desde Plantilla, su acceso se deriva solo de su ficha.</div>' +
       '<div class="search-box" style="margin-bottom:18px;max-width:340px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b7382" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>' +
         '<input id="search" type="text" placeholder="Buscar por nombre..."></div>' +
       '<div id="staff-panel" class="panel" style="overflow-x:auto;margin-bottom:20px;"></div>' +
       '<div id="players-panel" class="panel" style="overflow-x:auto;"></div>';
 
+    document.getElementById('add-user-btn').addEventListener('click', function () {
+      SM.forms.openStaffForm(null, function (data) {
+        DATA = SM.team.filterData(data, SM.team.current());
+        renderTables();
+      });
+    });
     document.getElementById('search').addEventListener('input', function (e) {
       search = e.target.value;
       renderTables();

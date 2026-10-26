@@ -230,7 +230,14 @@
     const periods = seasonPeriods();
     const byKey = cuotasByKey();
     const defaultImporte = DATA.settings && DATA.settings.cuota_mensual;
-    const head = '<tr><th style="text-align:left;">Jugador</th>' + periods.map(function (per) { return '<th>' + periodLabel(per) + '</th>'; }).join('') + '</tr>';
+    const head = '<tr><th style="text-align:left;">Jugador</th>' + periods.map(function (per) {
+      return (
+        '<th><div style="display:flex;flex-direction:column;align-items:center;gap:4px;">' +
+          periodLabel(per) +
+          '<button type="button" class="bulk-period-btn" data-periodo="' + per + '" title="Marcar/desmarcar pagado para todos este mes" style="touch-action:none;padding:2px 7px;border-radius:6px;border:1px solid var(--border-soft);background:var(--panel-2);color:var(--text-mute);font-size:9.5px;font-weight:700;cursor:pointer;white-space:nowrap;">Todos/Ninguno</button>' +
+        '</div></th>'
+      );
+    }).join('') + '</tr>';
     const rows = players.map(function (p) {
       const hasCustom = p.cuota_mensual_custom != null && p.cuota_mensual_custom !== '';
       const cells = periods.map(function (per) {
@@ -271,6 +278,56 @@
       btn.style.opacity = '0.45';
       btn.textContent = '…';
       toggleCuotaPagado(btn.getAttribute('data-player'), btn.getAttribute('data-periodo'), btn);
+    });
+    main.querySelectorAll('.bulk-period-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        bulkToggleCuotaMonth(btn.getAttribute('data-periodo'));
+      });
+    });
+  }
+
+  // "Todos/Ninguno" de un mes — para no tener que tocar jugador por
+  // jugador cada mes. Si YA está todo el mundo pagado, el botón pasa a
+  // desmarcar a todos; si no, marca a todos como pagado (el importe de
+  // cada uno se calcula solo, igual que al tocar una casilla suelta).
+  function bulkToggleCuotaMonth(periodo) {
+    const players = activePlayers();
+    if (!players.length) return;
+    const byKey = cuotasByKey();
+    const allPaid = players.every(function (p) { const c = byKey[p.id + '::' + periodo]; return !!(c && c.pagado); });
+    const willPay = !allPaid;
+    const label = periodLabel(periodo);
+    const msg = willPay
+      ? '¿Marcar la cuota de ' + label + ' como pagada para TODOS los jugadores activos (' + players.length + ')?'
+      : '¿Marcar la cuota de ' + label + ' como pendiente para TODOS los jugadores activos (' + players.length + ')? Esto desmarca a quien ya estuviera pagado.';
+    if (!window.confirm(msg)) return;
+    const calls = players.map(function (p) {
+      const existing = byKey[p.id + '::' + periodo];
+      return SM.api.postAction('saveCuota', {
+        id: existing ? existing.id : undefined,
+        player_id: p.id,
+        periodo: periodo,
+        importe: willPay ? effectiveCuota(p) : null,
+        pagado: willPay,
+        fecha_pago: willPay ? SM.ui.formatDateIso(new Date()) : ''
+      });
+    });
+    Promise.allSettled(calls).then(function (results) {
+      DATA.cuotas = DATA.cuotas || [];
+      let failed = 0;
+      results.forEach(function (r) {
+        if (r.status !== 'fulfilled') { failed++; return; }
+        const result = r.value;
+        const i = DATA.cuotas.findIndex(function (c) { return c.id === result.id; });
+        if (i >= 0) DATA.cuotas[i] = Object.assign({}, DATA.cuotas[i], result);
+        else DATA.cuotas.push(result);
+      });
+      render();
+      if (failed > 0) {
+        window.alert('Se actualizaron ' + (results.length - failed) + ' de ' + results.length + ' jugadores para ' + label + '.\n\n' + failed + ' fallaron — vuelve a tocarlos individualmente.');
+      } else {
+        SM.ui.toast(willPay ? 'Cuota de ' + label + ' marcada como pagada para todos.' : 'Cuota de ' + label + ' marcada como pendiente para todos.', 'ok');
+      }
     });
   }
 
