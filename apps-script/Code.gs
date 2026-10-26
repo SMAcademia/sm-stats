@@ -250,11 +250,26 @@ const TEXT_FORCED_COLUMNS = ['periodo'];
 function appendRow(name, columns, obj) {
   const sheet = getSheet(name, columns);
   const header = ensureHeader(sheet, columns);
-  const rowIndex = sheet.getLastRow() + 1;
+  const values = header.map(function (c) { return obj[c] !== undefined ? obj[c] : ''; });
+  // Camino rápido (un único appendRow) para el caso normal — un partido
+  // puede dar de alta decenas de filas de golpe (convocatoria, goles,
+  // tarjetas, intervalos) y escribir celda a celda ahí multiplicaba esas
+  // llamadas por 5-6, lo bastante para notarse como un guardado colgado.
+  // Solo las columnas de TEXT_FORCED_COLUMNS (p. ej. "periodo" en
+  // Cuotas) necesitan el camino celda a celda, para forzar texto plano
+  // antes de escribir y que Sheets no las confunda con una fecha.
+  const hasTextForced = header.some(function (c, i) { return TEXT_FORCED_COLUMNS.indexOf(c) !== -1 && values[i] !== ''; });
+  if (!hasTextForced) {
+    sheet.appendRow(values);
+    return;
+  }
+  sheet.appendRow(values);
+  const rowIndex = sheet.getLastRow();
   header.forEach(function (col, i) {
+    if (TEXT_FORCED_COLUMNS.indexOf(col) === -1 || values[i] === '') return;
     const cell = sheet.getRange(rowIndex, i + 1);
-    if (TEXT_FORCED_COLUMNS.indexOf(col) !== -1) cell.setNumberFormat('@');
-    cell.setValue(obj[col] !== undefined ? obj[col] : '');
+    cell.setNumberFormat('@');
+    cell.setValue(values[i]);
   });
 }
 
