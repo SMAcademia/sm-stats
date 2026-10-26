@@ -200,15 +200,26 @@
       if (elapsed.indexOf(periodo) !== -1) paidCount++;
     });
     const pendientes = Math.max(0, expected - paidCount);
-    const pctAlDia = expected > 0 ? Math.round((paidCount / expected) * 100) : null;
+    // Morosidad del mes en curso: % de jugadores que todavía no han
+    // pagado la cuota de ESTE mes en concreto (no la media acumulada de
+    // toda la temporada) — es el dato que de verdad hace falta perseguir
+    // cada mes.
+    const now = new Date();
+    const currentPeriod = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const paidThisMonth = new Set();
+    (DATA.cuotas || []).forEach(function (c) {
+      if (normPeriodo(c.periodo) !== currentPeriod || !c.pagado || playerIds.indexOf(c.player_id) === -1) return;
+      paidThisMonth.add(c.player_id);
+    });
+    const pctMorosidad = players.length > 0 ? Math.round(((players.length - paidThisMonth.size) / players.length) * 100) : null;
     return (
       '<div class="kpi-grid" style="margin-bottom:18px;">' +
         kpiCard('Recaudado (temporada)', recaudado.toLocaleString('es-ES') + '€', 'cuotas marcadas como pagadas',
           'var(--green)', '<circle cx="12" cy="12" r="9"/><path d="M9 9.2h5.2M9 12.3h4M15 7.6a4.3 4.3 0 100 8.8"/>') +
         kpiCard('Cuotas pendientes', pendientes, 'de ' + expected + ' esperadas hasta este mes',
           pendientes > 0 ? 'var(--amber)' : 'var(--green)', '<rect x="4.5" y="3.5" width="15" height="17" rx="2.2"/><path d="M8 8h8M8 11.5h8M8 15h5"/>') +
-        kpiCard('Al día', pctAlDia != null ? pctAlDia + '%' : '—', 'pagos del periodo ya transcurrido',
-          'var(--cyan)', '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.6L16 9.3"/>') +
+        kpiCard('Morosidad (' + periodLabel(currentPeriod) + ')', pctMorosidad != null ? pctMorosidad + '%' : '—', 'jugadores sin pagar este mes',
+          pctMorosidad > 0 ? 'var(--red-bright)' : 'var(--green)', '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v6M12 16.3h.01"/>') +
       '</div>'
     );
   }
