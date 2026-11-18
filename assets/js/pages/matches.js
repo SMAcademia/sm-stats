@@ -265,14 +265,22 @@
           SM.forms.field('Categoría (para todos)', SM.forms.selectHtml('categoria', categoryOptions(), SM.team.current())) +
           SM.forms.field('Lugar por defecto (opcional)', '<input name="lugarDefecto" placeholder="Campo Municipal La Ribera">', true) +
         '</div>' +
+        '<div class="form-hint" style="margin:4px 0 10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' +
+          '<label class="btn btn-outline" style="cursor:pointer;margin:0;">' +
+            'Subir PDF del calendario oficial' +
+            '<input type="file" id="pdf-file-input" accept="application/pdf" style="display:none;">' +
+          '</label>' +
+          '<span id="pdf-status"></span>' +
+        '</div>' +
+        '<div id="pdf-team-picker" style="display:none;margin-bottom:10px;"></div>' +
         '<div style="margin-top:14px;">' +
           SM.forms.field(
-            'Pega aquí el calendario — una línea por partido: fecha, rival, local/visitante, hora, lugar, jornada',
+            'O pega aquí el calendario a mano — una línea por partido: fecha, rival, local/visitante, hora, lugar, jornada',
             '<textarea id="fixture-text" rows="6" style="width:100%;font-family:monospace;font-size:12.5px;" placeholder="07/09/2026, CF Miralba, local, 18:30, , 1&#10;14/09/2026, At. Bracamonte, visitante, 17:30, , 2"></textarea>',
             true
           ) +
         '</div>' +
-        '<div class="form-hint" style="margin:10px 0;">Los campos hora, lugar y jornada son opcionales. Puedes pegar directamente varias filas copiadas de Excel/Google Sheets.</div>' +
+        '<div class="form-hint" style="margin:10px 0;">Los campos hora, lugar y jornada son opcionales. Puedes pegar directamente varias filas copiadas de Excel/Google Sheets, o subir el PDF de la federación y elegir tu equipo arriba.</div>' +
         '<div id="fixture-preview"></div>' +
         '<div class="form-actions">' +
           '<button type="button" class="btn btn-outline" id="cancel-btn">Cancelar</button>' +
@@ -293,6 +301,61 @@
       importBtn.textContent = validCount ? 'Importar ' + validCount + (validCount === 1 ? ' partido' : ' partidos') : 'Importar';
     }
     body.querySelector('#fixture-text').addEventListener('input', updatePreview);
+
+    // Importar desde el PDF oficial de la federación: lo convierte en las
+    // mismas líneas "fecha;rival;local/visitante;hora;campo;jornada" que
+    // entiende la caja de texto de arriba (con ; en vez de , porque los
+    // nombres de equipo de la federación casi siempre llevan comas:
+    // "COLORADAS, U.D. LAS") y deja que el resto del flujo (vista previa,
+    // validación, importar) sea exactamente el mismo que al pegar a mano.
+    const pdfInput = body.querySelector('#pdf-file-input');
+    const pdfStatus = body.querySelector('#pdf-status');
+    const pdfPicker = body.querySelector('#pdf-team-picker');
+    let pdfParsed = null;
+
+    function applyPdfTeam(teamName) {
+      if (!pdfParsed) return;
+      const rows = SM.pdfCalendar.matchesForTeam(pdfParsed, teamName);
+      if (!rows.length) {
+        pdfStatus.textContent = 'No se ha encontrado ningún partido de "' + teamName + '" en el PDF.';
+        body.querySelector('#fixture-text').value = '';
+        updatePreview();
+        return;
+      }
+      body.querySelector('#fixture-text').value = rows.map(function (m) {
+        return [m.fecha, m.rival, m.condicion, m.hora, m.lugar, m.jornada != null ? m.jornada : ''].join(';');
+      }).join('\n');
+      updatePreview();
+      pdfStatus.textContent = rows.length + (rows.length === 1 ? ' partido encontrado en el PDF.' : ' partidos encontrados en el PDF.') +
+        (pdfParsed.teamListFound ? '' : ' Revisa el campo (lugar) de cada uno — no se encontró la lista de equipos del PDF para separarlo con precisión del rival.');
+    }
+
+    pdfInput.addEventListener('change', function () {
+      const file = pdfInput.files[0];
+      if (!file) return;
+      pdfParsed = null;
+      pdfPicker.style.display = 'none';
+      pdfPicker.innerHTML = '';
+      pdfStatus.textContent = 'Leyendo PDF…';
+      SM.pdfCalendar.parseFile(file).then(function (parsed) {
+        pdfParsed = parsed;
+        if (!parsed.matches.length) {
+          pdfStatus.textContent = 'No se ha reconocido ningún partido en este PDF — prueba a pegar el calendario a mano abajo.';
+          return;
+        }
+        const bestIdx = SM.pdfCalendar.bestTeamMatch(parsed.teams, DATA.settings && DATA.settings.club_nombre);
+        const defaultTeam = parsed.teams[bestIdx];
+        pdfPicker.style.display = 'block';
+        pdfPicker.innerHTML = SM.forms.field(
+          '¿Cuál de estos equipos del PDF eres tú?',
+          SM.forms.selectHtml('pdfTeam', parsed.teams.map(function (t) { return [SM.ui.escapeHtml(t), SM.ui.escapeHtml(t)]; }), SM.ui.escapeHtml(defaultTeam))
+        );
+        pdfPicker.querySelector('[name="pdfTeam"]').addEventListener('change', function (e) { applyPdfTeam(e.target.value); });
+        applyPdfTeam(defaultTeam);
+      }).catch(function (err) {
+        pdfStatus.textContent = 'Error leyendo el PDF: ' + err.message;
+      });
+    });
 
     body.querySelector('#import-btn').addEventListener('click', function () {
       const competicion = body.querySelector('[name="competicion"]').value;
